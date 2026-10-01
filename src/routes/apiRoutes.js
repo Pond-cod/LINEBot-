@@ -13,9 +13,11 @@ const {
 } = require('../controllers/adminController');
 const { runDailyReminderCheck } = require('../services/reminderService');
 
+const { isUserAdmin, requireAdminAuth, getAdminUserIds } = require('../middleware/adminAuth');
+
 const router = express.Router();
 
-router.get('/version', (req, res) => res.json({ version: '2.2.0', time: new Date() }));
+router.get('/version', (req, res) => res.json({ version: '2.3.0', time: new Date() }));
 
 // -------------------------------------------------------------
 // 1. Client Portal Endpoints
@@ -26,16 +28,30 @@ router.post('/liff/register', registerFromLiff);
 router.get('/liff/debt/:userId', getDebtInfo);
 
 // -------------------------------------------------------------
-// 2. Admin Portal Endpoints
+// 2. Admin Portal & Access Control Endpoints
 // -------------------------------------------------------------
-router.get('/admin/stats', getAdminStats);
-router.get('/admin/debtors', getDebtors);
-router.get('/admin/contracts', getContracts);
-router.post('/admin/contracts', createContract);
-router.get('/admin/slips', getSlips);
-router.post('/admin/slips/approve', approveSlip);
-router.post('/admin/slips/reject', rejectSlip);
-router.post('/admin/remind/:debtId', remindSingleDebt);
+router.get('/admin/verify-access', (req, res) => {
+  const userId = req.query.userId || req.headers['x-line-userid'];
+  const { authorized, isConfigured } = isUserAdmin(userId);
+  const adminIds = getAdminUserIds();
+
+  return res.status(200).json({
+    success: true,
+    isConfigured,
+    authorized,
+    userId: userId || null,
+    adminCount: adminIds.length
+  });
+});
+
+router.get('/admin/stats', requireAdminAuth, getAdminStats);
+router.get('/admin/debtors', requireAdminAuth, getDebtors);
+router.get('/admin/contracts', requireAdminAuth, getContracts);
+router.post('/admin/contracts', requireAdminAuth, createContract);
+router.get('/admin/slips', requireAdminAuth, getSlips);
+router.post('/admin/slips/approve', requireAdminAuth, approveSlip);
+router.post('/admin/slips/reject', requireAdminAuth, rejectSlip);
+router.post('/admin/remind/:debtId', requireAdminAuth, remindSingleDebt);
 
 // -------------------------------------------------------------
 // 3. Automated Reminder Control

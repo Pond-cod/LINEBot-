@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/admin.css">
+  <!-- LINE Front-end Framework (LIFF) SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
   <div class="admin-app-shell">
@@ -18,10 +20,13 @@
         <div class="brand-icon">🛡️</div>
         <div>
           <div class="brand-title">Admin Hub</div>
-          <div class="brand-subtitle">ระบบจัดการหนี้ & ตรวจสลิป</div>
+          <div class="brand-subtitle" id="adminSubtitle">ระบบจัดการหนี้ & ตรวจสลิป</div>
         </div>
       </div>
-      <div class="header-badge" id="adminRoleBadge">ผู้ดูแลระบบ</div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div class="header-badge" id="adminRoleBadge">ผู้ดูแลระบบ</div>
+        <button id="btnAdminLogout" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #EF4444; border-radius: 12px; font-size: 11px; font-weight: 600; padding: 4px 8px; cursor: pointer; font-family: inherit;">ออก</button>
+      </div>
     </header>
 
     <!-- Scrollable Viewport -->
@@ -232,8 +237,89 @@
       <span id="toastMessage">แจ้งเตือน</span>
     </div>
 
+    <!-- Admin Access Control Overlay -->
+    <div id="adminAuthOverlay" class="auth-overlay">
+      <div class="auth-modal">
+        <!-- State 1: Checking -->
+        <div id="authCheckingState" style="text-align: center;">
+          <div class="auth-spinner"></div>
+          <h3 style="font-size: 16px; font-weight: 600; margin-top: 14px; color: #FFFFFF;">ระบบความปลอดภัย Admin</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">กำลังตรวจสอบสิทธิ์การเข้าใช้งานด้วยบัญชี LINE...</p>
+        </div>
+
+        <!-- State 2: Not Logged In -->
+        <div id="authLoginState" style="display: none; text-align: center;">
+          <div class="auth-icon-circle" style="background: rgba(6, 199, 85, 0.15); border: 1px solid rgba(6, 199, 85, 0.3); color: #06C755;">🛡️</div>
+          <h3 style="font-size: 17px; font-weight: 700; color: #FFFFFF; margin-top: 12px;">เข้าสู่ระบบผู้ดูแลระบบ</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin: 8px 0 20px 0; line-height: 1.5;">
+            สงวนสิทธิ์เฉพาะบัญชี LINE ของผู้ดูแลระบบที่ได้รับอนุญาตเท่านั้น กรุณาเข้าสู่ระบบเพื่อยืนยันตัวตน
+          </p>
+          <button class="btn-primary-admin" id="btnAdminLoginLine" style="background: #06C755; border: none; font-size: 14px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>💬 เข้าสู่ระบบด้วยบัญชี LINE</span>
+          </button>
+          <div style="margin-top: 15px;">
+            <a href="/client/" style="font-size: 12px; color: #64748B; text-decoration: none;">← ไปยังหน้าลูกหนี้ (Client Portal)</a>
+          </div>
+        </div>
+
+        <!-- State 3: Logged in but Unauthorized (Access Denied) -->
+        <div id="authDeniedState" style="display: none; text-align: center;">
+          <div class="auth-icon-circle" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444;">⛔</div>
+          <h3 style="font-size: 17px; font-weight: 700; color: #EF4444; margin-top: 12px;">ปฏิเสธการเข้าถึง (Access Denied)</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 16px 0;">
+            บัญชี LINE ของคุณไม่มีสิทธิ์เข้าใช้งานในส่วนผู้ดูแลระบบ
+          </p>
+
+          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 12px;">
+            <div style="color: #94A3B8; margin-bottom: 4px;">ชื่อบัญชี: <strong id="deniedDisplayName" style="color: #FFFFFF;">-</strong></div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+              <div style="color: #94A3B8; font-size: 11px;">LINE ID: <span id="deniedUserId" style="font-family: monospace; color: #38BDF8;">-</span></div>
+              <button id="btnCopyDeniedId" style="background: rgba(59, 130, 246, 0.2); border: none; color: #60A5FA; padding: 2px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;">คัดลอก</button>
+            </div>
+          </div>
+
+          <p style="font-size: 11px; color: #64748B; margin-bottom: 18px; line-height: 1.5; text-align: left;">
+            💡 หากคุณคือแอดมิน กรุณานำ LINE ID ข้างต้นไปกำหนดในตัวแปร <strong>ADMIN_LINE_USER_IDS</strong> ในระบบเพื่อเปิดสิทธิ์
+          </p>
+
+          <button class="btn-primary-admin" id="btnSwitchAccount" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #FFFFFF; margin-bottom: 10px;">
+            สลับบัญชี LINE อื่น
+          </button>
+          <div>
+            <a href="/client/" style="font-size: 12px; color: #38BDF8; text-decoration: none;">← ไปยังหน้าลูกหนี้ (Client Portal)</a>
+          </div>
+        </div>
+
+        <!-- State 4: Initial Setup Notice (When ADMIN_LINE_USER_IDS is not configured yet) -->
+        <div id="authSetupState" style="display: none; text-align: center;">
+          <div class="auth-icon-circle" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #F59E0B;">⚙️</div>
+          <h3 style="font-size: 17px; font-weight: 700; color: #F59E0B; margin-top: 12px;">การตั้งค่าสิทธิ์แอดมินเริ่มต้น</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 16px 0;">
+            ระบบยังไม่ได้ระบุรายชื่อแอดมินในตัวแปร <code>ADMIN_LINE_USER_IDS</code>
+          </p>
+
+          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 12px;">
+            <div style="color: #94A3B8; margin-bottom: 4px;">เข้าใช้งานโดย: <strong id="setupDisplayName" style="color: #FFFFFF;">-</strong></div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+              <div style="color: #94A3B8; font-size: 11px;">LINE ID: <span id="setupUserId" style="font-family: monospace; color: #38BDF8;">-</span></div>
+              <button id="btnCopySetupId" style="background: rgba(59, 130, 246, 0.2); border: none; color: #60A5FA; padding: 2px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;">คัดลอก</button>
+            </div>
+          </div>
+
+          <p style="font-size: 11px; color: #94A3B8; margin-bottom: 16px; line-height: 1.5; text-align: left;">
+            ℹ️ ในระหว่างการตั้งค่าเริ่มต้น ระบบเปิดให้บัญชีนี้เข้าใช้งานชั่วคราวได้ กรุณานำ LINE ID ไปใส่ในไฟล์ <code>.env</code> หรือ Vercel Variables: <code>ADMIN_LINE_USER_IDS=รหัสที่คัดลอก</code> เพื่อความปลอดภัยถาวร
+          </p>
+
+          <button class="btn-primary-admin" id="btnProceedSetup" style="background: #0EA5E9; border: none;">
+            เข้าสู่ระบบ Admin Hub
+          </button>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
-  <script src="js/admin.js?v=3.0"></script>
+  <script src="js/admin.js?v=4.0"></script>
 </body>
 </html>

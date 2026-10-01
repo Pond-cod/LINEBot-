@@ -1,6 +1,26 @@
-// Admin Portal JavaScript Controller
+// Admin Portal JavaScript Controller (v4.0 - LINE User ID Access Control)
+const LIFF_ID = '2011816015-RfpKwHVZ';
+let currentAdminUser = null;
 
-// Elements
+// Auth Overlay Elements
+const adminAuthOverlay = document.getElementById('adminAuthOverlay');
+const authCheckingState = document.getElementById('authCheckingState');
+const authLoginState = document.getElementById('authLoginState');
+const authDeniedState = document.getElementById('authDeniedState');
+const authSetupState = document.getElementById('authSetupState');
+const btnAdminLoginLine = document.getElementById('btnAdminLoginLine');
+const btnSwitchAccount = document.getElementById('btnSwitchAccount');
+const btnProceedSetup = document.getElementById('btnProceedSetup');
+const deniedDisplayName = document.getElementById('deniedDisplayName');
+const deniedUserId = document.getElementById('deniedUserId');
+const btnCopyDeniedId = document.getElementById('btnCopyDeniedId');
+const setupDisplayName = document.getElementById('setupDisplayName');
+const setupUserId = document.getElementById('setupUserId');
+const btnCopySetupId = document.getElementById('btnCopySetupId');
+const adminSubtitle = document.getElementById('adminSubtitle');
+const btnAdminLogout = document.getElementById('btnAdminLogout');
+
+// Nav & Views Elements
 const navItems = document.querySelectorAll('.nav-item');
 const subViews = document.querySelectorAll('.sub-view');
 
@@ -9,6 +29,7 @@ const statRemaining = document.getElementById('statRemaining');
 const statPendingSlips = document.getElementById('statPendingSlips');
 const statDueToday = document.getElementById('statDueToday');
 const statTotalContracts = document.getElementById('statTotalContracts');
+const statTotalDebtors = document.getElementById('statTotalDebtors');
 const btnTriggerCronNow = document.getElementById('btnTriggerCronNow');
 
 // Contracts Elements
@@ -25,7 +46,6 @@ const manualDebtIdInput = document.getElementById('manualDebtIdInput');
 const btnManualPushSingle = document.getElementById('btnManualPushSingle');
 
 // Debtors Elements
-const statTotalDebtors = document.getElementById('statTotalDebtors');
 const debtorsCountBadge = document.getElementById('debtorsCountBadge');
 const debtorSearchInput = document.getElementById('debtorSearchInput');
 const debtorsListContainer = document.getElementById('debtorsListContainer');
@@ -37,7 +57,139 @@ const toastMessage = document.getElementById('toastMessage');
 const toastIcon = document.getElementById('toastIcon');
 
 /**
- * 1. ควบคุมการสลับ Sub-views
+ * ฟังก์ชันเรียก API สำหรับ Admin โดยส่ง x-line-userid ไปตรวจสอบสิทธิ์อัตโนมัติ
+ */
+async function adminFetch(url, options = {}) {
+  const headers = options.headers || {};
+  if (currentAdminUser && currentAdminUser.userId) {
+    headers['x-line-userid'] = currentAdminUser.userId;
+  }
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 403) {
+    showToast('ไม่มีสิทธิ์เข้าถึงฟังก์ชันนี้ (403 Forbidden)', '⛔');
+    if (adminAuthOverlay) {
+      adminAuthOverlay.classList.remove('hidden');
+      showDeniedState(currentAdminUser || { displayName: 'ไม่ทราบ', userId: '-' });
+    }
+  }
+  return res;
+}
+
+/**
+ * 1. ตรวจสอบสิทธิ์การเข้าใช้งาน Admin ผ่าน LIFF และ LINE User ID
+ */
+async function initAdminAuth() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+
+    if (liff.isLoggedIn()) {
+      const profile = await liff.getProfile();
+      currentAdminUser = profile;
+
+      // ตรวจสอบสิทธิ์กับ Backend API
+      const res = await fetch(`/api/admin/verify-access?userId=${encodeURIComponent(profile.userId)}`);
+      const authData = await res.json();
+
+      if (authData.isConfigured && authData.authorized) {
+        // มีสิทธิ์ถูกต้อง -> ปลดล็อกหน้าแอดมิน
+        unlockAdminView(profile);
+      } else if (!authData.isConfigured) {
+        // ยังไม่มีการตั้งค่า ADMIN_LINE_USER_IDS ในระบบ -> โชว์หน้า Setup เพื่อแจ้งให้กำหนดสิทธิ์
+        showSetupState(profile);
+      } else {
+        // บัญชีไม่อยู่ในรายการที่อนุญาต -> ปฏิเสธการเข้าถึง
+        showDeniedState(profile);
+      }
+    } else {
+      if (liff.isInClient()) {
+        // หากเปิดใน LINE App ให้ redirect login อัตโนมัติ
+        liff.login({ redirectUri: window.location.href });
+      } else {
+        // เปิดผ่านเบราว์เซอร์ทั่วไป ให้แสดงปุ่มล็อกอิน LINE
+        showLoginState();
+      }
+    }
+  } catch (err) {
+    console.error('LIFF Init error:', err);
+    showLoginState();
+  }
+}
+
+function unlockAdminView(profile) {
+  if (adminAuthOverlay) adminAuthOverlay.classList.add('hidden');
+  if (adminSubtitle) adminSubtitle.textContent = `แอดมิน: ${profile.displayName}`;
+  if (btnAdminLogout) btnAdminLogout.style.display = 'block';
+  loadStats();
+}
+
+function showLoginState() {
+  if (authCheckingState) authCheckingState.style.display = 'none';
+  if (authDeniedState) authDeniedState.style.display = 'none';
+  if (authSetupState) authSetupState.style.display = 'none';
+  if (authLoginState) authLoginState.style.display = 'block';
+}
+
+function showDeniedState(profile) {
+  if (deniedDisplayName) deniedDisplayName.textContent = profile.displayName || '-';
+  if (deniedUserId) deniedUserId.textContent = profile.userId || '-';
+  if (authCheckingState) authCheckingState.style.display = 'none';
+  if (authLoginState) authLoginState.style.display = 'none';
+  if (authSetupState) authSetupState.style.display = 'none';
+  if (authDeniedState) authDeniedState.style.display = 'block';
+}
+
+function showSetupState(profile) {
+  if (setupDisplayName) setupDisplayName.textContent = profile.displayName || '-';
+  if (setupUserId) setupUserId.textContent = profile.userId || '-';
+  if (authCheckingState) authCheckingState.style.display = 'none';
+  if (authLoginState) authLoginState.style.display = 'none';
+  if (authDeniedState) authDeniedState.style.display = 'none';
+  if (authSetupState) authSetupState.style.display = 'block';
+}
+
+// ผูก Event Listeners สำหรับระบบความปลอดภัย
+if (btnAdminLoginLine) {
+  btnAdminLoginLine.addEventListener('click', () => {
+    liff.login({ redirectUri: window.location.href });
+  });
+}
+
+if (btnAdminLogout) {
+  btnAdminLogout.addEventListener('click', () => {
+    if (confirm('ต้องการออกจากระบบผู้ดูแลระบบใช่หรือไม่?')) {
+      liff.logout();
+      window.location.reload();
+    }
+  });
+}
+
+if (btnSwitchAccount) {
+  btnSwitchAccount.addEventListener('click', () => {
+    liff.logout();
+    liff.login({ redirectUri: window.location.href });
+  });
+}
+
+if (btnProceedSetup) {
+  btnProceedSetup.addEventListener('click', () => {
+    unlockAdminView(currentAdminUser || { displayName: 'Admin' });
+  });
+}
+
+if (btnCopyDeniedId) {
+  btnCopyDeniedId.addEventListener('click', () => {
+    copyText(currentAdminUser?.userId, 'คัดลอก LINE User ID เรียบร้อยแล้ว');
+  });
+}
+
+if (btnCopySetupId) {
+  btnCopySetupId.addEventListener('click', () => {
+    copyText(currentAdminUser?.userId, 'คัดลอก LINE User ID เรียบร้อยแล้ว');
+  });
+}
+
+/**
+ * 2. ควบคุมการสลับ Sub-views
  */
 function switchView(targetViewId) {
   subViews.forEach(view => {
@@ -85,11 +237,11 @@ function showToast(msg, icon = 'ℹ️') {
 }
 
 /**
- * 2. โหลดสถิติภาพรวม (Overview)
+ * 3. โหลดสถิติภาพรวม (Overview)
  */
 async function loadStats() {
   try {
-    const res = await fetch('/api/admin/stats');
+    const res = await adminFetch('/api/admin/stats');
     const json = await res.json();
 
     if (json.success && json.stats) {
@@ -106,12 +258,12 @@ async function loadStats() {
 }
 
 /**
- * 3. โหลดและแสดงรายการสัญญา (Contracts)
+ * 4. โหลดและแสดงรายการสัญญา (Contracts)
  */
 async function loadContracts() {
   try {
     contractsListContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">กำลังโหลด...</div>';
-    const res = await fetch('/api/admin/contracts');
+    const res = await adminFetch('/api/admin/contracts');
     const json = await res.json();
 
     if (json.success && json.contracts) {
@@ -155,7 +307,7 @@ async function loadContracts() {
 }
 
 /**
- * 4. สร้างสัญญาใหม่
+ * 5. สร้างสัญญาใหม่
  */
 createContractForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -171,7 +323,7 @@ createContractForm.addEventListener('submit', async (e) => {
   };
 
   try {
-    const res = await fetch('/api/admin/contracts', {
+    const res = await adminFetch('/api/admin/contracts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -193,12 +345,12 @@ createContractForm.addEventListener('submit', async (e) => {
 });
 
 /**
- * 5. โหลดและจัดการสลิป (Slips Approval Hub)
+ * 6. โหลดและจัดการสลิป (Slips Approval Hub)
  */
 async function loadSlips() {
   try {
     slipsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">กำลังโหลดรายการสลิป...</div>';
-    const res = await fetch('/api/admin/slips');
+    const res = await adminFetch('/api/admin/slips');
     const json = await res.json();
 
     if (json.success && json.slips) {
@@ -218,7 +370,7 @@ async function loadSlips() {
             <div class="slip-header">
               <div>
                 <div class="slip-debtor-name">${s.debtorName}</div>
-                <div class="slip-meta">สัญญา: ${s.debtId || '-'} | ส่งเมื่อ: ${s.uploadedAt || '-'}</div>
+                <div class="slip-meta">รหัส: ${s.paymentId} | 📅 ${s.uploadedAt}</div>
               </div>
               <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: ${isPending ? 'rgba(245, 158, 11, 0.2)' : s.verificationStatus === 'VERIFIED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${isPending ? '#F59E0B' : s.verificationStatus === 'VERIFIED' ? '#10B981' : '#EF4444'};">
                 ${s.verificationStatus === 'VERIFIED' ? 'อนุมัติแล้ว' : s.verificationStatus === 'REJECTED' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}
@@ -238,14 +390,16 @@ async function loadSlips() {
             ${isPending ? `
               <div class="slip-actions">
                 <button class="btn-approve" onclick="approveSlip('${s.paymentId}', ${s.amount || 0})">
-                  ✅ อนุมัติ & หักยอด
+                  ✅ อนุมัติ & หักยอดหนี้
                 </button>
                 <button class="btn-reject" onclick="rejectSlip('${s.paymentId}')">
-                  ❌ ปฏิเสธ
+                  ❌ ไม่อนุมัติ
                 </button>
               </div>
             ` : `
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">หมายเหตุ: ${s.adminNote || '-'}</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+                บันทึก: ${s.adminNote || '-'}
+              </div>
             `}
           </div>
         `;
@@ -258,7 +412,7 @@ async function loadSlips() {
 }
 
 /**
- * 6. อนุมัติสลิป
+ * 7. อนุมัติสลิป
  */
 window.approveSlip = async function(paymentId, currentAmount) {
   const confirmed = prompt(`ยืนยันยอดเงินที่จะตัดออกจากยอดหนี้ (บาท):`, currentAmount || '');
@@ -271,7 +425,7 @@ window.approveSlip = async function(paymentId, currentAmount) {
   }
 
   try {
-    const res = await fetch('/api/admin/slips/approve', {
+    const res = await adminFetch('/api/admin/slips/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId, confirmedAmount: amount })
@@ -291,14 +445,14 @@ window.approveSlip = async function(paymentId, currentAmount) {
 };
 
 /**
- * 7. ปฏิเสธสลิป
+ * 8. ปฏิเสธสลิป
  */
 window.rejectSlip = async function(paymentId) {
   const reason = prompt('ระบุเหตุผลที่ปฏิเสธสลิป:', 'สลิปไม่ถูกต้องหรือยอดเงินไม่ตรง');
   if (reason === null) return;
 
   try {
-    const res = await fetch('/api/admin/slips/reject', {
+    const res = await adminFetch('/api/admin/slips/reject', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId, reason })
@@ -318,14 +472,14 @@ window.rejectSlip = async function(paymentId) {
 };
 
 /**
- * 8. ยิงแจ้งเตือน 08:00 น. ทันที
+ * 9. ยิงแจ้งเตือน 08:00 น. ทันที
  */
 btnTriggerCronNow.addEventListener('click', async () => {
   btnTriggerCronNow.disabled = true;
   btnTriggerCronNow.textContent = '⏳ กำลังประมวลผลและยิงข้อความ...';
 
   try {
-    const res = await fetch('/api/reminder/trigger-now', { method: 'POST' });
+    const res = await adminFetch('/api/reminder/trigger-now', { method: 'POST' });
     const json = await res.json();
 
     if (json.success) {
@@ -343,13 +497,13 @@ btnTriggerCronNow.addEventListener('click', async () => {
 });
 
 /**
- * 9. ยิงแจ้งเตือนรายคน
+ * 10. ยิงแจ้งเตือนรายคน
  */
 window.sendSingleReminder = async function(debtId) {
   if (!confirm(`ต้องการส่ง LINE แจ้งเตือนยอดหนี้สัญญา ${debtId} ใช่หรือไม่?`)) return;
 
   try {
-    const res = await fetch(`/api/admin/remind/${encodeURIComponent(debtId)}`, { method: 'POST' });
+    const res = await adminFetch(`/api/admin/remind/${encodeURIComponent(debtId)}`, { method: 'POST' });
     const json = await res.json();
     if (json.success) {
       showToast(json.message || 'ส่งแจ้งเตือนเรียบร้อยแล้ว', '✅');
@@ -371,13 +525,13 @@ btnManualPushSingle.addEventListener('click', () => {
 });
 
 /**
- * 10. จัดการรายชื่อลูกหนี้ (Debtors Management)
+ * 11. จัดการรายชื่อลูกหนี้ (Debtors Management)
  */
 async function loadDebtors() {
   if (!debtorsListContainer) return;
   try {
     debtorsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);"><div class="spinner"></div> กำลังโหลดรายชื่อลูกหนี้...</div>';
-    const res = await fetch('/api/admin/debtors');
+    const res = await adminFetch('/api/admin/debtors');
     const json = await res.json();
 
     if (json.success && json.debtors) {
@@ -494,7 +648,9 @@ window.addEventListener('DOMContentLoaded', () => {
   // ตั้งค่าวันครบกำหนดเริ่มต้นเป็น 30 วันข้างหน้าในฟอร์มสร้างสัญญา
   const d = new Date();
   d.setDate(d.getDate() + 30);
-  document.getElementById('newDueDate').value = d.toISOString().split('T')[0];
+  const newDueDate = document.getElementById('newDueDate');
+  if (newDueDate) newDueDate.value = d.toISOString().split('T')[0];
 
-  loadStats();
+  // ตรวจสอบสิทธิ์ Admin ผ่าน LINE
+  initAdminAuth();
 });
