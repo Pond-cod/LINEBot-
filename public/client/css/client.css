@@ -141,11 +141,33 @@ body {
 .header-badge {
   background: var(--primary-light);
   color: var(--primary-dark);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   padding: 6px 12px;
   border-radius: var(--radius-full);
   border: 1px solid rgba(6, 199, 85, 0.2);
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.header-badge.login-btn {
+  background: #06C755;
+  color: #FFFFFF;
+  border: 1px solid #05a847;
+  box-shadow: 0 2px 8px rgba(6, 199, 85, 0.4);
+}
+
+.header-badge.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(6, 199, 85, 0.5);
+}
+
+.header-badge.logged-in {
+  background: rgba(6, 199, 85, 0.15);
+  color: #059669;
+  border: 1px solid rgba(6, 199, 85, 0.3);
 }
 
 /* Scrollable Viewport */

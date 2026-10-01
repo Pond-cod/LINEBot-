@@ -14,7 +14,25 @@ async function getClientData(req, res) {
       return res.status(400).json({ success: false, message: 'Missing userId' });
     }
 
-    const debtor = await sheetsService.getDebtorByUserId(userId);
+    let debtor = await sheetsService.getDebtorByUserId(userId);
+    const displayName = req.query.displayName;
+
+    // ถ้ายังไม่มีข้อมูลใน Google Sheets และเป็นผู้ใช้จริงจาก LINE (ขึ้นต้นด้วย U) ให้ลงทะเบียนเริ่มต้นให้อัตโนมัติ
+    if (!debtor && displayName && userId.startsWith('U') && userId !== 'U_DEMO_CLIENT' && userId !== 'U_DEMO_GUEST') {
+      try {
+        await sheetsService.registerDebtor({
+          userId,
+          displayName,
+          fullName: displayName,
+          phone: '',
+          idCardNumber: ''
+        });
+        debtor = await sheetsService.getDebtorByUserId(userId);
+      } catch (regErr) {
+        console.warn('Auto register debtor warning:', regErr.message);
+      }
+    }
+
     const activeDebt = await sheetsService.getActiveDebtByUserId(userId);
     const payments = await sheetsService.getPaymentsByUserId(userId);
 

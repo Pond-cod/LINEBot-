@@ -26,7 +26,7 @@
           <h2 id="userName" class="username">กำลังโหลด...</h2>
         </div>
       </div>
-      <div class="header-badge" id="clientStatusBadge">กำลังตรวจสอบ</div>
+      <button class="header-badge" id="clientStatusBadge">กำลังตรวจสอบ</button>
     </header>
 
     <!-- Scrollable Viewport Containing 4 Sub-views -->
@@ -36,6 +36,15 @@
       <!-- SUB-VIEW 1: DASHBOARD                      -->
       <!-- ========================================== -->
       <section id="view-dashboard" class="sub-view active">
+        <!-- Login Banner (shown when not logged in with LINE) -->
+        <div class="action-banner" id="loginNoticeBanner" style="display: none; background: linear-gradient(135deg, #06C755 0%, #059669 100%); margin-bottom: 14px; cursor: pointer; border: none;">
+          <div class="banner-text">
+            <h4 style="color: #FFFFFF;">💬 เข้าสู่ระบบด้วย LINE</h4>
+            <p style="color: rgba(255,255,255,0.9); font-size: 11px;">กดเพื่อเชื่อมต่อบัญชีจริง และดูยอดหนี้ของคุณ</p>
+          </div>
+          <button class="banner-btn" id="btnBannerLogin" style="background: #FFFFFF; color: #059669; font-weight: 700; white-space: nowrap;">เข้าสู่ระบบ</button>
+        </div>
+
         <!-- Balance Card -->
         <div class="balance-hero-card">
           <div class="hero-tag">
@@ -165,8 +174,19 @@
           <div style="font-size: 15px; font-weight: 600; color: #0F172A; margin-bottom: 14px;">ข้อมูลบัญชีผู้กู้</div>
 
           <div class="profile-field-row">
+            <span class="field-label">สถานะเชื่อมต่อ</span>
+            <span class="field-val" id="profileLoginStatus" style="font-weight: 600; color: #F59E0B;">กำลังตรวจสอบ</span>
+          </div>
+          <div class="profile-field-row">
             <span class="field-label">LINE User ID</span>
-            <span class="field-val" id="profileUserId" style="font-size: 11px; font-family: monospace;">-</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span class="field-val" id="profileUserId" style="font-size: 11px; font-family: monospace;">-</span>
+              <button id="btnCopyUserId" title="คัดลอก LINE ID" style="background: none; border: none; cursor: pointer; font-size: 13px; color: #64748B;">📋</button>
+            </div>
+          </div>
+          <div class="profile-field-row">
+            <span class="field-label">ชื่อโปรไฟล์ LINE</span>
+            <span class="field-val" id="profileDisplayName">-</span>
           </div>
           <div class="profile-field-row">
             <span class="field-label">ชื่อ - นามสกุล</span>
@@ -184,6 +204,16 @@
             <span class="field-label">วันที่ลงทะเบียน</span>
             <span class="field-val" id="profileRegisteredAt">-</span>
           </div>
+        </div>
+
+        <!-- Auth Action Buttons -->
+        <div style="margin-top: 14px;">
+          <button id="btnLoginLine" class="btn-primary" style="display: none; background: #06C755; width: 100%;">
+            <span>💬 เข้าสู่ระบบด้วย LINE (LINE Login)</span>
+          </button>
+          <button id="btnLogoutLine" style="display: none; width: 100%; padding: 12px; border: 1.5px solid #EF4444; color: #EF4444; border-radius: 14px; font-weight: 600; cursor: pointer; background: transparent; font-family: inherit; font-size: 14px;">
+            <span>🚪 ออกจากระบบ LINE</span>
+          </button>
         </div>
 
         <div class="profile-card" style="margin-top: 14px;">
@@ -227,6 +257,6 @@
 
   </div>
 
-  <script src="js/client.js?v=3.0"></script>
+  <script src="js/client.js?v=3.5"></script>
 </body>
 </html>

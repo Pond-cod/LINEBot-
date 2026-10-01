@@ -1,10 +1,12 @@
-// Client Portal JavaScript Controller (Unified)
+// Client Portal JavaScript Controller (Unified v3.5 - Real LINE Login Support)
 const LIFF_ID = '2011816015-RfpKwHVZ';
 
+const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm0 14c-2.03 0-4.43-.82-6.14-2.88C7.55 15.8 9.68 15 12 15s4.45.8 6.14 2.12C16.43 19.18 14.03 20 12 20z'/></svg>";
+
 let currentUser = {
-  userId: 'U_TEST_GUEST',
-  displayName: 'ผู้ใช้งาน',
-  pictureUrl: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm0 14c-2.03 0-4.43-.82-6.14-2.88C7.55 15.8 9.68 15 12 15s4.45.8 6.14 2.12C16.43 19.18 14.03 20 12 20z'/></svg>"
+  userId: 'U_GUEST',
+  displayName: 'ผู้ใช้งานทั่วไป',
+  pictureUrl: DEFAULT_AVATAR
 };
 
 let clientData = {
@@ -32,6 +34,8 @@ const progressPercent = document.getElementById('progressPercent');
 const metricDueDate = document.getElementById('metricDueDate');
 const metricInstallment = document.getElementById('metricInstallment');
 const btnGoToPay = document.getElementById('btnGoToPay');
+const loginNoticeBanner = document.getElementById('loginNoticeBanner');
+const btnBannerLogin = document.getElementById('btnBannerLogin');
 
 // Pay & Upload Elements
 const btnCopyAcc = document.getElementById('btnCopyAcc');
@@ -49,11 +53,16 @@ const historyListContainer = document.getElementById('historyListContainer');
 const historyCountBadge = document.getElementById('historyCountBadge');
 
 // Profile Elements
+const profileLoginStatus = document.getElementById('profileLoginStatus');
 const profileUserId = document.getElementById('profileUserId');
+const profileDisplayName = document.getElementById('profileDisplayName');
 const profileFullName = document.getElementById('profileFullName');
 const profilePhone = document.getElementById('profilePhone');
 const profileIdCard = document.getElementById('profileIdCard');
 const profileRegisteredAt = document.getElementById('profileRegisteredAt');
+const btnCopyUserId = document.getElementById('btnCopyUserId');
+const btnLoginLine = document.getElementById('btnLoginLine');
+const btnLogoutLine = document.getElementById('btnLogoutLine');
 
 // Toast
 const toast = document.getElementById('toast');
@@ -80,7 +89,8 @@ function switchView(targetViewId) {
     }
   });
 
-  document.querySelector('.views-viewport').scrollTop = 0;
+  const viewport = document.querySelector('.views-viewport');
+  if (viewport) viewport.scrollTop = 0;
 }
 
 navItems.forEach(item => {
@@ -107,6 +117,24 @@ if (btnCopyAcc) {
       showToast('คัดลอกเลขบัญชีแล้ว', '📋');
     } catch (e) {
       showToast('เลขบัญชี: ' + text, '📋');
+    }
+  });
+}
+
+/**
+ * คัดลอก LINE User ID
+ */
+if (btnCopyUserId) {
+  btnCopyUserId.addEventListener('click', async () => {
+    if (currentUser.userId && currentUser.userId.startsWith('U')) {
+      try {
+        await navigator.clipboard.writeText(currentUser.userId);
+        showToast('คัดลอก LINE User ID แล้ว', '📋');
+      } catch (e) {
+        showToast('LINE ID: ' + currentUser.userId, '📋');
+      }
+    } else {
+      showToast('ยังไม่ได้เข้าสู่ระบบ LINE', '⚠️');
     }
   });
 }
@@ -154,18 +182,18 @@ if (dropzoneArea && slipFileInput) {
       handleFile(e.target.files[0]);
     }
   });
+}
 
-  if (btnRemovePreview) {
-    btnRemovePreview.addEventListener('click', (e) => {
-      e.stopPropagation();
-      resetSlipUpload();
-    });
-  }
+if (btnRemovePreview) {
+  btnRemovePreview.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetSlipUpload();
+  });
 }
 
 function handleFile(file) {
   if (!file.type.startsWith('image/')) {
-    alert('กรุณาเลือกไฟล์รูปภาพเท่านั้นครับ');
+    showToast('กรุณาเลือกไฟล์รูปภาพเท่านั้นครับ', '⚠️');
     return;
   }
 
@@ -173,9 +201,9 @@ function handleFile(file) {
   reader.onload = (event) => {
     compressImage(event.target.result, 1280, 0.85, (compressedBase64) => {
       currentSlipBase64 = compressedBase64;
-      slipPreviewImg.src = compressedBase64;
-      dropzoneArea.style.display = 'none';
-      previewContainer.classList.add('show');
+      if (slipPreviewImg) slipPreviewImg.src = compressedBase64;
+      if (dropzoneArea) dropzoneArea.style.display = 'none';
+      if (previewContainer) previewContainer.classList.add('show');
       if (btnSubmitSlip) btnSubmitSlip.disabled = false;
     });
   };
@@ -215,39 +243,127 @@ function resetSlipUpload() {
 }
 
 /**
- * 5. เริ่มต้น LIFF และดึงข้อมูล
+ * 5. ฟังก์ชัน Login / Logout ผ่าน LINE LIFF
+ */
+function handleLineLogin() {
+  if (!liff.isLoggedIn()) {
+    showToast('กำลังนำไปสู่หน้า LINE Login...', '⏳');
+    liff.login({ redirectUri: window.location.origin + window.location.pathname });
+  }
+}
+
+function handleLineLogout() {
+  if (liff.isLoggedIn()) {
+    liff.logout();
+    showToast('ออกจากระบบ LINE เรียบร้อยแล้ว', '👋');
+    setTimeout(() => {
+      window.location.href = window.location.origin + window.location.pathname;
+    }, 600);
+  }
+}
+
+if (btnLoginLine) btnLoginLine.addEventListener('click', handleLineLogin);
+if (btnLogoutLine) btnLogoutLine.addEventListener('click', handleLineLogout);
+if (btnBannerLogin) btnBannerLogin.addEventListener('click', handleLineLogin);
+
+/**
+ * อัปเดตสถานะ UI การล็อกอิน
+ */
+function setLoginUiState(isLoggedIn) {
+  if (isLoggedIn) {
+    if (clientStatusBadge) {
+      clientStatusBadge.textContent = '🟢 บัญชี LINE';
+      clientStatusBadge.className = 'header-badge logged-in';
+      clientStatusBadge.onclick = () => switchView('view-profile');
+    }
+    if (loginNoticeBanner) loginNoticeBanner.style.display = 'none';
+    if (btnLoginLine) btnLoginLine.style.display = 'none';
+    if (btnLogoutLine) btnLogoutLine.style.display = 'block';
+    if (profileLoginStatus) {
+      profileLoginStatus.textContent = 'เชื่อมต่อ LINE แล้ว';
+      profileLoginStatus.style.color = '#06C755';
+    }
+  } else {
+    if (clientStatusBadge) {
+      clientStatusBadge.textContent = '💬 เข้าสู่ระบบ LINE';
+      clientStatusBadge.className = 'header-badge login-btn';
+      clientStatusBadge.onclick = handleLineLogin;
+    }
+    if (loginNoticeBanner) {
+      loginNoticeBanner.style.display = 'flex';
+      loginNoticeBanner.onclick = handleLineLogin;
+    }
+    if (btnLoginLine) {
+      btnLoginLine.style.display = 'flex';
+      btnLoginLine.onclick = handleLineLogin;
+    }
+    if (btnLogoutLine) btnLogoutLine.style.display = 'none';
+    if (profileLoginStatus) {
+      profileLoginStatus.textContent = 'ยังไม่ได้เข้าสู่ระบบ';
+      profileLoginStatus.style.color = '#F59E0B';
+    }
+  }
+}
+
+/**
+ * 6. เริ่มต้น LIFF และดึงข้อมูล
  */
 async function initApp() {
   try {
     await liff.init({ liffId: LIFF_ID });
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceLogin = urlParams.get('login') === '1' || urlParams.get('auto') === 'true';
+
     if (liff.isLoggedIn()) {
       const profile = await liff.getProfile();
-      currentUser = profile;
+      currentUser = {
+        userId: profile.userId,
+        displayName: profile.displayName || 'ผู้ใช้งาน LINE',
+        pictureUrl: profile.pictureUrl || DEFAULT_AVATAR
+      };
+      setLoginUiState(true);
     } else {
-      currentUser.userId = 'U_DEMO_CLIENT';
-      currentUser.displayName = 'คุณลูกค้า (Demo)';
+      if (liff.isInClient() || forceLogin) {
+        // หากเปิดใน LINE in-app browser หรือมี query param ?login=1 ให้ redirect เข้า LINE Login ทันที
+        liff.login({ redirectUri: window.location.origin + window.location.pathname });
+        return;
+      }
+
+      currentUser = {
+        userId: 'U_DEMO_GUEST',
+        displayName: 'ผู้ใช้งานทั่วไป (ยังไม่ได้ล็อกอิน)',
+        pictureUrl: DEFAULT_AVATAR
+      };
+      setLoginUiState(false);
     }
   } catch (err) {
-    console.warn('LIFF init fallback:', err);
-    currentUser.userId = 'U_DEMO_CLIENT';
-    currentUser.displayName = 'คุณลูกค้า (Demo)';
+    console.warn('LIFF init warning:', err);
+    currentUser = {
+      userId: 'U_DEMO_GUEST',
+      displayName: 'ผู้ใช้งานทั่วไป (Offline)',
+      pictureUrl: DEFAULT_AVATAR
+    };
+    setLoginUiState(false);
   }
 
+  // อัปเดตข้อมูลบน Header
   if (userNameEl) userNameEl.textContent = currentUser.displayName;
-  if (currentUser.pictureUrl && userAvatarEl) {
+  if (userAvatarEl && currentUser.pictureUrl) {
     userAvatarEl.src = currentUser.pictureUrl;
   }
 
+  // ดึงข้อมูลลูกหนี้และสัญญาจากเซิร์ฟเวอร์
   await loadClientData();
 }
 
 /**
- * 6. ดึงข้อมูลจาก Backend API
+ * 7. ดึงข้อมูลจาก Backend API
  */
 async function loadClientData() {
   try {
-    const res = await fetch(`/api/client/profile/${encodeURIComponent(currentUser.userId)}`);
+    const url = `/api/client/profile/${encodeURIComponent(currentUser.userId)}?displayName=${encodeURIComponent(currentUser.displayName)}`;
+    const res = await fetch(url);
     const json = await res.json();
 
     if (json.success && json.data) {
@@ -263,7 +379,7 @@ async function loadClientData() {
 }
 
 /**
- * 7. เรนเดอร์แดชบอร์ด
+ * 8. เรนเดอร์แดชบอร์ด
  */
 function renderDashboard() {
   const debt = clientData.activeDebt;
@@ -274,34 +390,34 @@ function renderDashboard() {
     if (metricDueDate) metricDueDate.textContent = debt.dueDate || '-';
     if (metricInstallment) metricInstallment.textContent = `฿${Number(debt.installmentAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
 
-    const total = debt.totalAmount || 0;
-    const remaining = debt.remainingBalance || 0;
+    const total = Number(debt.totalAmount) || 0;
+    const remaining = Number(debt.remainingBalance) || 0;
     const paid = Math.max(0, total - remaining);
     const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
 
     if (progressBar) progressBar.style.width = `${pct}%`;
     if (progressPercent) progressPercent.textContent = `${pct}% (จ่ายแล้ว ฿${paid.toLocaleString()})`;
 
-    if (clientStatusBadge) {
-      clientStatusBadge.textContent = debt.debtStatus === 'ACTIVE' ? 'สถานะปกติ' : debt.debtStatus;
-      clientStatusBadge.style.color = '#15803D';
-      clientStatusBadge.style.backgroundColor = '#DCFCE7';
+    if (clientStatusBadge && liff.isLoggedIn()) {
+      clientStatusBadge.textContent = debt.debtStatus === 'ACTIVE' ? '🟢 สัญญาปกติ' : debt.debtStatus;
+      clientStatusBadge.className = 'header-badge logged-in';
     }
 
     if (slipAmountInput) slipAmountInput.value = debt.installmentAmount || '';
   } else {
-    if (heroDebtId) heroDebtId.textContent = 'ยังไม่มีสัญญาหนี้ที่เปิดใช้งาน';
+    if (heroDebtId) {
+      heroDebtId.textContent = liff.isLoggedIn() ? 'ยังไม่มีสัญญาหนี้ที่เปิดอยู่' : 'โหมดทดสอบ (กรุณาล็อกอิน)';
+    }
     if (heroRemaining) heroRemaining.textContent = '฿0.00';
-    if (metricDueDate) metricDueDate.textContent = '-';
+    if (metricDueDate) metricDueDate.textContent = liff.isLoggedIn() ? 'ไม่มีหนี้ค้าง' : '-';
     if (metricInstallment) metricInstallment.textContent = '฿0.00';
     if (progressBar) progressBar.style.width = '0%';
     if (progressPercent) progressPercent.textContent = '0%';
-    if (clientStatusBadge) clientStatusBadge.textContent = 'ไม่มีสัญญา';
   }
 }
 
 /**
- * 8. เรนเดอร์ประวัติการชำระเงิน
+ * 9. เรนเดอร์ประวัติการชำระเงิน
  */
 function renderHistory() {
   const payments = clientData.payments || [];
@@ -347,11 +463,12 @@ function renderHistory() {
 }
 
 /**
- * 9. เรนเดอร์หน้าโปรไฟล์
+ * 10. เรนเดอร์หน้าโปรไฟล์
  */
 function renderProfile() {
   const debtor = clientData.debtor;
-  if (profileUserId) profileUserId.textContent = currentUser.userId;
+  if (profileUserId) profileUserId.textContent = currentUser.userId || '-';
+  if (profileDisplayName) profileDisplayName.textContent = currentUser.displayName || '-';
   if (profileFullName) profileFullName.textContent = debtor?.fullName || currentUser.displayName || '-';
   if (profilePhone) profilePhone.textContent = debtor?.phone || '-';
   if (profileIdCard) profileIdCard.textContent = debtor?.idCardNumber || '-';
@@ -359,7 +476,7 @@ function renderProfile() {
 }
 
 /**
- * 10. ส่งสลิปชำระเงิน
+ * 11. ส่งสลิปชำระเงิน
  */
 if (btnSubmitSlip) {
   btnSubmitSlip.addEventListener('click', async () => {
