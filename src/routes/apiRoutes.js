@@ -14,6 +14,8 @@ const { runDailyReminderCheck } = require('../services/reminderService');
 
 const router = express.Router();
 
+router.get('/version', (req, res) => res.json({ version: '2.2.0', time: new Date() }));
+
 // -------------------------------------------------------------
 // 1. Client Portal Endpoints
 // -------------------------------------------------------------
