@@ -51,6 +51,26 @@ const debtorSearchInput = document.getElementById('debtorSearchInput');
 const debtorsListContainer = document.getElementById('debtorsListContainer');
 let allDebtors = [];
 
+// Admin Managers Elements
+const adminsCountBadge = document.getElementById('adminsCountBadge');
+const adminSearchInput = document.getElementById('adminSearchInput');
+const adminsListContainer = document.getElementById('adminsListContainer');
+const btnOpenAddAdminModal = document.getElementById('btnOpenAddAdminModal');
+const modalAdminForm = document.getElementById('modalAdminForm');
+const btnCloseAdminModal = document.getElementById('btnCloseAdminModal');
+const btnCancelAdminModal = document.getElementById('btnCancelAdminModal');
+const adminManagerForm = document.getElementById('adminManagerForm');
+const adminFormMode = document.getElementById('adminFormMode');
+const adminInputUserId = document.getElementById('adminInputUserId');
+const adminInputDisplayName = document.getElementById('adminInputDisplayName');
+const adminInputRole = document.getElementById('adminInputRole');
+const adminInputPhone = document.getElementById('adminInputPhone');
+const adminInputNote = document.getElementById('adminInputNote');
+const adminInputStatus = document.getElementById('adminInputStatus');
+const modalAdminTitle = document.getElementById('modalAdminTitle');
+const btnSelectFromDebtors = document.getElementById('btnSelectFromDebtors');
+let allAdminsList = [];
+
 // Toast
 const toast = document.getElementById('toast');
 const toastMessage = document.getElementById('toastMessage');
@@ -216,6 +236,7 @@ function switchView(targetViewId) {
   if (targetViewId === 'view-admin-debtors') loadDebtors();
   if (targetViewId === 'view-admin-contracts') loadContracts();
   if (targetViewId === 'view-admin-slips') loadSlips();
+  if (targetViewId === 'view-admin-managers') loadAdmins();
 }
 
 window.switchView = switchView;
@@ -640,6 +661,269 @@ if (debtorSearchInput) {
       (d.phone && d.phone.includes(q))
     );
     renderDebtors(filtered);
+  });
+}
+
+// ==============================================================================
+// 7. จัดการผู้ดูแลระบบ (Admin Managers Management)
+// ==============================================================================
+
+async function loadAdmins() {
+  if (!adminsListContainer) return;
+  adminsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายชื่อผู้ดูแลระบบ...</div>';
+
+  try {
+    const res = await adminFetch('/api/admin/admins');
+    const data = await res.json();
+
+    if (data.success && Array.isArray(data.admins)) {
+      allAdminsList = data.admins;
+      if (adminsCountBadge) adminsCountBadge.textContent = `${allAdminsList.length} คน`;
+      renderAdmins(allAdminsList);
+    } else {
+      adminsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: #EF4444;">ไม่สามารถโหลดข้อมูลแอดมินได้</div>';
+    }
+  } catch (err) {
+    console.error('Error loading admins:', err);
+    adminsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: #EF4444;">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>';
+  }
+}
+
+function renderAdmins(admins) {
+  if (!adminsListContainer) return;
+
+  if (!admins || admins.length === 0) {
+    adminsListContainer.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px dashed var(--surface-border);">
+        <div style="font-size: 32px; margin-bottom: 8px;">🛡️</div>
+        <div style="font-size: 14px; font-weight: 600; color: #FFFFFF; margin-bottom: 4px;">ยังไม่มีรายชื่อผู้ดูแลระบบในชีต admin</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+          คุณสามารถกดปุ่ม "เพิ่มแอดมิน" เพื่อเพิ่มสิทธิ์ให้บัญชี LINE ของคุณหรือทีมงานได้ทันที
+        </p>
+        <button class="btn-primary-admin" onclick="openAddAdminModal()" style="display: inline-block; width: auto; padding: 8px 18px; font-size: 13px;">
+          ➕ เพิ่มผู้ดูแลระบบคนแรก
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  adminsListContainer.innerHTML = admins.map(admin => {
+    const isSuper = admin.isSuperAdmin || admin.role === 'SUPER_ADMIN';
+    const isActive = admin.status === 'ACTIVE';
+    const roleBadge = isSuper
+      ? '<span class="badge-role-super">👑 Super Admin</span>'
+      : '<span class="badge-role-admin">🛡️ Admin</span>';
+    const statusBadge = isActive
+      ? '<span class="badge-status-active">🟢 ใช้งานอยู่</span>'
+      : '<span class="badge-status-inactive">⚪ ระงับสิทธิ์</span>';
+
+    const safeName = (admin.displayName || 'ผู้ดูแลระบบ').replace(/'/g, "\\'");
+    const isCurrentUser = currentAdminUser && currentAdminUser.userId === admin.userId;
+
+    return `
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="admin-avatar">
+              ${isSuper ? '👑' : '🛡️'}
+            </div>
+            <div>
+              <div style="font-size: 14px; font-weight: 600; color: #FFFFFF; display: flex; align-items: center; gap: 6px;">
+                <span>${admin.displayName || 'ไม่ระบุชื่อ'}</span>
+                ${isCurrentUser ? '<span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #38BDF8;">คุณ</span>' : ''}
+              </div>
+              <div style="font-size: 11px; font-family: monospace; color: #94A3B8; margin-top: 2px;">
+                ${admin.userId}
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            ${roleBadge}
+            ${statusBadge}
+          </div>
+        </div>
+
+        ${(admin.phone || admin.note) ? `
+          <div style="font-size: 11.5px; color: var(--text-muted); background: rgba(0,0,0,0.15); padding: 6px 10px; border-radius: 6px; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 12px;">
+            ${admin.phone ? `<div>📞 ${admin.phone}</div>` : ''}
+            ${admin.note ? `<div>📝 ${admin.note}</div>` : ''}
+          </div>
+        ` : ''}
+
+        <div class="admin-card-actions">
+          <button class="btn-card-action btn-action-edit" onclick="openEditAdminModal('${admin.userId}')">
+            ✏️ แก้ไข
+          </button>
+          <button class="btn-card-action btn-action-delete" onclick="confirmDeleteAdmin('${admin.userId}', '${safeName}')">
+            🗑️ ลบสิทธิ์
+          </button>
+          <button class="btn-card-action" style="background: rgba(255,255,255,0.06); color: #94A3B8;" onclick="copyText('${admin.userId}', 'คัดลอก LINE ID แอดมินแล้ว')">
+            📋 คัดลอก ID
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.openAddAdminModal = function() {
+  if (!modalAdminForm) return;
+  if (adminManagerForm) adminManagerForm.reset();
+  if (adminFormMode) adminFormMode.value = 'create';
+  if (modalAdminTitle) modalAdminTitle.textContent = '➕ เพิ่มผู้ดูแลระบบใหม่';
+  if (adminInputUserId) {
+    adminInputUserId.readOnly = false;
+    adminInputUserId.style.opacity = '1';
+  }
+  if (adminInputStatus) adminInputStatus.value = 'ACTIVE';
+  if (adminInputRole) adminInputRole.value = 'ADMIN';
+
+  // หากปัจจุบันล็อกอินอยู่ และยังไม่มีในชีต อำนวยความสะดวกกรอกอัตโนมัติ
+  if (currentAdminUser && (!allAdminsList.some(a => a.userId === currentAdminUser.userId))) {
+    if (adminInputUserId) adminInputUserId.value = currentAdminUser.userId;
+    if (adminInputDisplayName) adminInputDisplayName.value = currentAdminUser.displayName || '';
+    if (adminInputRole) adminInputRole.value = 'SUPER_ADMIN';
+  }
+
+  modalAdminForm.classList.remove('hidden');
+};
+
+window.openEditAdminModal = function(userId) {
+  const admin = allAdminsList.find(a => a.userId === userId);
+  if (!admin || !modalAdminForm) return;
+
+  if (adminFormMode) adminFormMode.value = 'edit';
+  if (modalAdminTitle) modalAdminTitle.textContent = '✏️ แก้ไขข้อมูลผู้ดูแลระบบ';
+  if (adminInputUserId) {
+    adminInputUserId.value = admin.userId;
+    adminInputUserId.readOnly = true;
+    adminInputUserId.style.opacity = '0.7';
+  }
+  if (adminInputDisplayName) adminInputDisplayName.value = admin.displayName || '';
+  if (adminInputRole) adminInputRole.value = admin.role || 'ADMIN';
+  if (adminInputPhone) adminInputPhone.value = admin.phone || '';
+  if (adminInputNote) adminInputNote.value = admin.note || '';
+  if (adminInputStatus) adminInputStatus.value = admin.status || 'ACTIVE';
+
+  modalAdminForm.classList.remove('hidden');
+};
+
+function closeAdminModal() {
+  if (modalAdminForm) modalAdminForm.classList.add('hidden');
+}
+
+if (btnCloseAdminModal) btnCloseAdminModal.addEventListener('click', closeAdminModal);
+if (btnCancelAdminModal) btnCancelAdminModal.addEventListener('click', closeAdminModal);
+if (btnOpenAddAdminModal) btnOpenAddAdminModal.addEventListener('click', window.openAddAdminModal);
+
+if (btnSelectFromDebtors) {
+  btnSelectFromDebtors.addEventListener('click', () => {
+    if (allDebtors.length === 0) {
+      showToast('ไม่มีรายชื่อลูกหนี้ในระบบ', 'ℹ️');
+      return;
+    }
+    const promptText = allDebtors.slice(0, 10).map((d, i) => `${i + 1}. ${d.displayName || d.fullName} (${d.userId.slice(0, 8)}...)`).join('\n');
+    const idx = prompt(`เลือกลำดับลูกหนี้ที่จะเพิ่มเป็นแอดมิน:\n${promptText}`);
+    if (idx) {
+      const selected = allDebtors[parseInt(idx) - 1];
+      if (selected) {
+        if (adminInputUserId) adminInputUserId.value = selected.userId;
+        if (adminInputDisplayName) adminInputDisplayName.value = selected.displayName || selected.fullName || '';
+        if (adminInputPhone) adminInputPhone.value = selected.phone || '';
+      }
+    }
+  });
+}
+
+if (adminManagerForm) {
+  adminManagerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btnSubmit = document.getElementById('btnSaveAdminSubmit');
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'กำลังบันทึกลงชีต...';
+    }
+
+    try {
+      const payload = {
+        userId: adminInputUserId.value.trim(),
+        displayName: adminInputDisplayName.value.trim(),
+        role: adminInputRole.value,
+        phone: adminInputPhone.value.trim(),
+        note: adminInputNote.value.trim(),
+        status: adminInputStatus.value
+      };
+
+      const res = await adminFetch('/api/admin/admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'บันทึกข้อมูลเรียบร้อยแล้ว', '✅');
+        closeAdminModal();
+        await loadAdmins();
+      } else {
+        showToast(data.message || 'บันทึกไม่สำเร็จ', '⚠️');
+      }
+    } catch (err) {
+      console.error('Error saving admin:', err);
+      showToast('เกิดข้อผิดพลาดในการบันทึก', '⛔');
+    } finally {
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'บันทึกข้อมูล';
+      }
+    }
+  });
+}
+
+window.confirmDeleteAdmin = async function(userId, name) {
+  if (currentAdminUser && currentAdminUser.userId === userId) {
+    alert('⚠️ ไม่สามารถลบบัญชีของคุณเองที่กำลังใช้งานอยู่ได้');
+    return;
+  }
+
+  if (!confirm(`คุณต้องการลบสิทธิ์แอดมินของ "${name}" (${userId}) ใช่หรือไม่?\nข้อมูลจะถูกลบออกจากชีต admin ทันที`)) {
+    return;
+  }
+
+  try {
+    const res = await adminFetch(`/api/admin/admins/${encodeURIComponent(userId)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast('ลบแอดมินออกจากระบบแล้ว', '🗑️');
+      await loadAdmins();
+    } else {
+      showToast(data.message || 'ไม่สามารถลบได้', '⚠️');
+    }
+  } catch (err) {
+    console.error('Error deleting admin:', err);
+    showToast('เกิดข้อผิดพลาดในการลบ', '⛔');
+  }
+};
+
+if (adminSearchInput) {
+  adminSearchInput.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    if (!q) {
+      renderAdmins(allAdminsList);
+      return;
+    }
+    const filtered = allAdminsList.filter(a => 
+      (a.displayName && a.displayName.toLowerCase().includes(q)) ||
+      (a.userId && a.userId.toLowerCase().includes(q)) ||
+      (a.phone && a.phone.includes(q)) ||
+      (a.note && a.note.toLowerCase().includes(q)) ||
+      (a.role && a.role.toLowerCase().includes(q))
+    );
+    renderAdmins(filtered);
   });
 }
 

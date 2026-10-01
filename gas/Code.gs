@@ -13,7 +13,8 @@ const CONFIG = {
     DEBTORS: 'Debtors',
     DEBTS: 'Debts',
     PAYMENTS: 'Payments',
-    REMINDER_LOGS: 'ReminderLogs'
+    REMINDER_LOGS: 'ReminderLogs',
+    ADMINS: 'admin'
   }
 };
 
@@ -21,7 +22,8 @@ const HEADERS = {
   Debtors: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status'],
   Debts: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt'],
   Payments: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote'],
-  ReminderLogs: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status']
+  ReminderLogs: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
+  admin: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status']
 };
 
 /**
@@ -105,6 +107,18 @@ function doPost(e) {
 
       case 'hasBeenRemindedToday':
         result = handleHasBeenRemindedToday(contents.debtId, contents.reminderType);
+        break;
+
+      case 'getAllAdmins':
+        result = handleGetAllAdmins();
+        break;
+
+      case 'saveAdmin':
+        result = handleSaveAdmin(contents);
+        break;
+
+      case 'deleteAdmin':
+        result = handleDeleteAdmin(contents.userId);
         break;
 
       default:
@@ -628,4 +642,117 @@ function handleHasBeenRemindedToday(debtId, reminderType) {
     }
   }
   return false;
+}
+
+/**
+ * ==============================================================================
+ * ฟังก์ชันจัดการผู้ดูแลระบบ (Admin Management)
+ * ==============================================================================
+ */
+
+/**
+ * ดึงรายชื่อผู้ดูแลระบบทั้งหมดจาก Sheet 'admin'
+ */
+function handleGetAllAdmins() {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.ADMINS) || ss.getSheetByName('admin') || ss.getSheetByName('Admins');
+  if (!sheet) return [];
+
+  // หากยังไม่มีข้อมูลหรือไม่มี Header
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(HEADERS.admin);
+    return [];
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+
+  const admins = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const userId = String(row[0] || '').trim();
+    if (userId) {
+      admins.push({
+        userId: userId,
+        displayName: row[1] ? String(row[1]) : '',
+        role: row[2] ? String(row[2]) : 'ADMIN',
+        phone: row[3] ? String(row[3]) : '',
+        note: row[4] ? String(row[4]) : '',
+        createdAt: row[5] ? (row[5] instanceof Date ? Utilities.formatDate(row[5], 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss') : String(row[5])) : '',
+        status: row[6] ? String(row[6]).toUpperCase() : 'ACTIVE'
+      });
+    }
+  }
+
+  return admins;
+}
+
+/**
+ * บันทึกหรืออัปเดตข้อมูลผู้ดูแลระบบ
+ */
+function handleSaveAdmin(contents) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.ADMINS) || ss.getSheetByName('admin') || ss.getSheetByName('Admins');
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_NAMES.ADMINS);
+    sheet.appendRow(HEADERS.admin);
+  } else if (sheet.getLastRow() === 0) {
+    sheet.appendRow(HEADERS.admin);
+  }
+
+  const userId = String(contents.userId || '').trim();
+  if (!userId) throw new Error('userId is required');
+
+  const displayName = contents.displayName || '';
+  const role = contents.role || 'ADMIN';
+  const phone = contents.phone || '';
+  const note = contents.note || '';
+  const status = (contents.status || 'ACTIVE').toUpperCase();
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+
+  const data = sheet.getDataRange().getValues();
+  let foundRowIndex = -1;
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === userId) {
+      foundRowIndex = i + 1; // 1-indexed
+      break;
+    }
+  }
+
+  if (foundRowIndex > -1) {
+    // แก้ไขข้อมูลเดิม
+    sheet.getRange(foundRowIndex, 2).setValue(displayName);
+    sheet.getRange(foundRowIndex, 3).setValue(role);
+    sheet.getRange(foundRowIndex, 4).setValue(phone);
+    sheet.getRange(foundRowIndex, 5).setValue(note);
+    sheet.getRange(foundRowIndex, 7).setValue(status);
+    return { action: 'updated', userId, displayName, role, status };
+  } else {
+    // เพิ่มแอดมินใหม่
+    sheet.appendRow([userId, displayName, role, phone, note, nowStr, status]);
+    return { action: 'created', userId, displayName, role, status };
+  }
+}
+
+/**
+ * ลบผู้ดูแลระบบออกจากชีต
+ */
+function handleDeleteAdmin(userId) {
+  const cleanId = String(userId || '').trim();
+  if (!cleanId) throw new Error('userId is required');
+
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.ADMINS) || ss.getSheetByName('admin') || ss.getSheetByName('Admins');
+  if (!sheet) return { deleted: false, message: 'Sheet not found' };
+
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === cleanId) {
+      sheet.deleteRow(i + 1);
+      return { deleted: true, userId: cleanId };
+    }
+  }
+
+  return { deleted: false, message: 'Admin not found' };
 }

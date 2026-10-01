@@ -201,6 +201,35 @@
         </div>
       </section>
 
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 5: ADMIN MANAGERS (สิทธิ์แอดมิน) -->
+      <!-- ========================================== -->
+      <section id="view-admin-managers" class="sub-view">
+        <div class="panel-header" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="panel-title">🛡️ จัดการผู้ดูแลระบบ</div>
+            <span id="adminsCountBadge" style="font-size: 11px; background: rgba(56, 189, 248, 0.15); color: var(--primary); padding: 2px 8px; border-radius: 10px;">0 คน</span>
+          </div>
+          <button class="btn-primary-admin" id="btnOpenAddAdminModal" style="width: auto; margin-top: 0; padding: 6px 14px; font-size: 12px; background: #0EA5E9;">
+            ➕ เพิ่มแอดมิน
+          </button>
+        </div>
+
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+          รายชื่อผู้ดูแลระบบจะถูกบันทึกลงใน Google Sheet แท็บ <code>admin</code> อัตโนมัติ เพื่อใช้ตรวจสอบสิทธิ์การเข้าใช้งาน Admin Hub ทันที
+        </p>
+
+        <!-- Search Bar -->
+        <div style="margin-bottom: 12px;">
+          <input type="text" id="adminSearchInput" class="form-control" placeholder="🔍 ค้นหาชื่อ, LINE ID, เบอร์โทร..." style="font-size: 13px;">
+        </div>
+
+        <!-- Admins List Container -->
+        <div id="adminsListContainer">
+          <div style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายชื่อผู้ดูแลระบบ...</div>
+        </div>
+      </section>
+
     </main>
 
     <!-- Floating Bottom Navigation Bar -->
@@ -229,7 +258,70 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         <span>แจ้งเตือน</span>
       </button>
+
+      <button class="nav-item" data-target="view-admin-managers">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        <span>แอดมิน</span>
+      </button>
     </nav>
+
+    <!-- Modal: เพิ่ม / แก้ไข ผู้ดูแลระบบ -->
+    <div id="modalAdminForm" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalAdminTitle">➕ เพิ่มผู้ดูแลระบบใหม่</h3>
+          <button class="modal-close" id="btnCloseAdminModal">&times;</button>
+        </div>
+        <form id="adminManagerForm">
+          <input type="hidden" id="adminFormMode" value="create">
+          
+          <div class="form-group">
+            <label>LINE User ID <span style="color: #EF4444;">*</span></label>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="adminInputUserId" class="form-control" placeholder="Uxxxxxxxx..." required style="font-family: monospace; font-size: 13px;">
+              <button type="button" id="btnSelectFromDebtors" style="background: rgba(255,255,255,0.08); border: 1px solid var(--surface-border); color: #94A3B8; padding: 0 10px; border-radius: 8px; font-size: 11px; white-space: nowrap; cursor: pointer;">เลือกลูกหนี้</button>
+            </div>
+            <small style="font-size: 11px; color: var(--text-muted);">รหัสบัญชี LINE 33 หลัก (ขึ้นต้นด้วย U)</small>
+          </div>
+
+          <div class="form-group">
+            <label>ชื่อผู้ดูแลระบบ (Display Name)</label>
+            <input type="text" id="adminInputDisplayName" class="form-control" placeholder="เช่น พี่ปอนด์, แอดมินหลัก">
+          </div>
+
+          <div class="form-group">
+            <label>บทบาท (Role)</label>
+            <select id="adminInputRole" class="form-control">
+              <option value="ADMIN">ADMIN (ผู้ดูแลระบบทั่วไป)</option>
+              <option value="SUPER_ADMIN">SUPER_ADMIN (ผู้ดูแลระบบสูงสุด)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>เบอร์โทรศัพท์ (ถ้ามี)</label>
+            <input type="tel" id="adminInputPhone" class="form-control" placeholder="08xxxxxxxx">
+          </div>
+
+          <div class="form-group">
+            <label>หมายเหตุ</label>
+            <input type="text" id="adminInputNote" class="form-control" placeholder="เช่น แอดมินฝ่ายบัญชี, ผู้ช่วยดูแล">
+          </div>
+
+          <div class="form-group">
+            <label>สถานะสิทธิ์การใช้งาน</label>
+            <select id="adminInputStatus" class="form-control">
+              <option value="ACTIVE">ACTIVE (เปิดใช้งาน)</option>
+              <option value="INACTIVE">INACTIVE (ระงับสิทธิ์ชั่วคราว)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 18px;">
+            <button type="button" class="btn-cancel" id="btnCancelAdminModal" style="flex: 1; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid var(--surface-border); color: #FFFFFF; border-radius: 8px; font-size: 13px; cursor: pointer;">ยกเลิก</button>
+            <button type="submit" class="btn-primary-admin" id="btnSaveAdminSubmit" style="flex: 2; margin-top: 0; padding: 12px; font-size: 13px; background: #0EA5E9; cursor: pointer;">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <!-- Toast Notification -->
     <div id="toast" class="toast">
@@ -320,6 +412,6 @@
 
   </div>
 
-  <script src="js/admin.js?v=4.0"></script>
+  <script src="js/admin.js?v=4.1"></script>
 </body>
 </html>

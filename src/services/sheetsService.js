@@ -6,14 +6,16 @@ const SHEET_NAMES = {
   DEBTORS: 'Debtors',
   DEBTS: 'Debts',
   PAYMENTS: 'Payments',
-  REMINDER_LOGS: 'ReminderLogs'
+  REMINDER_LOGS: 'ReminderLogs',
+  ADMINS: 'admin'
 };
 
 const HEADERS = {
   [SHEET_NAMES.DEBTORS]: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status'],
   [SHEET_NAMES.DEBTS]: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt'],
   [SHEET_NAMES.PAYMENTS]: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote'],
-  [SHEET_NAMES.REMINDER_LOGS]: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status']
+  [SHEET_NAMES.REMINDER_LOGS]: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
+  [SHEET_NAMES.ADMINS]: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status']
 };
 
 /**
@@ -726,6 +728,191 @@ async function logReminder({ debtId, userId, reminderType, status = 'SUCCESS' })
   }
 }
 
+/**
+ * ==============================================================================
+ * ฟังก์ชันจัดการผู้ดูแลระบบ (Admin Management Services)
+ * ==============================================================================
+ */
+
+/**
+ * ดึงรายชื่อผู้ดูแลระบบทั้งหมด (Google Sheet 'admin')
+ */
+async function getAllAdmins() {
+  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก Real-time)
+  if (sheetId) {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAMES.ADMINS}`;
+      const fetchRes = await fetch(url);
+      if (fetchRes.ok) {
+        const csvText = await fetchRes.text();
+        const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length > 1) {
+          const admins = [];
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+            if (clean[0] && clean[0].startsWith('U')) {
+              admins.push({
+                userId: clean[0],
+                displayName: clean[1] || '',
+                role: clean[2] || 'ADMIN',
+                phone: clean[3] || '',
+                note: clean[4] || '',
+                createdAt: clean[5] || '',
+                status: (clean[6] || 'ACTIVE').toUpperCase()
+              });
+            }
+          }
+          if (admins.length > 0) return admins;
+        }
+      }
+    } catch (csvErr) {
+      console.warn('Error reading Admins via CSV:', csvErr.message);
+    }
+  }
+
+  // 2. เรียกผ่าน GAS Web App
+  if (isGasConfigured()) {
+    try {
+      const res = await callGas('getAllAdmins', {}, 0);
+      if (Array.isArray(res)) return res;
+    } catch (e) {
+      console.warn('callGas getAllAdmins note:', e.message);
+    }
+  }
+
+  // 3. Fallback: Google Sheets API
+  if (sheets && sheetId) {
+    try {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${SHEET_NAMES.ADMINS}!A2:G`
+      });
+      const rows = res.data.values || [];
+      return rows
+        .filter(r => r[0] && r[0].startsWith('U'))
+        .map(r => ({
+          userId: r[0],
+          displayName: r[1] || '',
+          role: r[2] || 'ADMIN',
+          phone: r[3] || '',
+          note: r[4] || '',
+          createdAt: r[5] || '',
+          status: (r[6] || 'ACTIVE').toUpperCase()
+        }));
+    } catch (err) {
+      console.warn('Sheets API getAllAdmins note:', err.message);
+    }
+  }
+
+  return [];
+}
+
+/**
+ * บันทึกหรืออัปเดตผู้ดูแลระบบ
+ */
+async function saveAdmin(adminData) {
+  if (isGasConfigured()) {
+    return await callGas('saveAdmin', adminData);
+  }
+
+  if (!sheets || !sheetId) {
+    throw new Error('Google connection not configured');
+  }
+
+  const { userId, displayName = '', role = 'ADMIN', phone = '', note = '', status = 'ACTIVE' } = adminData;
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss');
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `${SHEET_NAMES.ADMINS}!A:G`
+  });
+
+  const rows = res.data.values || [];
+  let foundIndex = -1;
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === userId) {
+      foundIndex = i + 1;
+      break;
+    }
+  }
+
+  if (foundIndex > -1) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${SHEET_NAMES.ADMINS}!B${foundIndex}:G${foundIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[displayName, role, phone, note, rows[foundIndex - 1][5] || now, status]]
+      }
+    });
+    return { action: 'updated', userId, displayName, role, status };
+  } else {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: `${SHEET_NAMES.ADMINS}!A:G`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[userId, displayName, role, phone, note, now, status]]
+      }
+    });
+    return { action: 'created', userId, displayName, role, status };
+  }
+}
+
+/**
+ * ลบผู้ดูแลระบบ
+ */
+async function deleteAdmin(userId) {
+  if (isGasConfigured()) {
+    return await callGas('deleteAdmin', { userId });
+  }
+
+  if (!sheets || !sheetId) {
+    throw new Error('Google connection not configured');
+  }
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `${SHEET_NAMES.ADMINS}!A:G`
+  });
+
+  const rows = res.data.values || [];
+  let foundIndex = -1;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === userId) {
+      foundIndex = i;
+      break;
+    }
+  }
+
+  if (foundIndex > -1) {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const adminSheet = meta.data.sheets.find(s => s.properties.title === SHEET_NAMES.ADMINS);
+    if (adminSheet) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: {
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId: adminSheet.properties.sheetId,
+                dimension: 'ROWS',
+                startIndex: foundIndex,
+                endIndex: foundIndex + 1
+              }
+            }
+          }]
+        }
+      });
+      return { deleted: true, userId };
+    }
+  }
+
+  return { deleted: false, message: 'Admin not found' };
+}
+
 module.exports = {
   SHEET_NAMES,
   initializeSheets,
@@ -742,5 +929,8 @@ module.exports = {
   rejectPayment,
   getDueDebtsForReminder,
   hasBeenRemindedToday,
-  logReminder
+  logReminder,
+  getAllAdmins,
+  saveAdmin,
+  deleteAdmin
 };

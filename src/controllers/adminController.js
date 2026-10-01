@@ -271,6 +271,98 @@ async function getDebtors(req, res) {
   }
 }
 
+/**
+ * 9. ดึงรายชื่อผู้ดูแลระบบทั้งหมด (Admins)
+ */
+async function getAdmins(req, res) {
+  try {
+    const admins = await sheetsService.getAllAdmins();
+    const envAdmins = (process.env.ADMIN_LINE_USER_IDS || '')
+      .split(',')
+      .map(id => id.trim())
+      .filter(Boolean);
+
+    // ทำ flag ระบุว่าแอดมินคนไหนเป็น Master / Super Admin จาก Env
+    const enriched = admins.map(a => ({
+      ...a,
+      isSuperAdmin: envAdmins.includes(a.userId) || a.role === 'SUPER_ADMIN'
+    }));
+
+    return res.status(200).json({
+      success: true,
+      admins: enriched,
+      envAdmins
+    });
+  } catch (error) {
+    console.error('Error getting admins:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 10. เพิ่มหรือแก้ไขผู้ดูแลระบบ
+ */
+async function saveAdmin(req, res) {
+  try {
+    const { userId, displayName, role, phone, note, status } = req.body;
+    if (!userId || !userId.trim()) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุ LINE User ID' });
+    }
+
+    const result = await sheetsService.saveAdmin({
+      userId: userId.trim(),
+      displayName: displayName ? displayName.trim() : '',
+      role: role || 'ADMIN',
+      phone: phone ? phone.trim() : '',
+      note: note ? note.trim() : '',
+      status: status || 'ACTIVE'
+    });
+
+    const { invalidateAdminCache } = require('../middleware/adminAuth');
+    invalidateAdminCache();
+
+    return res.status(200).json({
+      success: true,
+      message: result.action === 'created' ? 'เพิ่มผู้ดูแลระบบเรียบร้อยแล้ว' : 'อัปเดตข้อมูลผู้ดูแลระบบเรียบร้อยแล้ว',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error saving admin:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 11. ลบผู้ดูแลระบบ
+ */
+async function deleteAdmin(req, res) {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.headers['x-line-userid'];
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุ userId ที่ต้องการลบ' });
+    }
+
+    if (currentUserId && currentUserId === userId) {
+      return res.status(400).json({ success: false, message: 'ไม่สามารถลบบัญชีแอดมินของตนเองที่กำลังล็อกอินอยู่ได้' });
+    }
+
+    const result = await sheetsService.deleteAdmin(userId);
+    const { invalidateAdminCache } = require('../middleware/adminAuth');
+    invalidateAdminCache();
+
+    return res.status(200).json({
+      success: true,
+      message: 'ลบผู้ดูแลระบบออกจากระบบเรียบร้อยแล้ว',
+      result
+    });
+  } catch (error) {
+    console.error('Error deleting admin:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   getAdminStats,
   getContracts,
@@ -279,5 +371,8 @@ module.exports = {
   approveSlip,
   rejectSlip,
   remindSingleDebt,
-  getDebtors
+  getDebtors,
+  getAdmins,
+  saveAdmin,
+  deleteAdmin
 };

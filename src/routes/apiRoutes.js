@@ -9,7 +9,10 @@ const {
   approveSlip,
   rejectSlip,
   remindSingleDebt,
-  getDebtors
+  getDebtors,
+  getAdmins,
+  saveAdmin,
+  deleteAdmin
 } = require('../controllers/adminController');
 const { runDailyReminderCheck } = require('../services/reminderService');
 
@@ -17,7 +20,7 @@ const { isUserAdmin, requireAdminAuth, getAdminUserIds } = require('../middlewar
 
 const router = express.Router();
 
-router.get('/version', (req, res) => res.json({ version: '2.3.0', time: new Date() }));
+router.get('/version', (req, res) => res.json({ version: '2.4.0', time: new Date() }));
 
 // -------------------------------------------------------------
 // 1. Client Portal Endpoints
@@ -30,17 +33,17 @@ router.get('/liff/debt/:userId', getDebtInfo);
 // -------------------------------------------------------------
 // 2. Admin Portal & Access Control Endpoints
 // -------------------------------------------------------------
-router.get('/admin/verify-access', (req, res) => {
+router.get('/admin/verify-access', async (req, res) => {
   const userId = req.query.userId || req.headers['x-line-userid'];
-  const { authorized, isConfigured } = isUserAdmin(userId);
-  const adminIds = getAdminUserIds();
+  const { authorized, isConfigured, adminCount } = await isUserAdmin(userId);
+  const adminIds = await getAdminUserIds();
 
   return res.status(200).json({
     success: true,
     isConfigured,
     authorized,
     userId: userId || null,
-    adminCount: adminIds.length
+    adminCount: adminCount || adminIds.length
   });
 });
 
@@ -52,6 +55,11 @@ router.get('/admin/slips', requireAdminAuth, getSlips);
 router.post('/admin/slips/approve', requireAdminAuth, approveSlip);
 router.post('/admin/slips/reject', requireAdminAuth, rejectSlip);
 router.post('/admin/remind/:debtId', requireAdminAuth, remindSingleDebt);
+
+// Admin Management (เก็บใน Google Sheet 'admin' และแก้ไขผ่านหน้าเว็บ)
+router.get('/admin/admins', requireAdminAuth, getAdmins);
+router.post('/admin/admins', requireAdminAuth, saveAdmin);
+router.delete('/admin/admins/:userId', requireAdminAuth, deleteAdmin);
 
 // -------------------------------------------------------------
 // 3. Automated Reminder Control
