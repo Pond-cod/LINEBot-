@@ -784,6 +784,7 @@ window.openAddAdminModal = function() {
     if (adminInputRole) adminInputRole.value = 'SUPER_ADMIN';
   }
 
+  modalAdminForm.style.display = 'flex';
   modalAdminForm.classList.remove('hidden');
 };
 
@@ -804,16 +805,36 @@ window.openEditAdminModal = function(userId) {
   if (adminInputNote) adminInputNote.value = admin.note || '';
   if (adminInputStatus) adminInputStatus.value = admin.status || 'ACTIVE';
 
+  modalAdminForm.style.display = 'flex';
   modalAdminForm.classList.remove('hidden');
 };
 
 function closeAdminModal() {
-  if (modalAdminForm) modalAdminForm.classList.add('hidden');
+  if (modalAdminForm) {
+    modalAdminForm.style.display = 'none';
+    modalAdminForm.classList.add('hidden');
+  }
 }
 
 if (btnCloseAdminModal) btnCloseAdminModal.addEventListener('click', closeAdminModal);
 if (btnCancelAdminModal) btnCancelAdminModal.addEventListener('click', closeAdminModal);
 if (btnOpenAddAdminModal) btnOpenAddAdminModal.addEventListener('click', window.openAddAdminModal);
+
+// คลิกพื้นหลังสีดำรอบนอกเพื่อปิด modal
+if (modalAdminForm) {
+  modalAdminForm.addEventListener('click', (e) => {
+    if (e.target === modalAdminForm) {
+      closeAdminModal();
+    }
+  });
+}
+
+// กดปุ่ม Escape เพื่อปิด modal
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modalAdminForm && !modalAdminForm.classList.contains('hidden')) {
+    closeAdminModal();
+  }
+});
 
 if (btnSelectFromDebtors) {
   btnSelectFromDebtors.addEventListener('click', () => {
