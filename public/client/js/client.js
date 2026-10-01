@@ -1,5 +1,4 @@
-(function() {
-// Client Portal JavaScript Controller
+// Client Portal JavaScript Controller (Unified)
 const LIFF_ID = '2011816015-RfpKwHVZ';
 
 let currentUser = {
@@ -13,6 +12,8 @@ let clientData = {
   activeDebt: null,
   payments: []
 };
+
+let currentSlipBase64 = null;
 
 // Elements
 const userAvatarEl = document.getElementById('userAvatar');
@@ -32,11 +33,16 @@ const metricDueDate = document.getElementById('metricDueDate');
 const metricInstallment = document.getElementById('metricInstallment');
 const btnGoToPay = document.getElementById('btnGoToPay');
 
-// Pay Elements
+// Pay & Upload Elements
 const btnCopyAcc = document.getElementById('btnCopyAcc');
 const bankAccNo = document.getElementById('bankAccNo');
 const slipAmountInput = document.getElementById('slipAmountInput');
 const btnSubmitSlip = document.getElementById('btnSubmitSlip');
+const dropzoneArea = document.getElementById('dropzoneArea');
+const slipFileInput = document.getElementById('slipFileInput');
+const previewContainer = document.getElementById('previewContainer');
+const slipPreviewImg = document.getElementById('slipPreviewImg');
+const btnRemovePreview = document.getElementById('btnRemovePreview');
 
 // History Elements
 const historyListContainer = document.getElementById('historyListContainer');
@@ -74,7 +80,6 @@ function switchView(targetViewId) {
     }
   });
 
-  // เลื่อนกลับขึ้นบนสุดเมื่อสลับหน้า
   document.querySelector('.views-viewport').scrollTop = 0;
 }
 
@@ -85,27 +90,32 @@ navItems.forEach(item => {
   });
 });
 
-btnGoToPay.addEventListener('click', () => {
-  switchView('view-pay');
-});
+if (btnGoToPay) {
+  btnGoToPay.addEventListener('click', () => {
+    switchView('view-pay');
+  });
+}
 
 /**
  * 2. คัดลอกเลขบัญชี
  */
-btnCopyAcc.addEventListener('click', async () => {
-  const text = bankAccNo.textContent.trim();
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast('คัดลอกเลขบัญชีแล้ว', '📋');
-  } catch (e) {
-    showToast('เลขบัญชี: ' + text, '📋');
-  }
-});
+if (btnCopyAcc) {
+  btnCopyAcc.addEventListener('click', async () => {
+    const text = bankAccNo.textContent.trim();
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('คัดลอกเลขบัญชีแล้ว', '📋');
+    } catch (e) {
+      showToast('เลขบัญชี: ' + text, '📋');
+    }
+  });
+}
 
 /**
  * 3. แสดง Toast Notification
  */
 function showToast(msg, icon = 'ℹ️') {
+  if (!toast) return;
   toastMessage.textContent = msg;
   toastIcon.textContent = icon;
   toast.classList.add('show');
@@ -115,7 +125,97 @@ function showToast(msg, icon = 'ℹ️') {
 }
 
 /**
- * 4. เริ่มต้น LIFF และดึงข้อมูล
+ * 4. จัดการการเลือกรูปสลิปและบีบอัดภาพ
+ */
+if (dropzoneArea && slipFileInput) {
+  dropzoneArea.addEventListener('click', () => {
+    slipFileInput.click();
+  });
+
+  dropzoneArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzoneArea.classList.add('dragover');
+  });
+
+  dropzoneArea.addEventListener('dragleave', () => {
+    dropzoneArea.classList.remove('dragover');
+  });
+
+  dropzoneArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzoneArea.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  slipFileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  });
+
+  if (btnRemovePreview) {
+    btnRemovePreview.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetSlipUpload();
+    });
+  }
+}
+
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) {
+    alert('กรุณาเลือกไฟล์รูปภาพเท่านั้นครับ');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    compressImage(event.target.result, 1280, 0.85, (compressedBase64) => {
+      currentSlipBase64 = compressedBase64;
+      slipPreviewImg.src = compressedBase64;
+      dropzoneArea.style.display = 'none';
+      previewContainer.classList.add('show');
+      if (btnSubmitSlip) btnSubmitSlip.disabled = false;
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function compressImage(srcBase64, maxWidth, quality, callback) {
+  const img = new Image();
+  img.src = srcBase64;
+  img.onload = () => {
+    let width = img.width;
+    let height = img.height;
+
+    if (width > maxWidth) {
+      height = Math.round((height * maxWidth) / width);
+      width = maxWidth;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const compressed = canvas.toDataURL('image/jpeg', quality);
+    callback(compressed);
+  };
+}
+
+function resetSlipUpload() {
+  currentSlipBase64 = null;
+  if (slipFileInput) slipFileInput.value = '';
+  if (slipPreviewImg) slipPreviewImg.src = '';
+  if (previewContainer) previewContainer.classList.remove('show');
+  if (dropzoneArea) dropzoneArea.style.display = 'block';
+  if (btnSubmitSlip) btnSubmitSlip.disabled = true;
+}
+
+/**
+ * 5. เริ่มต้น LIFF และดึงข้อมูล
  */
 async function initApp() {
   try {
@@ -125,7 +225,6 @@ async function initApp() {
       const profile = await liff.getProfile();
       currentUser = profile;
     } else {
-      // สำหรับทดสอบภายนอก LINE
       currentUser.userId = 'U_DEMO_CLIENT';
       currentUser.displayName = 'คุณลูกค้า (Demo)';
     }
@@ -135,9 +234,8 @@ async function initApp() {
     currentUser.displayName = 'คุณลูกค้า (Demo)';
   }
 
-  // อัปเดตข้อมูลผู้ใช้ใน Header
-  userNameEl.textContent = currentUser.displayName;
-  if (currentUser.pictureUrl) {
+  if (userNameEl) userNameEl.textContent = currentUser.displayName;
+  if (currentUser.pictureUrl && userAvatarEl) {
     userAvatarEl.src = currentUser.pictureUrl;
   }
 
@@ -145,7 +243,7 @@ async function initApp() {
 }
 
 /**
- * 5. ดึงข้อมูลจาก Backend API
+ * 6. ดึงข้อมูลจาก Backend API
  */
 async function loadClientData() {
   try {
@@ -165,50 +263,51 @@ async function loadClientData() {
 }
 
 /**
- * 6. เรนเดอร์แดชบอร์ด
+ * 7. เรนเดอร์แดชบอร์ด
  */
 function renderDashboard() {
   const debt = clientData.activeDebt;
 
   if (debt) {
-    heroDebtId.textContent = `สัญญาเลขที่: ${debt.debtId}`;
-    heroRemaining.textContent = `฿${Number(debt.remainingBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
-    metricDueDate.textContent = debt.dueDate || '-';
-    metricInstallment.textContent = `฿${Number(debt.installmentAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+    if (heroDebtId) heroDebtId.textContent = `สัญญาเลขที่: ${debt.debtId}`;
+    if (heroRemaining) heroRemaining.textContent = `฿${Number(debt.remainingBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+    if (metricDueDate) metricDueDate.textContent = debt.dueDate || '-';
+    if (metricInstallment) metricInstallment.textContent = `฿${Number(debt.installmentAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
 
-    // คำนวณเปอร์เซ็นต์ที่ชำระไปแล้ว
     const total = debt.totalAmount || 0;
     const remaining = debt.remainingBalance || 0;
     const paid = Math.max(0, total - remaining);
     const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
 
-    progressBar.style.width = `${pct}%`;
-    progressPercent.textContent = `${pct}% (จ่ายแล้ว ฿${paid.toLocaleString()})`;
+    if (progressBar) progressBar.style.width = `${pct}%`;
+    if (progressPercent) progressPercent.textContent = `${pct}% (จ่ายแล้ว ฿${paid.toLocaleString()})`;
 
-    // สถานะ
-    clientStatusBadge.textContent = debt.debtStatus === 'ACTIVE' ? 'สถานะปกติ' : debt.debtStatus;
-    clientStatusBadge.style.color = '#15803D';
-    clientStatusBadge.style.backgroundColor = '#DCFCE7';
+    if (clientStatusBadge) {
+      clientStatusBadge.textContent = debt.debtStatus === 'ACTIVE' ? 'สถานะปกติ' : debt.debtStatus;
+      clientStatusBadge.style.color = '#15803D';
+      clientStatusBadge.style.backgroundColor = '#DCFCE7';
+    }
 
-    // เซ็ตค่างวดเริ่มต้นในช่องชำระเงิน
-    slipAmountInput.value = debt.installmentAmount || '';
+    if (slipAmountInput) slipAmountInput.value = debt.installmentAmount || '';
   } else {
-    heroDebtId.textContent = 'ยังไม่มีสัญญาหนี้ที่เปิดใช้งาน';
-    heroRemaining.textContent = '฿0.00';
-    metricDueDate.textContent = '-';
-    metricInstallment.textContent = '฿0.00';
-    progressBar.style.width = '0%';
-    progressPercent.textContent = '0%';
-    clientStatusBadge.textContent = 'ไม่มีสัญญา';
+    if (heroDebtId) heroDebtId.textContent = 'ยังไม่มีสัญญาหนี้ที่เปิดใช้งาน';
+    if (heroRemaining) heroRemaining.textContent = '฿0.00';
+    if (metricDueDate) metricDueDate.textContent = '-';
+    if (metricInstallment) metricInstallment.textContent = '฿0.00';
+    if (progressBar) progressBar.style.width = '0%';
+    if (progressPercent) progressPercent.textContent = '0%';
+    if (clientStatusBadge) clientStatusBadge.textContent = 'ไม่มีสัญญา';
   }
 }
 
 /**
- * 7. เรนเดอร์ประวัติการชำระเงิน
+ * 8. เรนเดอร์ประวัติการชำระเงิน
  */
 function renderHistory() {
   const payments = clientData.payments || [];
-  historyCountBadge.textContent = `${payments.length} รายการ`;
+  if (historyCountBadge) historyCountBadge.textContent = `${payments.length} รายการ`;
+
+  if (!historyListContainer) return;
 
   if (payments.length === 0) {
     historyListContainer.innerHTML = `
@@ -248,62 +347,62 @@ function renderHistory() {
 }
 
 /**
- * 8. เรนเดอร์หน้าโปรไฟล์
+ * 9. เรนเดอร์หน้าโปรไฟล์
  */
 function renderProfile() {
   const debtor = clientData.debtor;
-  profileUserId.textContent = currentUser.userId;
-  profileFullName.textContent = debtor?.fullName || currentUser.displayName || '-';
-  profilePhone.textContent = debtor?.phone || '-';
-  profileIdCard.textContent = debtor?.idCardNumber || '-';
-  profileRegisteredAt.textContent = debtor?.registeredAt || '-';
+  if (profileUserId) profileUserId.textContent = currentUser.userId;
+  if (profileFullName) profileFullName.textContent = debtor?.fullName || currentUser.displayName || '-';
+  if (profilePhone) profilePhone.textContent = debtor?.phone || '-';
+  if (profileIdCard) profileIdCard.textContent = debtor?.idCardNumber || '-';
+  if (profileRegisteredAt) profileRegisteredAt.textContent = debtor?.registeredAt || '-';
 }
 
 /**
- * 9. ส่งสลิปชำระเงิน
+ * 10. ส่งสลิปชำระเงิน
  */
-btnSubmitSlip.addEventListener('click', async () => {
-  const base64 = window.getSlipBase64();
-  if (!base64) {
-    showToast('กรุณาเลือกไฟล์สลิปก่อนครับ', '⚠️');
-    return;
-  }
-
-  btnSubmitSlip.disabled = true;
-  btnSubmitSlip.innerHTML = '<span>⏳ กำลังอัปโหลด...</span>';
-
-  const payload = {
-    userId: currentUser.userId,
-    debtId: clientData.activeDebt?.debtId || '',
-    amount: slipAmountInput.value || 0,
-    imageBase64: base64
-  };
-
-  try {
-    const res = await fetch('/api/client/upload-slip', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const json = await res.json();
-    if (json.success) {
-      showToast('ส่งสลิปชำระเงินเรียบร้อยแล้ว!', '✅');
-      window.resetSlipUpload();
-      await loadClientData();
-      switchView('view-history');
-    } else {
-      showToast(json.message || 'ส่งสลิปไม่สำเร็จ', '❌');
+if (btnSubmitSlip) {
+  btnSubmitSlip.addEventListener('click', async () => {
+    if (!currentSlipBase64) {
+      showToast('กรุณาเลือกไฟล์สลิปก่อนครับ', '⚠️');
+      return;
     }
-  } catch (err) {
-    console.error('Error submitting slip:', err);
-    showToast('เกิดข้อผิดพลาดในการส่งสลิป', '❌');
-  } finally {
-    btnSubmitSlip.disabled = false;
-    btnSubmitSlip.innerHTML = '<span>🚀 ส่งสลิปชำระเงิน</span>';
-  }
-});
+
+    btnSubmitSlip.disabled = true;
+    btnSubmitSlip.innerHTML = '<span>⏳ กำลังอัปโหลด...</span>';
+
+    const payload = {
+      userId: currentUser.userId,
+      debtId: clientData.activeDebt?.debtId || '',
+      amount: slipAmountInput ? slipAmountInput.value : 0,
+      imageBase64: currentSlipBase64
+    };
+
+    try {
+      const res = await fetch('/api/client/upload-slip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        showToast('ส่งสลิปชำระเงินเรียบร้อยแล้ว!', '✅');
+        resetSlipUpload();
+        await loadClientData();
+        switchView('view-history');
+      } else {
+        showToast(json.message || 'ส่งสลิปไม่สำเร็จ', '❌');
+      }
+    } catch (err) {
+      console.error('Error submitting slip:', err);
+      showToast('เกิดข้อผิดพลาดในการส่งสลิป', '❌');
+    } finally {
+      btnSubmitSlip.disabled = false;
+      btnSubmitSlip.innerHTML = '<span>🚀 ส่งสลิปชำระเงิน</span>';
+    }
+  });
+}
 
 // เริ่มต้นระบบ
 window.addEventListener('DOMContentLoaded', initApp);
-})();

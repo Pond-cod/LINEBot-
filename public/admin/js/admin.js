@@ -215,7 +215,7 @@ async function loadSlips() {
 
             ${s.slipViewUrl ? `
               <div class="slip-preview-box" onclick="window.open('${s.slipViewUrl}', '_blank')">
-                <img src="${s.slipViewUrl}" alt="Slip" class="slip-preview-img" onerror="this.src='https://via.placeholder.com/300x150?text=Preview+Google+Drive+Slip'">
+                <img src="${s.slipViewUrl}" alt="Slip" class="slip-preview-img" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'150\' viewBox=\'0 0 300 150\' fill=\'%231E293B\'><text x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%2394A3B8\' font-family=\'sans-serif\' font-size=\'14\'>คลิกเพื่อเปิดดูสลิปใน Google Drive</text></svg>';">
               </div>
             ` : ''}
 
