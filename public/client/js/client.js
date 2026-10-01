@@ -255,9 +255,10 @@ function handleLineLogin() {
 function handleLineLogout() {
   if (liff.isLoggedIn()) {
     liff.logout();
-    showToast('ออกจากระบบ LINE เรียบร้อยแล้ว', '👋');
+    showToast('ออกจากระบบ LINE แล้ว', '👋');
     setTimeout(() => {
-      window.location.href = window.location.origin + window.location.pathname;
+      // ใส่ ?guest=1 เพื่อไม่ให้ redirect ล็อกอินทันทีหลังกดออกจากระบบ
+      window.location.href = window.location.origin + window.location.pathname + '?guest=1';
     }, 600);
   }
 }
@@ -306,14 +307,14 @@ function setLoginUiState(isLoggedIn) {
 }
 
 /**
- * 6. เริ่มต้น LIFF และดึงข้อมูล
+ * 6. เริ่มต้น LIFF และดึงข้อมูล (บังคับ Auto-Login)
  */
 async function initApp() {
   try {
     await liff.init({ liffId: LIFF_ID });
 
     const urlParams = new URLSearchParams(window.location.search);
-    const forceLogin = urlParams.get('login') === '1' || urlParams.get('auto') === 'true';
+    const isGuest = urlParams.get('guest') === '1';
 
     if (liff.isLoggedIn()) {
       const profile = await liff.getProfile();
@@ -324,24 +325,28 @@ async function initApp() {
       };
       setLoginUiState(true);
     } else {
-      if (liff.isInClient() || forceLogin) {
-        // หากเปิดใน LINE in-app browser หรือมี query param ?login=1 ให้ redirect เข้า LINE Login ทันที
+      if (isGuest) {
+        // ให้สิทธิ์เข้าชมแบบ Guest ถ้ามี ?guest=1
+        currentUser = {
+          userId: 'U_DEMO_GUEST',
+          displayName: 'ผู้ใช้งานทั่วไป (Guest)',
+          pictureUrl: DEFAULT_AVATAR
+        };
+        setLoginUiState(false);
+      } else {
+        // บังคับ Redirect ไปหน้า LINE Login ทันที!
+        if (userNameEl) userNameEl.textContent = 'กำลังเข้าสู่ระบบ LINE...';
+        if (clientStatusBadge) clientStatusBadge.textContent = '⏳ เข้าสู่ระบบ...';
+        showToast('กำลังนำเข้าสู่ระบบ LINE...', '⏳');
         liff.login({ redirectUri: window.location.origin + window.location.pathname });
         return;
       }
-
-      currentUser = {
-        userId: 'U_DEMO_GUEST',
-        displayName: 'ผู้ใช้งานทั่วไป (ยังไม่ได้ล็อกอิน)',
-        pictureUrl: DEFAULT_AVATAR
-      };
-      setLoginUiState(false);
     }
   } catch (err) {
-    console.warn('LIFF init warning:', err);
+    console.error('LIFF init error:', err);
     currentUser = {
       userId: 'U_DEMO_GUEST',
-      displayName: 'ผู้ใช้งานทั่วไป (Offline)',
+      displayName: 'โหมดออฟไลน์ (ทดสอบ)',
       pictureUrl: DEFAULT_AVATAR
     };
     setLoginUiState(false);
