@@ -1,0 +1,30 @@
+{
+  "name": "line-debt-slip-reminder-bot",
+  "version": "1.0.0",
+  "description": "LINE Bot สำหรับจัดการหนี้ รับสลิปเข้า Google Drive และแจ้งเตือนอัตโนมัติด้วย Google Sheets",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "setup:sheets": "node scripts/setupSheets.js"
+  },
+  "keywords": [
+    "line-bot",
+    "liff",
+    "google-sheets",
+    "google-drive",
+    "debt-reminder",
+    "slip-uploader"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@line/bot-sdk": "^9.6.1",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0",
+    "node-cron": "^3.0.3"
+  }
+}

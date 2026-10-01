@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ระบบจัดการหนี้ รับสลิป และแจ้งเตือนอัตโนมัติ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Prompt', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #1E293B 0%, #0F172A 100%);
+      color: #FFFFFF;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .hub-container {
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+    }
+
+    .logo-badge {
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(135deg, #06C755 0%, #10B981 100%);
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      box-shadow: 0 10px 25px rgba(6, 199, 85, 0.35);
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    p.subtitle {
+      font-size: 13px;
+      color: #94A3B8;
+      margin-bottom: 30px;
+    }
+
+    .portal-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .portal-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 22px 20px;
+      text-align: left;
+      text-decoration: none;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .portal-card:hover, .portal-card:active {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .portal-card.client:hover {
+      border-color: #06C755;
+      box-shadow: 0 10px 25px rgba(6, 199, 85, 0.2);
+    }
+
+    .portal-card.admin:hover {
+      border-color: #0EA5E9;
+      box-shadow: 0 10px 25px rgba(14, 165, 233, 0.2);
+    }
+
+    .portal-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+
+    .portal-card.client .portal-icon {
+      background: rgba(6, 199, 85, 0.15);
+      border: 1px solid rgba(6, 199, 85, 0.3);
+    }
+
+    .portal-card.admin .portal-icon {
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(14, 165, 233, 0.3);
+    }
+
+    .portal-info h3 {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .portal-info p {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .portal-arrow {
+      margin-left: auto;
+      font-size: 20px;
+      color: #64748B;
+      transition: transform 0.2s;
+    }
+
+    .portal-card:hover .portal-arrow {
+      transform: translateX(4px);
+      color: #FFFFFF;
+    }
+
+    .footer-note {
+      margin-top: 32px;
+      font-size: 11px;
+      color: #64748B;
+    }
+  </style>
+</head>
+<body>
+  <div class="hub-container">
+    <div class="logo-badge">💬</div>
+    <h1>ระบบจัดการหนี้ & แจ้งเตือน LINE</h1>
+    <p class="subtitle">เลือกพอร์ทัลที่ต้องการเข้าใช้งาน</p>
+
+    <div class="portal-cards">
+      <!-- Client Portal -->
+      <a href="/client/" class="portal-card client">
+        <div class="portal-icon">👤</div>
+        <div class="portal-info">
+          <h3>ลูกหนี้ / ลูกค้า <span style="font-size: 11px; color: #06C755; background: rgba(6, 199, 85, 0.15); padding: 2px 6px; border-radius: 6px;">LIFF</span></h3>
+          <p>ตรวจยอดคงเหลือ, วันครบกำหนด, แนบสลิปโอนเงิน และดูประวัติ</p>
+        </div>
+        <div class="portal-arrow">›</div>
+      </a>
+
+      <!-- Admin Portal -->
+      <a href="/admin/" class="portal-card admin">
+        <div class="portal-icon">🛡️</div>
+        <div class="portal-info">
+          <h3>เจ้าหนี้ / ผู้ดูแลระบบ</h3>
+          <p>แดชบอร์ดสรุปยอด, สร้างสัญญา, อนุมัติสลิป และควบคุมการแจ้งเตือน</p>
+        </div>
+        <div class="portal-arrow">›</div>
+      </a>
+    </div>
+
+    <div class="footer-note">
+      Node.js Backend • Google Sheets & Drive Database • LINE Messaging API
+    </div>
+  </div>
+</body>
+</html>

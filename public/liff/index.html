@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบจัดการหนี้และแจ้งเตือน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- LINE Front-end Framework (LIFF) SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Section -->
+    <header class="app-header">
+      <div class="user-badge" id="userBadge">
+        <img id="userAvatar" src="https://via.placeholder.com/60" alt="Avatar" class="avatar">
+        <div class="user-details">
+          <span class="user-greeting">ยินดีต้อนรับ</span>
+          <h2 id="userName" class="user-name">กำลังโหลด...</h2>
+        </div>
+      </div>
+      <div class="badge-tag">ระบบจัดการหนี้</div>
+    </header>
+
+    <!-- Tabs Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="tab-register" id="btnTabRegister">📝 บันทึกข้อมูลสัญญา</button>
+      <button class="tab-btn" data-tab="tab-info" id="btnTabInfo">📊 ข้อมูลหนี้ของฉัน</button>
+    </div>
+
+    <!-- Main Content -->
+    <main class="content-wrapper">
+      
+      <!-- Tab 1: ฟอร์มลงทะเบียนและบันทึกสัญญาหนี้ -->
+      <section id="tab-register" class="tab-pane active">
+        <div class="card">
+          <div class="card-header">
+            <h3>กรอกข้อมูลสัญญาและลูกหนี้</h3>
+            <p>ระบบจะดึง LINE User ID ของคุณโดยอัตโนมัติ</p>
+          </div>
+
+          <form id="debtForm">
+            <!-- Hidden Fields -->
+            <input type="hidden" id="userId" name="userId">
+            <input type="hidden" id="displayName" name="displayName">
+
+            <div class="form-group">
+              <label for="fullName">ชื่อ - นามสกุล <span class="required">*</span></label>
+              <input type="text" id="fullName" name="fullName" placeholder="เช่น นายสมชาย ใจดี" required>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="phone">เบอร์โทรศัพท์ <span class="required">*</span></label>
+                <input type="tel" id="phone" name="phone" placeholder="08XXXXXXXX" required>
+              </div>
+
+              <div class="form-group col">
+                <label for="idCardNumber">เลขประจำตัวประชาชน</label>
+                <input type="text" id="idCardNumber" name="idCardNumber" maxlength="13" placeholder="13 หลัก">
+              </div>
+            </div>
+
+            <div class="section-divider">
+              <span>รายละเอียดสัญญาหนี้</span>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="totalAmount">ยอดหนี้รวม (บาท) <span class="required">*</span></label>
+                <input type="number" id="totalAmount" name="totalAmount" placeholder="เช่น 20000" step="any" required>
+              </div>
+
+              <div class="form-group col">
+                <label for="installmentAmount">ค่างวดต่องวด (บาท) <span class="required">*</span></label>
+                <input type="number" id="installmentAmount" name="installmentAmount" placeholder="เช่น 2000" step="any" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="dueDate">วันครบกำหนดชำระงวดแรก <span class="required">*</span></label>
+                <input type="date" id="dueDate" name="dueDate" required>
+              </div>
+
+              <div class="form-group col">
+                <label for="cycleDays">รอบการจ่าย (วัน)</label>
+                <input type="number" id="cycleDays" name="cycleDays" value="30">
+              </div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+              <span class="btn-text">บันทึกข้อมูลสัญญา</span>
+              <span class="btn-loader hidden"></span>
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Tab 2: ตรวจสอบข้อมูลหนี้ปัจจุบัน -->
+      <section id="tab-info" class="tab-pane">
+        <div class="card" id="debtInfoCard">
+          <div class="card-header">
+            <h3>สรุปข้อมูลสัญญาหนี้</h3>
+            <p id="debtInfoSub">กำลังดึงข้อมูล...</p>
+          </div>
+
+          <div id="debtDetails" class="details-content">
+            <!-- Dynamic Injection via JavaScript -->
+            <div class="placeholder-text">กำลังตรวจสอบข้อมูลจาก Google Sheets...</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-icon">✅</div>
+        <h3>บันทึกข้อมูลสำเร็จ!</h3>
+        <p id="modalMsg">ระบบได้บันทึกข้อมูลลง Google Sheets เรียบร้อยแล้ว</p>
+        <button id="closeLiffBtn" class="modal-btn">ปิดหน้าต่างนี้</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

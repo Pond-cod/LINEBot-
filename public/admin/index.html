@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ระบบเจ้าหนี้ / ผู้ดูแลระบบ - Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-app-shell">
+    
+    <!-- Top Admin Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">🛡️</div>
+        <div>
+          <div class="brand-title">Admin Hub</div>
+          <div class="brand-subtitle">ระบบจัดการหนี้ & ตรวจสลิป</div>
+        </div>
+      </div>
+      <div class="header-badge" id="adminRoleBadge">ผู้ดูแลระบบ</div>
+    </header>
+
+    <!-- Scrollable Viewport -->
+    <main class="views-viewport">
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 1: OVERVIEW & STATS               -->
+      <!-- ========================================== -->
+      <section id="view-admin-overview" class="sub-view active">
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-label">ยอดหนี้คงค้างรวม</div>
+            <div class="stat-val primary" id="statRemaining">฿0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📥</div>
+            <div class="stat-label">สลิปรอตรวจสอบ</div>
+            <div class="stat-val warning" id="statPendingSlips">0 ใบ</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-label">ครบกำหนดวันนี้</div>
+            <div class="stat-val danger" id="statDueToday">0 ราย</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📑</div>
+            <div class="stat-label">สัญญาทั้งหมด</div>
+            <div class="stat-val success" id="statTotalContracts">0</div>
+          </div>
+        </div>
+
+        <!-- Quick Remind Trigger -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">⏰ ระบบแจ้งเตือนอัตโนมัติ (08:00 น.)</div>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+            ระบบทำงานอัตโนมัติทุกเช้า 08:00 น. หากต้องการสั่งให้ระบบสแกนและยิงข้อความเตือนลูกหนี้ทันที สามารถกดปุ่มด้านล่างได้ครับ
+          </p>
+          <button class="btn-primary-admin" id="btnTriggerCronNow">
+            🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)
+          </button>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 2: CONTRACTS MANAGEMENT          -->
+      <!-- ========================================== -->
+      <section id="view-admin-contracts" class="sub-view">
+        <!-- Create Contract Form -->
+        <div class="panel-card">
+          <div class="panel-title" style="margin-bottom: 12px;">➕ สร้างสัญญาหนี้ใหม่</div>
+          <form id="createContractForm">
+            <div class="form-group">
+              <label>LINE User ID ผู้กู้ (เช่น U1234...)</label>
+              <input type="text" id="newUserId" class="form-control" placeholder="Uxxxxxxxx..." required>
+            </div>
+            <div class="form-group">
+              <label>ชื่อ - นามสกุล ผู้กู้</label>
+              <input type="text" id="newDebtorName" class="form-control" placeholder="นายสมชาย ใจดี" required>
+            </div>
+            <div class="form-group">
+              <label>เบอร์โทรศัพท์</label>
+              <input type="tel" id="newPhone" class="form-control" placeholder="08xxxxxxxx">
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <div class="form-group" style="flex: 1;">
+                <label>ยอดหนี้รวม (บาท)</label>
+                <input type="number" id="newTotalAmount" class="form-control" placeholder="20000" required>
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label>ค่างวดต่องวด (บาท)</label>
+                <input type="number" id="newInstallmentAmount" class="form-control" placeholder="2000" required>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <div class="form-group" style="flex: 1;">
+                <label>วันครบกำหนดชำระ</label>
+                <input type="date" id="newDueDate" class="form-control" required>
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label>รอบชำระ (วัน)</label>
+                <input type="number" id="newCycleDays" class="form-control" value="30">
+              </div>
+            </div>
+            <button type="submit" class="btn-primary-admin" id="btnSaveContract">บันทึกสัญญาใหม่</button>
+          </form>
+        </div>
+
+        <!-- Contracts List -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">📑 รายการสัญญาทั้งหมด</div>
+            <span id="contractsCount" style="font-size: 11px; color: var(--text-muted);">0 รายการ</span>
+          </div>
+          <div id="contractsListContainer">
+            <div style="text-align: center; padding: 20px; color: var(--text-muted);">กำลังโหลดข้อมูลสัญญา...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 3: SLIP APPROVAL HUB             -->
+      <!-- ========================================== -->
+      <section id="view-admin-slips" class="sub-view">
+        <div class="panel-header" style="margin-bottom: 12px;">
+          <div class="panel-title">🔍 ตรวจสอบและอนุมัติสลิป</div>
+          <span id="pendingSlipsBadge" style="font-size: 11px; background: rgba(245, 158, 11, 0.2); color: #F59E0B; padding: 2px 8px; border-radius: 10px;">รอตรวจ 0 ใบ</span>
+        </div>
+
+        <div id="slipsContainer">
+          <div style="text-align: center; padding: 40px; color: var(--text-muted);">กำลังโหลดรายการสลิป...</div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 4: REMINDERS & LOGS              -->
+      <!-- ========================================== -->
+      <section id="view-admin-reminders" class="sub-view">
+        <div class="panel-card">
+          <div class="panel-title" style="margin-bottom: 10px;">⏰ แดชบอร์ดระบบแจ้งเตือน</div>
+          <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+            สถานะ Cron Job: <strong style="color: #10B981;">กำลังทำงาน (08:00 น. ทุกวัน)</strong><br>
+            โซนเวลา: <strong>Asia/Bangkok</strong>
+          </p>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-title" style="margin-bottom: 12px;">📲 ยิงแจ้งเตือนรายบุคคล (Manual Push)</div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+            คุณสามารถกดส่งข้อความทวงถามไปยังลูกหนี้เฉพาะรายคนได้จากแท็บ <strong>"สัญญา"</strong> หรือใส่รหัสสัญญาด้านล่างนี้:
+          </p>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="manualDebtIdInput" class="form-control" placeholder="รหัสสัญญา เช่น DB-202610-001">
+            <button class="btn-primary-admin" id="btnManualPushSingle" style="width: auto; margin-top: 0; white-space: nowrap;">
+              ส่งข้อความ
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Floating Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-target="view-admin-overview">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+        <span>ภาพรวม</span>
+      </button>
+
+      <button class="nav-item" data-target="view-admin-contracts">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span>สัญญา</span>
+      </button>
+
+      <button class="nav-item" data-target="view-admin-slips">
+        <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        <span>ตรวจสลิป</span>
+      </button>
+
+      <button class="nav-item" data-target="view-admin-reminders">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>แจ้งเตือน</span>
+      </button>
+    </nav>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+      <span id="toastIcon">ℹ️</span>
+      <span id="toastMessage">แจ้งเตือน</span>
+    </div>
+
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

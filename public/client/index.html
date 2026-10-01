@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ระบบลูกหนี้และชำระเงิน - Client Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/client.css">
+  <!-- LINE LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <div class="mobile-app-shell">
+    
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="profile-chip">
+        <div class="avatar-wrapper">
+          <img id="userAvatar" src="https://via.placeholder.com/80" alt="Avatar" class="avatar-img">
+          <div class="online-dot"></div>
+        </div>
+        <div class="user-meta">
+          <span class="greeting">บัญชีลูกหนี้</span>
+          <h2 id="userName" class="username">กำลังโหลด...</h2>
+        </div>
+      </div>
+      <div class="header-badge" id="clientStatusBadge">กำลังตรวจสอบ</div>
+    </header>
+
+    <!-- Scrollable Viewport Containing 4 Sub-views -->
+    <main class="views-viewport">
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 1: DASHBOARD                      -->
+      <!-- ========================================== -->
+      <section id="view-dashboard" class="sub-view active">
+        <!-- Balance Card -->
+        <div class="balance-hero-card">
+          <div class="hero-tag">
+            <span id="heroDebtId">สัญญาเลขที่: -</span>
+          </div>
+          <div class="hero-label">ยอดหนี้คงเหลือปัจจุบัน</div>
+          <div class="hero-amount" id="heroRemaining">฿0.00</div>
+
+          <div class="progress-container">
+            <div class="progress-labels">
+              <span>ความคืบหน้าการชำระ</span>
+              <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progressBar" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-icon">📅</div>
+            <div class="metric-title">วันครบกำหนดชำระ</div>
+            <div class="metric-value alert" id="metricDueDate">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">💵</div>
+            <div class="metric-title">ค่างวดต่องวด</div>
+            <div class="metric-value highlight" id="metricInstallment">฿0.00</div>
+          </div>
+        </div>
+
+        <!-- Quick Action Banner -->
+        <div class="action-banner">
+          <div class="banner-text">
+            <h4>พร้อมชำระเงินงวดนี้?</h4>
+            <p>โอนเงินและแนบสลิปผ่านระบบได้ทันที</p>
+          </div>
+          <button class="banner-btn" id="btnGoToPay">ชำระเงินเลย</button>
+        </div>
+
+        <!-- Notice Card -->
+        <div class="metric-card" style="margin-top: 12px;">
+          <div style="font-size: 13px; font-weight: 600; color: #1E293B; margin-bottom: 4px;">💡 คำแนะนำ</div>
+          <div style="font-size: 12px; color: #64748B; line-height: 1.6;">
+            • ระบบจะส่งแจ้งเตือนยอดชำระล่วงหน้าเวลา 08:00 น.<br>
+            • คุณสามารถส่งรูปสลิปในแชท LINE หรือแนบผ่านหน้านี้ได้ตลอด 24 ชม.
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 2: PAY & UPLOAD SLIP             -->
+      <!-- ========================================== -->
+      <section id="view-pay" class="sub-view">
+        <!-- Bank Account Card -->
+        <div class="bank-info-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 14px; font-weight: 600; color: #0F172A;">ช่องทางการโอนเงิน</div>
+            <span style="font-size: 11px; background: #DCFCE7; color: #15803D; padding: 2px 8px; border-radius: 10px; font-weight: 600;">พร้อมเพย์ / ธนาคาร</span>
+          </div>
+
+          <div class="bank-row">
+            <div>
+              <div style="font-size: 11px; color: #64748B;">ธนาคารกสิกรไทย (KBANK)</div>
+              <div class="account-num" id="bankAccNo">123-4-56789-0</div>
+              <div style="font-size: 11px; color: #64748B; margin-top: 2px;">ชื่อบัญชี: บจก. จัดการหนี้สิน</div>
+            </div>
+            <button class="btn-copy" id="btnCopyAcc">
+              <span>📋</span> คัดลอก
+            </button>
+          </div>
+        </div>
+
+        <!-- Upload Slip Card -->
+        <div class="upload-card">
+          <div style="font-size: 14px; font-weight: 600; color: #0F172A; margin-bottom: 4px;">แนบหลักฐานการโอนเงิน (สลิป)</div>
+          <p style="font-size: 12px; color: #64748B; margin-bottom: 14px;">รูปภาพจะถูกบันทึกเข้า Google Drive และส่งให้เจ้าหน้าที่ตรวจสอบ</p>
+
+          <input type="file" id="slipFileInput" accept="image/*" style="display: none;">
+          
+          <div class="dropzone" id="dropzoneArea">
+            <div class="dropzone-icon">📸</div>
+            <div class="dropzone-title">แตะเพื่อถ่ายรูป หรือเลือกไฟล์สลิป</div>
+            <div class="dropzone-hint">รองรับไฟล์ JPG, PNG (สูงสุด 10MB)</div>
+          </div>
+
+          <div class="preview-container" id="previewContainer">
+            <img id="slipPreviewImg" src="" alt="Preview" class="preview-img">
+            <button class="btn-remove-preview" id="btnRemovePreview">✕</button>
+          </div>
+
+          <div class="form-field">
+            <label for="slipAmountInput">ยอดเงินที่โอน (บาท)</label>
+            <input type="number" id="slipAmountInput" class="form-input" placeholder="เช่น 2000" step="any">
+          </div>
+
+          <button class="btn-primary" id="btnSubmitSlip" disabled>
+            <span>🚀 ส่งสลิปชำระเงิน</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 3: PAYMENT HISTORY               -->
+      <!-- ========================================== -->
+      <section id="view-history" class="sub-view">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <h3 style="font-size: 16px; font-weight: 600; color: #0F172A;">ประวัติการส่งสลิป & ชำระเงิน</h3>
+          <span id="historyCountBadge" style="font-size: 11px; color: #64748B;">0 รายการ</span>
+        </div>
+
+        <div class="history-list" id="historyListContainer">
+          <div class="state-box">
+            <div class="spinner"></div>
+            <div>กำลังโหลดประวัติ...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- SUB-VIEW 4: PROFILE                       -->
+      <!-- ========================================== -->
+      <section id="view-profile" class="sub-view">
+        <div class="profile-card">
+          <div style="font-size: 15px; font-weight: 600; color: #0F172A; margin-bottom: 14px;">ข้อมูลบัญชีผู้กู้</div>
+
+          <div class="profile-field-row">
+            <span class="field-label">LINE User ID</span>
+            <span class="field-val" id="profileUserId" style="font-size: 11px; font-family: monospace;">-</span>
+          </div>
+          <div class="profile-field-row">
+            <span class="field-label">ชื่อ - นามสกุล</span>
+            <span class="field-val" id="profileFullName">-</span>
+          </div>
+          <div class="profile-field-row">
+            <span class="field-label">เบอร์โทรศัพท์</span>
+            <span class="field-val" id="profilePhone">-</span>
+          </div>
+          <div class="profile-field-row">
+            <span class="field-label">เลขประจำตัวประชาชน</span>
+            <span class="field-val" id="profileIdCard">-</span>
+          </div>
+          <div class="profile-field-row">
+            <span class="field-label">วันที่ลงทะเบียน</span>
+            <span class="field-val" id="profileRegisteredAt">-</span>
+          </div>
+        </div>
+
+        <div class="profile-card" style="margin-top: 14px;">
+          <div style="font-size: 15px; font-weight: 600; color: #0F172A; margin-bottom: 14px;">ศูนย์ช่วยเหลือและติดต่อ</div>
+          <p style="font-size: 12px; color: #64748B; line-height: 1.6;">
+            หากมีข้อสงสัยเกี่ยวกับยอดเงิน หรือต้องการปรับโครงสร้างหนี้ สามารถพิมพ์ข้อความในแชท LINE เพื่อพูดคุยกับเจ้าหน้าที่ได้ตลอดเวลาครับ
+          </p>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Floating Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-target="view-dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <span>ภาพรวม</span>
+      </button>
+
+      <button class="nav-item" data-target="view-pay">
+        <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        <span>ชำระเงิน</span>
+      </button>
+
+      <button class="nav-item" data-target="view-history">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>ประวัติ</span>
+      </button>
+
+      <button class="nav-item" data-target="view-profile">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>โปรไฟล์</span>
+      </button>
+    </nav>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+      <span id="toastIcon">ℹ️</span>
+      <span id="toastMessage">ข้อความแจ้งเตือน</span>
+    </div>
+
+  </div>
+
+  <script src="js/slipUploader.js"></script>
+  <script src="js/client.js"></script>
+</body>
+</html>
