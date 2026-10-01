@@ -24,6 +24,13 @@ const pendingSlipsBadge = document.getElementById('pendingSlipsBadge');
 const manualDebtIdInput = document.getElementById('manualDebtIdInput');
 const btnManualPushSingle = document.getElementById('btnManualPushSingle');
 
+// Debtors Elements
+const statTotalDebtors = document.getElementById('statTotalDebtors');
+const debtorsCountBadge = document.getElementById('debtorsCountBadge');
+const debtorSearchInput = document.getElementById('debtorSearchInput');
+const debtorsListContainer = document.getElementById('debtorsListContainer');
+let allDebtors = [];
+
 // Toast
 const toast = document.getElementById('toast');
 const toastMessage = document.getElementById('toastMessage');
@@ -49,13 +56,17 @@ function switchView(targetViewId) {
     }
   });
 
-  document.querySelector('.views-viewport').scrollTop = 0;
+  const viewport = document.querySelector('.views-viewport');
+  if (viewport) viewport.scrollTop = 0;
 
   // โหลดข้อมูลตามหน้า
   if (targetViewId === 'view-admin-overview') loadStats();
+  if (targetViewId === 'view-admin-debtors') loadDebtors();
   if (targetViewId === 'view-admin-contracts') loadContracts();
   if (targetViewId === 'view-admin-slips') loadSlips();
 }
+
+window.switchView = switchView;
 
 navItems.forEach(item => {
   item.addEventListener('click', () => {
@@ -87,6 +98,7 @@ async function loadStats() {
       statPendingSlips.textContent = `${s.pendingSlipsCount} ใบ`;
       statDueToday.textContent = `${s.dueTodayCount} ราย`;
       statTotalContracts.textContent = `${s.totalContracts}`;
+      if (statTotalDebtors) statTotalDebtors.textContent = `${s.totalDebtors || 0} คน`;
     }
   } catch (err) {
     console.error('Error loading stats:', err);
@@ -357,6 +369,125 @@ btnManualPushSingle.addEventListener('click', () => {
   }
   window.sendSingleReminder(debtId);
 });
+
+/**
+ * 10. จัดการรายชื่อลูกหนี้ (Debtors Management)
+ */
+async function loadDebtors() {
+  if (!debtorsListContainer) return;
+  try {
+    debtorsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);"><div class="spinner"></div> กำลังโหลดรายชื่อลูกหนี้...</div>';
+    const res = await fetch('/api/admin/debtors');
+    const json = await res.json();
+
+    if (json.success && json.debtors) {
+      allDebtors = json.debtors;
+      if (debtorsCountBadge) debtorsCountBadge.textContent = `${allDebtors.length} คน`;
+      if (statTotalDebtors) statTotalDebtors.textContent = `${allDebtors.length} คน`;
+      renderDebtors(allDebtors);
+    } else {
+      debtorsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่สามารถโหลดข้อมูลลูกหนี้ได้</div>';
+    }
+  } catch (err) {
+    console.error('Error loading debtors:', err);
+    debtorsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: #EF4444;">เกิดข้อผิดพลาดในการโหลด</div>';
+  }
+}
+
+function renderDebtors(list) {
+  if (!debtorsListContainer) return;
+
+  if (!list || list.length === 0) {
+    debtorsListContainer.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+        <div style="font-size: 44px; margin-bottom: 12px;">👥</div>
+        <div style="font-weight: 600; color: #FFFFFF; font-size: 15px; margin-bottom: 4px;">ยังไม่มีรายชื่อลูกหนี้ในระบบ</div>
+        <div style="font-size: 12px; line-height: 1.6;">เมื่อมีผู้ใช้ล็อกอินผ่าน LINE Client Portal หรือสร้างสัญญา รายชื่อจะเข้ามาแสดงที่นี่โดยอัตโนมัติ</div>
+      </div>
+    `;
+    return;
+  }
+
+  debtorsListContainer.innerHTML = list.map(d => {
+    const displayName = d.displayName || 'ผู้ใช้ LINE';
+    const fullName = d.fullName && d.fullName !== d.displayName ? d.fullName : '';
+    const initial = (displayName.charAt(0) || 'U').toUpperCase();
+
+    return `
+      <div class="debtor-card">
+        <div class="debtor-top">
+          <div class="debtor-avatar-name">
+            <div class="debtor-avatar-circle">${initial}</div>
+            <div>
+              <div class="debtor-name">${displayName}</div>
+              ${fullName ? `<div class="debtor-line-name">👤 ชื่อจริง: ${fullName}</div>` : ''}
+              <div class="debtor-line-name" style="font-family: monospace; color: #94A3B8;">LINE ID: ${d.userId}</div>
+            </div>
+          </div>
+          <span style="font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #10B981; font-weight: 600;">
+            ${d.status || 'ACTIVE'}
+          </span>
+        </div>
+
+        <div class="debtor-meta-row">
+          <span>📞 เบอร์: <strong>${d.phone || 'ยังไม่ระบุ'}</strong></span>
+          <span>📅 วันที่เข้าใช้: <strong>${d.registeredAt || '-'}</strong></span>
+        </div>
+
+        <div class="debtor-actions">
+          <button class="btn-debtor-action btn-debtor-contract" onclick="openContractForUser('${d.userId}', '${(d.fullName || d.displayName || '').replace(/'/g, "\\'")}', '${d.phone || ''}')">
+            ➕ เปิดสัญญาใหม่
+          </button>
+          <button class="btn-debtor-action btn-debtor-copy" onclick="copyText('${d.userId}', 'คัดลอก LINE ID เรียบร้อยแล้ว')">
+            📋 คัดลอก ID
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.openContractForUser = function(userId, name, phone) {
+  switchView('view-admin-contracts');
+  const newUserIdInput = document.getElementById('newUserId');
+  const newDebtorNameInput = document.getElementById('newDebtorName');
+  const newPhoneInput = document.getElementById('newPhone');
+  const newTotalAmountInput = document.getElementById('newTotalAmount');
+
+  if (newUserIdInput) newUserIdInput.value = userId;
+  if (newDebtorNameInput) newDebtorNameInput.value = name;
+  if (newPhoneInput) newPhoneInput.value = phone;
+
+  showToast('นำข้อมูลลูกหนี้ใส่ในฟอร์มแล้ว', '📝');
+  if (newTotalAmountInput) {
+    setTimeout(() => newTotalAmountInput.focus(), 250);
+  }
+};
+
+window.copyText = function(text, successMsg = 'คัดลอกแล้ว') {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast(successMsg, '📋');
+  }).catch(() => {
+    showToast('ข้อความ: ' + text, '📋');
+  });
+};
+
+if (debtorSearchInput) {
+  debtorSearchInput.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    if (!q) {
+      renderDebtors(allDebtors);
+      return;
+    }
+    const filtered = allDebtors.filter(d => 
+      (d.displayName && d.displayName.toLowerCase().includes(q)) ||
+      (d.fullName && d.fullName.toLowerCase().includes(q)) ||
+      (d.userId && d.userId.toLowerCase().includes(q)) ||
+      (d.phone && d.phone.includes(q))
+    );
+    renderDebtors(filtered);
+  });
+}
 
 // เริ่มต้นระบบ
 window.addEventListener('DOMContentLoaded', () => {

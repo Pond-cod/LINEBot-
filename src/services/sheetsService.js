@@ -243,6 +243,80 @@ async function getDebtorByUserId(userId) {
 }
 
 /**
+ * ดึงรายชื่อลูกหนี้ทั้งหมด (Debtors)
+ */
+async function getAllDebtors() {
+  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก ~300ms และเป็นข้อมูล real-time เสมอ)
+  if (sheetId) {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAMES.DEBTORS}`;
+      const fetchRes = await fetch(url);
+      if (fetchRes.ok) {
+        const csvText = await fetchRes.text();
+        const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length > 1) {
+          const debtors = [];
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+            if (clean[0] && clean[0].startsWith('U')) {
+              debtors.push({
+                userId: clean[0],
+                displayName: clean[1] || '',
+                fullName: clean[2] || clean[1] || 'ลูกหนี้',
+                phone: clean[3] || '',
+                idCardNumber: clean[4] || '',
+                registeredAt: clean[5] || '',
+                status: clean[6] || 'ACTIVE'
+              });
+            }
+          }
+          return debtors;
+        }
+      }
+    } catch (csvErr) {
+      console.warn('Error reading Debtors via CSV:', csvErr.message);
+    }
+  }
+
+  // 2. เรียกผ่าน GAS Web App (retries = 0 เพื่อไม่ให้หน่วง)
+  if (isGasConfigured()) {
+    try {
+      const res = await callGas('getAllDebtors', {}, 0);
+      if (Array.isArray(res)) return res;
+    } catch (e) {
+      console.warn('callGas getAllDebtors note:', e.message);
+    }
+  }
+
+  // 3. Fallback: Google Sheets API Service Account
+  if (sheets && sheetId) {
+    try {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${SHEET_NAMES.DEBTORS}!A2:G`
+      });
+      const rows = res.data.values || [];
+      return rows
+        .filter(r => r[0] && r[0].startsWith('U'))
+        .map(r => ({
+          userId: r[0],
+          displayName: r[1] || '',
+          fullName: r[2] || r[1] || '',
+          phone: r[3] || '',
+          idCardNumber: r[4] || '',
+          registeredAt: r[5] || '',
+          status: r[6] || 'ACTIVE'
+        }));
+    } catch (error) {
+      console.error('Error fetching debtors via API:', error.message);
+    }
+  }
+
+  return [];
+}
+
+/**
  * บันทึกการส่งสลิปชำระเงิน
  */
 async function recordPayment({ debtId, userId, amount = 0, driveFileId, slipViewUrl, adminNote = '' }) {
@@ -659,6 +733,7 @@ module.exports = {
   createDebt,
   getActiveDebtByUserId,
   getDebtorByUserId,
+  getAllDebtors,
   recordPayment,
   getPaymentsByUserId,
   getAllPayments,

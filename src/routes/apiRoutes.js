@@ -8,7 +8,8 @@ const {
   getSlips,
   approveSlip,
   rejectSlip,
-  remindSingleDebt
+  remindSingleDebt,
+  getDebtors
 } = require('../controllers/adminController');
 const { runDailyReminderCheck } = require('../services/reminderService');
 
@@ -28,6 +29,7 @@ router.get('/liff/debt/:userId', getDebtInfo);
 // 2. Admin Portal Endpoints
 // -------------------------------------------------------------
 router.get('/admin/stats', getAdminStats);
+router.get('/admin/debtors', getDebtors);
 router.get('/admin/contracts', getContracts);
 router.post('/admin/contracts', createContract);
 router.get('/admin/slips', getSlips);

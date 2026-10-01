@@ -83,6 +83,10 @@ function doPost(e) {
         result = handleGetAllDebts();
         break;
 
+      case 'getAllDebtors':
+        result = handleGetAllDebtors();
+        break;
+
       case 'approvePayment':
         result = handleApprovePayment(contents);
         break;
@@ -311,6 +315,33 @@ function handleGetDebtor(userId) {
     }
   }
   return null;
+}
+
+/**
+ * ดึงรายชื่อลูกหนี้ทั้งหมด (Debtors)
+ */
+function handleGetAllDebtors() {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.DEBTORS);
+  if (!sheet) return [];
+  const values = sheet.getDataRange().getValues();
+  const list = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (row[0] && String(row[0]).startsWith('U')) {
+      list.push({
+        userId: row[0],
+        displayName: row[1] || '',
+        fullName: row[2] || row[1] || '',
+        phone: row[3] || '',
+        idCardNumber: row[4] || '',
+        registeredAt: row[5] ? Utilities.formatDate(new Date(row[5]), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss') : '',
+        status: row[6] || 'ACTIVE'
+      });
+    }
+  }
+  return list;
 }
 
 /**

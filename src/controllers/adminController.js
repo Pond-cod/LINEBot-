@@ -10,6 +10,7 @@ async function getAdminStats(req, res) {
   try {
     const debts = await sheetsService.getAllDebts();
     const payments = await sheetsService.getAllPayments();
+    const debtors = await sheetsService.getAllDebtors();
 
     const todayStr = dayjs().format('YYYY-MM-DD');
 
@@ -47,7 +48,8 @@ async function getAdminStats(req, res) {
         dueTodayCount,
         pendingSlipsCount,
         verifiedSlipsCount,
-        totalContracts: debts.length
+        totalContracts: debts.length,
+        totalDebtors: debtors.length
       }
     });
   } catch (error) {
@@ -256,6 +258,19 @@ async function remindSingleDebt(req, res) {
   }
 }
 
+/**
+ * 8. ดึงรายชื่อลูกหนี้ทั้งหมด (Debtors)
+ */
+async function getDebtors(req, res) {
+  try {
+    const debtors = await sheetsService.getAllDebtors();
+    return res.status(200).json({ success: true, debtors });
+  } catch (error) {
+    console.error('Error getting debtors:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   getAdminStats,
   getContracts,
@@ -263,5 +278,6 @@ module.exports = {
   getSlips,
   approveSlip,
   rejectSlip,
-  remindSingleDebt
+  remindSingleDebt,
+  getDebtors
 };
