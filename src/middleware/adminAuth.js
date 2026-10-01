@@ -63,15 +63,15 @@ async function requireAdminAuth(req, res, next) {
     const userId = req.headers['x-line-userid'] || req.query.adminUserId || req.body?.adminUserId;
     const adminIds = await getAdminUserIds();
 
-    // หากมีการตั้งค่ารายชื่อแอดมินไว้แล้ว
-    if (adminIds.length > 0) {
-      if (!userId || !adminIds.includes(userId)) {
-        return res.status(403).json({
-          success: false,
-          error: 'FORBIDDEN',
-          message: 'ปฏิเสธการเข้าถึง: บัญชี LINE นี้ไม่มีสิทธิ์เข้าถึงฟังก์ชันผู้ดูแลระบบ (Admin Hub)'
-        });
-      }
+    // บล็อกเด็ดขาด หากไม่มีแอดมินในระบบ หรือ userId ไม่อยู่ในรายชื่อแอดมินที่ได้รับอนุญาต
+    if (adminIds.length === 0 || !userId || !adminIds.includes(userId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: adminIds.length === 0
+          ? 'ปฏิเสธการเข้าถึง: ยังไม่มีข้อมูลผู้ดูแลระบบในชีต admin (Google Sheet)'
+          : 'ปฏิเสธการเข้าถึง: บัญชี LINE นี้ไม่มีสิทธิ์เข้าถึงฟังก์ชันผู้ดูแลระบบ (Admin Hub)'
+      });
     }
 
     next();

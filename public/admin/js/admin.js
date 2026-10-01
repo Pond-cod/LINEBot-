@@ -110,15 +110,15 @@ async function initAdminAuth() {
       const res = await fetch(`/api/admin/verify-access?userId=${encodeURIComponent(profile.userId)}`);
       const authData = await res.json();
 
-      if (authData.isConfigured && authData.authorized) {
-        // มีสิทธิ์ถูกต้อง -> ปลดล็อกหน้าแอดมิน
+      if (authData.authorized) {
+        // มีสิทธิ์ถูกต้องในชีตหรือ env -> ปลดล็อกหน้าแอดมิน
         unlockAdminView(profile);
-      } else if (!authData.isConfigured) {
-        // ยังไม่มีการตั้งค่า ADMIN_LINE_USER_IDS ในระบบ -> โชว์หน้า Setup เพื่อแจ้งให้กำหนดสิทธิ์
-        showSetupState(profile);
       } else {
-        // บัญชีไม่อยู่ในรายการที่อนุญาต -> ปฏิเสธการเข้าถึง
-        showDeniedState(profile);
+        // บัญชีไม่อยู่ในรายการที่อนุญาต หรือชีตยังว่างเปล่า -> ปฏิเสธการเข้าถึงเด็ดขาด!
+        const reason = authData.adminCount === 0
+          ? 'ยังไม่มีรายชื่อผู้ดูแลระบบใน Google Sheet (แท็บ <code>admin</code> ยังว่างเปล่า)'
+          : 'บัญชี LINE ของคุณไม่มีสิทธิ์เข้าใช้งานในส่วนผู้ดูแลระบบ';
+        showDeniedState(profile, reason);
       }
     } else {
       if (liff.isInClient()) {
@@ -145,26 +145,17 @@ function unlockAdminView(profile) {
 function showLoginState() {
   if (authCheckingState) authCheckingState.style.display = 'none';
   if (authDeniedState) authDeniedState.style.display = 'none';
-  if (authSetupState) authSetupState.style.display = 'none';
   if (authLoginState) authLoginState.style.display = 'block';
 }
 
-function showDeniedState(profile) {
+function showDeniedState(profile, reason) {
   if (deniedDisplayName) deniedDisplayName.textContent = profile.displayName || '-';
   if (deniedUserId) deniedUserId.textContent = profile.userId || '-';
+  const reasonEl = document.getElementById('deniedReasonText');
+  if (reasonEl && reason) reasonEl.innerHTML = reason;
   if (authCheckingState) authCheckingState.style.display = 'none';
   if (authLoginState) authLoginState.style.display = 'none';
-  if (authSetupState) authSetupState.style.display = 'none';
   if (authDeniedState) authDeniedState.style.display = 'block';
-}
-
-function showSetupState(profile) {
-  if (setupDisplayName) setupDisplayName.textContent = profile.displayName || '-';
-  if (setupUserId) setupUserId.textContent = profile.userId || '-';
-  if (authCheckingState) authCheckingState.style.display = 'none';
-  if (authLoginState) authLoginState.style.display = 'none';
-  if (authDeniedState) authDeniedState.style.display = 'none';
-  if (authSetupState) authSetupState.style.display = 'block';
 }
 
 // ผูก Event Listeners สำหรับระบบความปลอดภัย
@@ -190,9 +181,16 @@ if (btnSwitchAccount) {
   });
 }
 
-if (btnProceedSetup) {
-  btnProceedSetup.addEventListener('click', () => {
-    unlockAdminView(currentAdminUser || { displayName: 'Admin' });
+const btnRecheckAuth = document.getElementById('btnRecheckAuth');
+if (btnRecheckAuth) {
+  btnRecheckAuth.addEventListener('click', async () => {
+    btnRecheckAuth.textContent = 'กำลังตรวจสอบชีต...';
+    btnRecheckAuth.disabled = true;
+    if (authCheckingState) authCheckingState.style.display = 'block';
+    if (authDeniedState) authDeniedState.style.display = 'none';
+    await initAdminAuth();
+    btnRecheckAuth.textContent = '🔄 ตรวจสอบสิทธิ์อีกครั้ง';
+    btnRecheckAuth.disabled = false;
   });
 }
 
