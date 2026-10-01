@@ -342,9 +342,12 @@ async function loadContracts() {
               <div>ยอดคงเหลือ: <strong style="color: var(--primary);">฿${Number(c.remainingBalance).toLocaleString()}</strong> / ยอดรวม ฿${Number(c.totalAmount).toLocaleString()}</div>
               <div>ค่างวด: ฿${Number(c.installmentAmount).toLocaleString()} | กำหนดชำระ: <strong style="color: #EF4444;">${c.dueDate || '-'}</strong></div>
             </div>
-            <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
-              <button onclick="sendSingleReminder('${c.debtId}')" style="background: none; border: 1px solid var(--surface-border); color: var(--text-muted); font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+            <div style="margin-top: 8px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button onclick="sendSingleReminder('${c.debtId}')" style="background: none; border: 1px solid rgba(56, 189, 248, 0.4); color: #38BDF8; font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
                 🔔 ส่งแจ้งเตือน
+              </button>
+              <button onclick="deleteContract('${c.debtId}')" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                🗑️ ลบสัญญา
               </button>
             </div>
           </div>
@@ -358,10 +361,17 @@ async function loadContracts() {
 }
 
 /**
- * 5. สร้างสัญญาใหม่
+ * 5. สร้างสัญญาใหม่ (พร้อมระบบป้องกันการกดส่งซ้ำ)
  */
+let isSubmittingContract = false;
+
 createContractForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+
+  if (isSubmittingContract) return;
+
+  const btnSaveContract = document.getElementById('btnSaveContract');
+  const originalBtnText = btnSaveContract ? btnSaveContract.textContent : 'บันทึกสัญญาใหม่';
 
   const payload = {
     userId: document.getElementById('newUserId').value.trim(),
@@ -373,6 +383,12 @@ createContractForm.addEventListener('submit', async (e) => {
     cycleDays: document.getElementById('newCycleDays').value
   };
 
+  isSubmittingContract = true;
+  if (btnSaveContract) {
+    btnSaveContract.disabled = true;
+    btnSaveContract.textContent = '⏳ กำลังบันทึกสัญญาใหม่...';
+  }
+
   try {
     const res = await adminFetch('/api/admin/contracts', {
       method: 'POST',
@@ -382,7 +398,7 @@ createContractForm.addEventListener('submit', async (e) => {
 
     const json = await res.json();
     if (json.success) {
-      showToast('สร้างสัญญาใหม่สำเร็จ!', '✅');
+      showToast(json.message || 'สร้างสัญญาใหม่สำเร็จ!', '✅');
       createContractForm.reset();
       loadContracts();
       loadStats();
@@ -392,8 +408,37 @@ createContractForm.addEventListener('submit', async (e) => {
   } catch (err) {
     console.error('Error creating contract:', err);
     showToast('เกิดข้อผิดพลาดในการสร้างสัญญา', '❌');
+  } finally {
+    isSubmittingContract = false;
+    if (btnSaveContract) {
+      btnSaveContract.disabled = false;
+      btnSaveContract.textContent = originalBtnText;
+    }
   }
 });
+
+/**
+ * 5.1 ฟังก์ชันลบสัญญาหนี้
+ */
+window.deleteContract = async function(debtId) {
+  if (!confirm(`ต้องการลบสัญญา ${debtId} ใช่หรือไม่?`)) return;
+
+  try {
+    const res = await adminFetch(`/api/admin/contracts/${encodeURIComponent(debtId)}`, {
+      method: 'DELETE'
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast(json.message || 'ลบสัญญาเรียบร้อยแล้ว', '🗑️');
+      loadContracts();
+      loadStats();
+    } else {
+      showToast(json.message || 'ลบสัญญาไม่สำเร็จ', '❌');
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาดในการลบสัญญา', '❌');
+  }
+};
 
 /**
  * 6. โหลดและจัดการสลิป (Slips Approval Hub)

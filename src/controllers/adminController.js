@@ -71,6 +71,8 @@ async function getContracts(req, res) {
   }
 }
 
+const recentContractCreations = new Map();
+
 /**
  * 3. สร้างสัญญาหนี้ใหม่จากฝั่งแอดมิน
  */
@@ -82,6 +84,17 @@ async function createContract(req, res) {
       return res.status(400).json({
         success: false,
         message: 'กรุณากรอกข้อมูลที่จำเป็น: userId, totalAmount, installmentAmount, dueDate'
+      });
+    }
+
+    // ป้องกันการกดสร้างสัญญาซ้ำเบิ้ลหลายครั้งภายใน 15 วินาที
+    const dedupeKey = `${userId}_${totalAmount}_${installmentAmount}_${dueDate}`;
+    const lastCreation = recentContractCreations.get(dedupeKey);
+    if (lastCreation && (Date.now() - lastCreation.timestamp < 15000)) {
+      return res.status(200).json({
+        success: true,
+        message: 'สัญญาได้รับการสร้างเรียบร้อยแล้ว (ระบบป้องกันการสร้างซ้ำ)',
+        debt: lastCreation.debt
       });
     }
 
@@ -101,6 +114,11 @@ async function createContract(req, res) {
       installmentAmount,
       dueDate,
       cycleDays: cycleDays || 30
+    });
+
+    recentContractCreations.set(dedupeKey, {
+      timestamp: Date.now(),
+      debt: newDebt
     });
 
     return res.status(200).json({
@@ -227,17 +245,31 @@ async function remindSingleDebt(req, res) {
     const target = debts.find(d => d.debtId === debtId);
 
     if (!target) {
-      return res.status(404).json({ success: false, message: 'Debt record not found' });
+      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลสัญญาที่ระบุ' });
+    }
+
+    if (!target.userId) {
+      return res.status(400).json({ success: false, message: 'สัญญานี้ไม่มี LINE User ID ไม่สามารถส่งข้อความได้' });
     }
 
     const debtor = await sheetsService.getDebtorByUserId(target.userId);
+    const reminderSettingsService = require('../services/reminderSettingsService');
+    const settings = await reminderSettingsService.getSettings();
+    const tpl = settings.template || {};
+    const bankStr = tpl.bankName && tpl.accountNumber ? `${tpl.bankName} ${tpl.accountNumber}` : 'ธนาคารกสิกรไทย (KBANK) 123-4-56789-0';
+
     const flex = createReminderFlex({
       debtorName: debtor?.fullName || target.debtorName || 'คุณลูกค้า',
       debtId: target.debtId,
       installmentAmount: target.installmentAmount,
       remainingBalance: target.remainingBalance,
       dueDate: target.dueDate,
-      reminderType: 'DUE_TODAY'
+      reminderType: 'DUE_TODAY',
+      tone: tpl.tone || 'POLITE',
+      bankAccount: bankStr,
+      accountName: tpl.accountName || 'ชื่อบัญชีผู้รับโอน',
+      promptPayNumber: tpl.promptPayNumber || '',
+      customFooter: tpl.customFooter || ''
     });
 
     await lineService.pushMessage(target.userId, flex);
@@ -254,6 +286,29 @@ async function remindSingleDebt(req, res) {
     });
   } catch (error) {
     console.error('Error sending single reminder:', error);
+    const errMsg = error.originalError?.response?.data?.message || error.message;
+    return res.status(500).json({ success: false, message: errMsg });
+  }
+}
+
+/**
+ * 7.1 ลบสัญญาหนี้ (Delete Contract)
+ */
+async function deleteContract(req, res) {
+  try {
+    const { debtId } = req.params;
+    if (!debtId) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุรหัสสัญญา' });
+    }
+
+    const result = await sheetsService.deleteDebt(debtId);
+    return res.status(200).json({
+      success: true,
+      message: `ลบสัญญา ${debtId} เรียบร้อยแล้ว`,
+      result
+    });
+  } catch (error) {
+    console.error('Error deleting contract:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 }
@@ -462,6 +517,7 @@ module.exports = {
   getAdmins,
   saveAdmin,
   deleteAdmin,
+  deleteContract,
   getReminderSettings,
   saveReminderSettings,
   sendTestReminderPush,

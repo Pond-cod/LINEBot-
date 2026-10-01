@@ -6,10 +6,7 @@ const { lineClient } = require('../config/line');
 async function replyMessage(replyToken, messages) {
   try {
     const msgArray = Array.isArray(messages) ? messages : [messages];
-    return await lineClient.replyMessage({
-      replyToken,
-      messages: msgArray
-    });
+    return await lineClient.replyMessage(replyToken, msgArray);
   } catch (error) {
     console.error('❌ Error replying message:', error.originalError?.response?.data || error.message);
     throw error;
@@ -22,10 +19,7 @@ async function replyMessage(replyToken, messages) {
 async function pushMessage(toUserId, messages) {
   try {
     const msgArray = Array.isArray(messages) ? messages : [messages];
-    return await lineClient.pushMessage({
-      to: toUserId,
-      messages: msgArray
-    });
+    return await lineClient.pushMessage(toUserId, msgArray);
   } catch (error) {
     console.error(`❌ Error pushing message to ${toUserId}:`, error.originalError?.response?.data || error.message);
     throw error;

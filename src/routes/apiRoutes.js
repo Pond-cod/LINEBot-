@@ -5,6 +5,7 @@ const {
   getAdminStats,
   getContracts,
   createContract,
+  deleteContract,
   getSlips,
   approveSlip,
   rejectSlip,
@@ -24,7 +25,7 @@ const { isUserAdmin, requireAdminAuth, getAdminUserIds } = require('../middlewar
 
 const router = express.Router();
 
-router.get('/version', (req, res) => res.json({ version: '2.5.0', time: new Date() }));
+router.get('/version', (req, res) => res.json({ version: '2.5.1', time: new Date() }));
 
 // -------------------------------------------------------------
 // 1. Client Portal Endpoints
@@ -55,6 +56,7 @@ router.get('/admin/stats', requireAdminAuth, getAdminStats);
 router.get('/admin/debtors', requireAdminAuth, getDebtors);
 router.get('/admin/contracts', requireAdminAuth, getContracts);
 router.post('/admin/contracts', requireAdminAuth, createContract);
+router.delete('/admin/contracts/:debtId', requireAdminAuth, deleteContract);
 router.get('/admin/slips', requireAdminAuth, getSlips);
 router.post('/admin/slips/approve', requireAdminAuth, approveSlip);
 router.post('/admin/slips/reject', requireAdminAuth, rejectSlip);

@@ -190,7 +190,7 @@ function createReminderFlex({
                 text: accountName,
                 size: 'xs',
                 color: '#475569',
-                margin: 'xxs'
+                margin: 'xs'
               },
               ...(promptPayNumber ? [{
                 type: 'text',
@@ -217,7 +217,7 @@ function createReminderFlex({
             height: 'sm',
             action: {
               type: 'message',
-              label: '📸 ส่งสลิปชำระเงินในแชทนี้',
+              label: '📸 ส่งสลิปชำระเงิน',
               text: 'ฉันต้องการส่งสลิปชำระเงิน'
             }
           },
@@ -327,7 +327,7 @@ function createSlipReceivedFlex({
             height: 'sm',
             action: {
               type: 'uri',
-              label: '🔗 เปิดดูสลิปบน Google Drive',
+              label: '🔗 เปิดดูรูปสลิป',
               uri: slipViewUrl
             }
           }] : []),
@@ -536,7 +536,7 @@ function createWelcomeFlex({ displayName, liffUrl }) {
             height: 'sm',
             action: {
               type: 'uri',
-              label: '📱 เปิดระบบ Client Portal (LIFF)',
+              label: '📱 เปิด Client Portal',
               uri: liffUrl
             }
           }

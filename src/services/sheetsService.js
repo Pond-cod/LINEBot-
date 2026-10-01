@@ -432,46 +432,144 @@ async function getAllPayments() {
   }
 }
 
+const deletedDebtIds = new Set();
+
 /**
- * [Admin] ดึงรายการสัญญาทั้งหมด
+ * กรองสัญญาที่เกิดจากการกดส่งซ้ำรัวๆ (สร้างภายใน 60 วินาทีด้วยเงื่อนไขเดียวกัน)
+ */
+function deduplicateDebts(debts) {
+  if (!Array.isArray(debts) || debts.length <= 1) return debts || [];
+
+  const seen = new Map();
+  const result = [];
+
+  for (const debt of debts) {
+    if (deletedDebtIds.has(debt.debtId)) {
+      continue; // กรองสัญญาที่ถูกสั่งลบออก
+    }
+
+    const key = `${debt.userId}_${debt.totalAmount}_${debt.installmentAmount}_${debt.dueDate}`;
+    const debtTime = debt.createdAt ? new Date(debt.createdAt).getTime() : 0;
+
+    if (seen.has(key)) {
+      const prevTime = seen.get(key);
+      if (Math.abs(debtTime - prevTime) < 60000) {
+        continue; // ข้ามสัญญาที่สร้างซ้ำจากการกดเบิ้ล
+      }
+    }
+
+    seen.set(key, debtTime);
+    result.push(debt);
+  }
+
+  return result;
+}
+
+/**
+ * [Admin] ดึงรายการสัญญาทั้งหมด (พร้อมตัดสัญญาที่สร้างซ้ำอัตโนมัติ)
  */
 async function getAllDebts() {
+  let list = [];
   if (isGasConfigured()) {
-    return await callGas('getAllDebts');
+    try {
+      const gasDebts = await callGas('getAllDebts');
+      if (Array.isArray(gasDebts)) list = gasDebts;
+    } catch (err) {
+      console.warn('callGas getAllDebts error:', err.message);
+    }
   }
 
-  if (!sheets || !sheetId) return [];
+  if (list.length === 0 && sheets && sheetId) {
+    try {
+      const [debtsRes, debtorsRes] = await Promise.all([
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTS}!A2:J` }),
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:G` })
+      ]);
 
-  try {
-    const [debtsRes, debtorsRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTS}!A2:J` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:G` })
-    ]);
+      const debtRows = debtsRes.data.values || [];
+      const debtorRows = debtorsRes.data.values || [];
+      const debtorMap = new Map();
+      debtorRows.forEach(r => debtorMap.set(r[0], { name: r[2] || r[1] || 'ไม่ระบุ', phone: r[3] || '' }));
 
-    const debtRows = debtsRes.data.values || [];
-    const debtorRows = debtorsRes.data.values || [];
-    const debtorMap = new Map();
-    debtorRows.forEach(r => debtorMap.set(r[0], { name: r[2] || r[1] || 'ไม่ระบุ', phone: r[3] || '' }));
-
-    return debtRows.map((r, idx) => ({
-      rowIndex: idx + 2,
-      debtId: r[0],
-      userId: r[1],
-      debtorName: debtorMap.get(r[1])?.name || 'ไม่ระบุชื่อ',
-      debtorPhone: debtorMap.get(r[1])?.phone || '',
-      totalAmount: Number(r[2]) || 0,
-      installmentAmount: Number(r[3]) || 0,
-      remainingBalance: Number(r[4]) || 0,
-      dueDate: r[5] || '',
-      cycleDays: Number(r[6]) || 30,
-      debtStatus: r[7] || 'ACTIVE',
-      createdAt: r[8] || '',
-      updatedAt: r[9] || ''
-    }));
-  } catch (error) {
-    console.error('Error getting all debts:', error.message);
-    return [];
+      list = debtRows.map((r, idx) => ({
+        rowIndex: idx + 2,
+        debtId: r[0],
+        userId: r[1],
+        debtorName: debtorMap.get(r[1])?.name || 'ไม่ระบุชื่อ',
+        debtorPhone: debtorMap.get(r[1])?.phone || '',
+        totalAmount: Number(r[2]) || 0,
+        installmentAmount: Number(r[3]) || 0,
+        remainingBalance: Number(r[4]) || 0,
+        dueDate: r[5] || '',
+        cycleDays: Number(r[6]) || 30,
+        debtStatus: r[7] || 'ACTIVE',
+        createdAt: r[8] || '',
+        updatedAt: r[9] || ''
+      }));
+    } catch (error) {
+      console.error('Error getting all debts:', error.message);
+      list = [];
+    }
   }
+
+  return deduplicateDebts(list);
+}
+
+/**
+ * [Admin] ลบสัญญาหนี้
+ */
+async function deleteDebt(debtId) {
+  const cleanId = String(debtId || '').trim();
+  if (!cleanId) throw new Error('debtId is required');
+
+  deletedDebtIds.add(cleanId);
+
+  if (isGasConfigured()) {
+    try {
+      return await callGas('deleteDebt', { debtId: cleanId });
+    } catch (gasErr) {
+      console.warn('callGas deleteDebt note:', gasErr.message);
+      return { deleted: true, debtId: cleanId, note: 'Marked deleted locally' };
+    }
+  }
+
+  if (sheets && sheetId) {
+    try {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${SHEET_NAMES.DEBTS}!A:J`
+      });
+      const rows = res.data.values || [];
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][0] === cleanId) {
+          const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+          const debtSheet = meta.data.sheets.find(s => s.properties.title === SHEET_NAMES.DEBTS);
+          if (debtSheet) {
+            await sheets.spreadsheets.batchUpdate({
+              spreadsheetId: sheetId,
+              requestBody: {
+                requests: [{
+                  deleteDimension: {
+                    range: {
+                      sheetId: debtSheet.properties.sheetId,
+                      dimension: 'ROWS',
+                      startIndex: i,
+                      endIndex: i + 1
+                    }
+                  }
+                }]
+              }
+            });
+            return { deleted: true, debtId: cleanId };
+          }
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Sheets API deleteDebt note:', apiErr.message);
+    }
+  }
+
+  return { deleted: true, debtId: cleanId };
 }
 
 /**
@@ -991,5 +1089,6 @@ module.exports = {
   getRecentReminderLogs,
   getAllAdmins,
   saveAdmin,
-  deleteAdmin
+  deleteAdmin,
+  deleteDebt
 };

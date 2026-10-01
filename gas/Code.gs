@@ -121,6 +121,10 @@ function doPost(e) {
         result = handleDeleteAdmin(contents.userId);
         break;
 
+      case 'deleteDebt':
+        result = handleDeleteDebt(contents.debtId);
+        break;
+
       default:
         throw new Error('Unknown action: ' + action);
     }
@@ -755,4 +759,26 @@ function handleDeleteAdmin(userId) {
   }
 
   return { deleted: false, message: 'Admin not found' };
+}
+
+/**
+ * ลบสัญญาหนี้ออกจากชีต Debts
+ */
+function handleDeleteDebt(debtId) {
+  const cleanId = String(debtId || '').trim();
+  if (!cleanId) throw new Error('debtId is required');
+
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.DEBTS);
+  if (!sheet) return { deleted: false, message: 'Sheet not found' };
+
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === cleanId) {
+      sheet.deleteRow(i + 1);
+      return { deleted: true, debtId: cleanId };
+    }
+  }
+
+  return { deleted: false, message: 'Debt not found' };
 }
