@@ -44,6 +44,33 @@ const pendingSlipsBadge = document.getElementById('pendingSlipsBadge');
 // Reminders Elements
 const manualDebtIdInput = document.getElementById('manualDebtIdInput');
 const btnManualPushSingle = document.getElementById('btnManualPushSingle');
+const overviewReminderStatusBadge = document.getElementById('overviewReminderStatusBadge');
+const overviewReminderDesc = document.getElementById('overviewReminderDesc');
+const cfgEnabled = document.getElementById('cfgEnabled');
+const masterStatusBadge = document.getElementById('masterStatusBadge');
+const cfgPrimaryTime = document.getElementById('cfgPrimaryTime');
+const cfgSecondaryTimeEnabled = document.getElementById('cfgSecondaryTimeEnabled');
+const cfgSecondaryTime = document.getElementById('cfgSecondaryTime');
+const secondaryTimeWrapper = document.getElementById('secondaryTimeWrapper');
+const cfgRemindBeforeEnabled = document.getElementById('cfgRemindBeforeEnabled');
+const cfgRemindBeforeDays = document.getElementById('cfgRemindBeforeDays');
+const remindBeforeDaysWrapper = document.getElementById('remindBeforeDaysWrapper');
+const cfgRemindDueTodayEnabled = document.getElementById('cfgRemindDueTodayEnabled');
+const cfgRemindOverdueEnabled = document.getElementById('cfgRemindOverdueEnabled');
+const cfgOverdueFrequency = document.getElementById('cfgOverdueFrequency');
+const overdueFrequencyWrapper = document.getElementById('overdueFrequencyWrapper');
+const cfgTone = document.getElementById('cfgTone');
+const cfgBankName = document.getElementById('cfgBankName');
+const cfgAccountNumber = document.getElementById('cfgAccountNumber');
+const cfgAccountName = document.getElementById('cfgAccountName');
+const cfgPromptPay = document.getElementById('cfgPromptPay');
+const cfgCustomFooter = document.getElementById('cfgCustomFooter');
+const cfgNotifyAdmin = document.getElementById('cfgNotifyAdmin');
+const btnSaveReminderSettings = document.getElementById('btnSaveReminderSettings');
+const btnTestPushToAdmin = document.getElementById('btnTestPushToAdmin');
+const btnTriggerCronFromSettings = document.getElementById('btnTriggerCronFromSettings');
+const btnRefreshLogs = document.getElementById('btnRefreshLogs');
+const reminderLogsContainer = document.getElementById('reminderLogsContainer');
 
 // Debtors Elements
 const debtorsCountBadge = document.getElementById('debtorsCountBadge');
@@ -140,6 +167,7 @@ function unlockAdminView(profile) {
   if (adminSubtitle) adminSubtitle.textContent = `แอดมิน: ${profile.displayName}`;
   if (btnAdminLogout) btnAdminLogout.style.display = 'block';
   loadStats();
+  loadReminderSettings();
 }
 
 function showLoginState() {
@@ -234,6 +262,10 @@ function switchView(targetViewId) {
   if (targetViewId === 'view-admin-debtors') loadDebtors();
   if (targetViewId === 'view-admin-contracts') loadContracts();
   if (targetViewId === 'view-admin-slips') loadSlips();
+  if (targetViewId === 'view-admin-reminders') {
+    loadReminderSettings();
+    loadReminderLogs();
+  }
   if (targetViewId === 'view-admin-managers') loadAdmins();
 }
 
@@ -491,11 +523,247 @@ window.rejectSlip = async function(paymentId) {
 };
 
 /**
- * 9. ยิงแจ้งเตือน 08:00 น. ทันที
+ * 9. ระบบจัดการการตั้งค่าแจ้งเตือนอัตโนมัติแบบละเอียด (Detailed Reminder Settings)
  */
-btnTriggerCronNow.addEventListener('click', async () => {
-  btnTriggerCronNow.disabled = true;
-  btnTriggerCronNow.textContent = '⏳ กำลังประมวลผลและยิงข้อความ...';
+async function loadReminderSettings() {
+  try {
+    const res = await adminFetch('/api/admin/reminder/settings');
+    const json = await res.json();
+    if (!json.success || !json.settings) return;
+
+    const s = json.settings;
+
+    // Master Switch
+    if (cfgEnabled) {
+      cfgEnabled.checked = s.enabled !== false;
+      updateMasterStatusDisplay(s.enabled !== false);
+    }
+
+    // Schedule
+    if (cfgPrimaryTime) cfgPrimaryTime.value = s.primaryTime || '08:00';
+    if (cfgSecondaryTimeEnabled) {
+      cfgSecondaryTimeEnabled.checked = !!s.secondaryTimeEnabled;
+      if (secondaryTimeWrapper) {
+        secondaryTimeWrapper.style.display = s.secondaryTimeEnabled ? 'block' : 'none';
+      }
+    }
+    if (cfgSecondaryTime) cfgSecondaryTime.value = s.secondaryTime || '18:00';
+
+    // Rules
+    const r = s.rules || {};
+    if (cfgRemindBeforeEnabled) {
+      cfgRemindBeforeEnabled.checked = r.remindBeforeEnabled !== false;
+      if (remindBeforeDaysWrapper) {
+        remindBeforeDaysWrapper.style.display = r.remindBeforeEnabled !== false ? 'flex' : 'none';
+      }
+    }
+    if (cfgRemindBeforeDays) cfgRemindBeforeDays.value = String(r.remindBeforeDays || 1);
+
+    if (cfgRemindDueTodayEnabled) {
+      cfgRemindDueTodayEnabled.checked = r.remindDueTodayEnabled !== false;
+    }
+
+    if (cfgRemindOverdueEnabled) {
+      cfgRemindOverdueEnabled.checked = r.remindOverdueEnabled !== false;
+      if (overdueFrequencyWrapper) {
+        overdueFrequencyWrapper.style.display = r.remindOverdueEnabled !== false ? 'flex' : 'none';
+      }
+    }
+    if (cfgOverdueFrequency) cfgOverdueFrequency.value = r.overdueFrequency || 'DAILY';
+
+    // Template
+    const tpl = s.template || {};
+    if (cfgTone) cfgTone.value = tpl.tone || 'POLITE';
+    if (cfgBankName) cfgBankName.value = tpl.bankName || '';
+    if (cfgAccountNumber) cfgAccountNumber.value = tpl.accountNumber || '';
+    if (cfgAccountName) cfgAccountName.value = tpl.accountName || '';
+    if (cfgPromptPay) cfgPromptPay.value = tpl.promptPayNumber || '';
+    if (cfgCustomFooter) cfgCustomFooter.value = tpl.customFooter || '';
+
+    // Admin notify
+    if (cfgNotifyAdmin) {
+      cfgNotifyAdmin.checked = s.notifyAdminOnRun !== false;
+    }
+
+    // Update Overview Card
+    updateOverviewReminderCard(s);
+
+  } catch (err) {
+    console.error('Error loading reminder settings:', err);
+  }
+}
+
+function updateMasterStatusDisplay(enabled) {
+  if (!masterStatusBadge) return;
+  if (enabled) {
+    masterStatusBadge.textContent = '🟢 สถานะ: กำลังเปิดทำงานอัตโนมัติ';
+    masterStatusBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+    masterStatusBadge.style.color = '#10B981';
+  } else {
+    masterStatusBadge.textContent = '🔴 สถานะ: ปิดการทำงานชั่วคราว';
+    masterStatusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+    masterStatusBadge.style.color = '#EF4444';
+  }
+}
+
+function updateOverviewReminderCard(s) {
+  if (overviewReminderStatusBadge) {
+    if (s.enabled !== false) {
+      overviewReminderStatusBadge.textContent = `เปิดใช้งาน (${s.primaryTime || '08:00'} น.)`;
+      overviewReminderStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+      overviewReminderStatusBadge.style.color = '#10B981';
+    } else {
+      overviewReminderStatusBadge.textContent = 'ปิดใช้งาน';
+      overviewReminderStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+      overviewReminderStatusBadge.style.color = '#EF4444';
+    }
+  }
+
+  if (overviewReminderDesc) {
+    const rules = [];
+    if (s.rules?.remindBeforeEnabled) rules.push(`ก่อนกำหนด ${s.rules.remindBeforeDays || 1} วัน`);
+    if (s.rules?.remindDueTodayEnabled) rules.push('วันครบกำหนด');
+    if (s.rules?.remindOverdueEnabled) rules.push('ค้างชำระ');
+    const rulesStr = rules.length ? rules.join(', ') : 'ไม่มีเงื่อนไขที่เปิด';
+    overviewReminderDesc.textContent = `ระบบทำงานอัตโนมัติทุกเช้า ${s.primaryTime || '08:00'} น. (${rulesStr})`;
+  }
+}
+
+// UI Interactive Event Listeners
+if (cfgEnabled) {
+  cfgEnabled.addEventListener('change', () => {
+    updateMasterStatusDisplay(cfgEnabled.checked);
+  });
+}
+
+if (cfgSecondaryTimeEnabled) {
+  cfgSecondaryTimeEnabled.addEventListener('change', () => {
+    if (secondaryTimeWrapper) {
+      secondaryTimeWrapper.style.display = cfgSecondaryTimeEnabled.checked ? 'block' : 'none';
+    }
+  });
+}
+
+if (cfgRemindBeforeEnabled) {
+  cfgRemindBeforeEnabled.addEventListener('change', () => {
+    if (remindBeforeDaysWrapper) {
+      remindBeforeDaysWrapper.style.display = cfgRemindBeforeEnabled.checked ? 'flex' : 'none';
+    }
+  });
+}
+
+if (cfgRemindOverdueEnabled) {
+  cfgRemindOverdueEnabled.addEventListener('change', () => {
+    if (overdueFrequencyWrapper) {
+      overdueFrequencyWrapper.style.display = cfgRemindOverdueEnabled.checked ? 'flex' : 'none';
+    }
+  });
+}
+
+// Save Settings Handler
+if (btnSaveReminderSettings) {
+  btnSaveReminderSettings.addEventListener('click', async () => {
+    btnSaveReminderSettings.disabled = true;
+    const originalText = btnSaveReminderSettings.textContent;
+    btnSaveReminderSettings.textContent = '⏳ กำลังบันทึกการตั้งค่า...';
+
+    const payload = {
+      enabled: cfgEnabled ? cfgEnabled.checked : true,
+      primaryTime: cfgPrimaryTime ? cfgPrimaryTime.value : '08:00',
+      secondaryTimeEnabled: cfgSecondaryTimeEnabled ? cfgSecondaryTimeEnabled.checked : false,
+      secondaryTime: cfgSecondaryTime ? cfgSecondaryTime.value : '18:00',
+      timezone: 'Asia/Bangkok',
+      rules: {
+        remindBeforeEnabled: cfgRemindBeforeEnabled ? cfgRemindBeforeEnabled.checked : true,
+        remindBeforeDays: cfgRemindBeforeDays ? parseInt(cfgRemindBeforeDays.value) : 1,
+        remindDueTodayEnabled: cfgRemindDueTodayEnabled ? cfgRemindDueTodayEnabled.checked : true,
+        remindOverdueEnabled: cfgRemindOverdueEnabled ? cfgRemindOverdueEnabled.checked : true,
+        overdueFrequency: cfgOverdueFrequency ? cfgOverdueFrequency.value : 'DAILY'
+      },
+      template: {
+        tone: cfgTone ? cfgTone.value : 'POLITE',
+        bankName: cfgBankName ? cfgBankName.value.trim() : '',
+        accountNumber: cfgAccountNumber ? cfgAccountNumber.value.trim() : '',
+        accountName: cfgAccountName ? cfgAccountName.value.trim() : '',
+        promptPayNumber: cfgPromptPay ? cfgPromptPay.value.trim() : '',
+        customFooter: cfgCustomFooter ? cfgCustomFooter.value.trim() : ''
+      },
+      notifyAdminOnRun: cfgNotifyAdmin ? cfgNotifyAdmin.checked : true
+    };
+
+    try {
+      const res = await adminFetch('/api/admin/reminder/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message || 'บันทึกการตั้งค่าเรียบร้อยแล้ว', '💾');
+        updateOverviewReminderCard(payload);
+      } else {
+        showToast(json.message || 'เกิดข้อผิดพลาดในการบันทึก', '❌');
+      }
+    } catch (err) {
+      showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกการตั้งค่าได้', '❌');
+    } finally {
+      btnSaveReminderSettings.disabled = false;
+      btnSaveReminderSettings.textContent = originalText;
+    }
+  });
+}
+
+// Test Push Handler
+if (btnTestPushToAdmin) {
+  btnTestPushToAdmin.addEventListener('click', async () => {
+    btnTestPushToAdmin.disabled = true;
+    const originalText = btnTestPushToAdmin.textContent;
+    btnTestPushToAdmin.textContent = '⏳ กำลังส่งเข้า LINE...';
+
+    const testPayload = {
+      adminUserId: currentAdminUser?.userId,
+      tone: cfgTone ? cfgTone.value : 'POLITE',
+      reminderType: 'DUE_TODAY',
+      template: {
+        tone: cfgTone ? cfgTone.value : 'POLITE',
+        bankName: cfgBankName ? cfgBankName.value.trim() : '',
+        accountNumber: cfgAccountNumber ? cfgAccountNumber.value.trim() : '',
+        accountName: cfgAccountName ? cfgAccountName.value.trim() : '',
+        promptPayNumber: cfgPromptPay ? cfgPromptPay.value.trim() : '',
+        customFooter: cfgCustomFooter ? cfgCustomFooter.value.trim() : ''
+      }
+    };
+
+    try {
+      const res = await adminFetch('/api/admin/reminder/test-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testPayload)
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast('ส่งตัวอย่างเข้า LINE สำเร็จ 📲 ตรวจสอบที่แชทของคุณ', '✅');
+      } else {
+        showToast(json.message || 'ส่งตัวอย่างไม่สำเร็จ', '❌');
+      }
+    } catch (err) {
+      showToast('เกิดข้อผิดพลาดในการส่งตัวอย่าง', '❌');
+    } finally {
+      btnTestPushToAdmin.disabled = false;
+      btnTestPushToAdmin.textContent = originalText;
+    }
+  });
+}
+
+// Shared Trigger Cron Now
+async function executeCronTrigger(btnEl) {
+  if (!confirm('ยืนยันสั่งสแกนและยิงแจ้งเตือนลูกหนี้ทุกคนที่เข้าเงื่อนไขในวันนี้ทันที ใช่หรือไม่?')) return;
+
+  const originalText = btnEl ? btnEl.textContent : '';
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = '⏳ กำลังประมวลผลและยิงข้อความ...';
+  }
 
   try {
     const res = await adminFetch('/api/reminder/trigger-now', { method: 'POST' });
@@ -504,16 +772,89 @@ btnTriggerCronNow.addEventListener('click', async () => {
     if (json.success) {
       const s = json.summary;
       showToast(`ยิงเตือนสำเร็จ ${s.sent} ราย (ข้าม ${s.skipped} ราย)`, '🚀');
+      loadReminderLogs();
     } else {
-      showToast('เกิดข้อผิดพลาดในการยิงแจ้งเตือน', '❌');
+      showToast(json.message || 'เกิดข้อผิดพลาดในการยิงแจ้งเตือน', '❌');
     }
   } catch (err) {
     showToast('ไม่สามารถเชื่อมต่อระบบแจ้งเตือนได้', '❌');
   } finally {
-    btnTriggerCronNow.disabled = false;
-    btnTriggerCronNow.textContent = '🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)';
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.textContent = originalText || '🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)';
+    }
   }
-});
+}
+
+if (btnTriggerCronNow) {
+  btnTriggerCronNow.addEventListener('click', () => executeCronTrigger(btnTriggerCronNow));
+}
+
+if (btnTriggerCronFromSettings) {
+  btnTriggerCronFromSettings.addEventListener('click', () => executeCronTrigger(btnTriggerCronFromSettings));
+}
+
+// Load Reminder Logs
+async function loadReminderLogs() {
+  if (!reminderLogsContainer) return;
+  reminderLogsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 14px; font-size: 12px;">⏳ กำลังโหลดประวัติ...</div>';
+
+  try {
+    const res = await adminFetch('/api/admin/reminder/logs?limit=15');
+    const json = await res.json();
+    if (!json.success || !json.logs || json.logs.length === 0) {
+      reminderLogsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 12px;">ยังไม่มีประวัติการส่งแจ้งเตือนในระบบ</div>';
+      return;
+    }
+
+    const typeLabels = {
+      'BEFORE_DUE': { text: 'ก่อนกำหนด', color: '#60A5FA' },
+      'DUE_TODAY': { text: 'ครบกำหนด', color: '#34D399' },
+      'OVERDUE': { text: 'ค้างชำระ', color: '#F87171' }
+    };
+
+    let html = '';
+    json.logs.forEach(item => {
+      const typeInfo = typeLabels[item.reminderType] || { text: item.reminderType || 'แจ้งเตือน', color: '#94A3B8' };
+      const isSuccess = (item.status || '').toUpperCase() === 'SENT';
+      const statusBadge = isSuccess
+        ? '<span style="color: #10B981; font-weight: 600; font-size: 11px;">✓ สำเร็จ</span>'
+        : '<span style="color: #EF4444; font-weight: 600; font-size: 11px;">✕ ไม่สำเร็จ</span>';
+
+      html += `
+        <div class="log-item">
+          <div style="flex: 1; min-width: 0; margin-right: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+              <span style="background: rgba(255,255,255,0.08); color: ${typeInfo.color}; padding: 1px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 600;">
+                ${typeInfo.text}
+              </span>
+              <strong style="color: #FFFFFF; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${item.debtorName || item.debtId || '-'}
+              </strong>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              สัญญา: ${item.debtId || '-'} | ${item.timestamp || '-'}
+            </div>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            ${statusBadge}
+          </div>
+        </div>
+      `;
+    });
+
+    reminderLogsContainer.innerHTML = html;
+  } catch (err) {
+    reminderLogsContainer.innerHTML = '<div style="text-align: center; color: #EF4444; padding: 12px; font-size: 12px;">เกิดข้อผิดพลาดในการโหลดประวัติ</div>';
+  }
+}
+
+if (btnRefreshLogs) {
+  btnRefreshLogs.addEventListener('click', () => {
+    loadReminderLogs();
+    showToast('รีเฟรชประวัติการแจ้งเตือนแล้ว', '🔄');
+  });
+}
 
 /**
  * 10. ยิงแจ้งเตือนรายคน
@@ -526,6 +867,7 @@ window.sendSingleReminder = async function(debtId) {
     const json = await res.json();
     if (json.success) {
       showToast(json.message || 'ส่งแจ้งเตือนเรียบร้อยแล้ว', '✅');
+      loadReminderLogs();
     } else {
       showToast(json.message || 'ส่งแจ้งเตือนไม่สำเร็จ', '❌');
     }

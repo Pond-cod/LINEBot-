@@ -363,6 +363,93 @@ async function deleteAdmin(req, res) {
   }
 }
 
+/**
+ * 12. ดึงการตั้งค่าระบบแจ้งเตือนอัตโนมัติ
+ */
+async function getReminderSettings(req, res) {
+  try {
+    const reminderSettingsService = require('../services/reminderSettingsService');
+    const settings = await reminderSettingsService.getSettings();
+    return res.status(200).json({ success: true, settings });
+  } catch (error) {
+    console.error('Error getting reminder settings:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 13. บันทึกการตั้งค่าระบบแจ้งเตือนอัตโนมัติ
+ */
+async function saveReminderSettings(req, res) {
+  try {
+    const reminderSettingsService = require('../services/reminderSettingsService');
+    const updated = await reminderSettingsService.saveSettings(req.body);
+    return res.status(200).json({
+      success: true,
+      message: 'บันทึกการตั้งค่าระบบแจ้งเตือนเรียบร้อยแล้ว',
+      settings: updated
+    });
+  } catch (error) {
+    console.error('Error saving reminder settings:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 14. ส่งข้อความแจ้งเตือนตัวอย่างไปยัง LINE แอดมิน (Test Preview)
+ */
+async function sendTestReminderPush(req, res) {
+  try {
+    const targetUserId = req.headers['x-line-userid'] || req.body?.adminUserId;
+    if (!targetUserId) {
+      return res.status(400).json({ success: false, message: 'ไม่พบ LINE User ID ของแอดมินสำหรับส่งตัวอย่าง' });
+    }
+
+    const { template, tone, reminderType } = req.body || {};
+    const tpl = template || {};
+    const bankStr = tpl.bankName && tpl.accountNumber ? `${tpl.bankName} ${tpl.accountNumber}` : 'ธนาคารกสิกรไทย (KBANK) 123-4-56789-0';
+
+    const { createReminderFlex } = require('../templates/flexMessages');
+    const flex = createReminderFlex({
+      debtorName: 'ตัวอย่าง: คุณทดสอบ ระบบ',
+      debtId: 'DB-TEST-999',
+      installmentAmount: 2500,
+      remainingBalance: 12500,
+      dueDate: dayjs().format('YYYY-MM-DD'),
+      reminderType: reminderType || 'DUE_TODAY',
+      tone: tone || tpl.tone || 'POLITE',
+      bankAccount: bankStr,
+      accountName: tpl.accountName || 'ชื่อบัญชีตัวอย่าง',
+      promptPayNumber: tpl.promptPayNumber || '',
+      customFooter: tpl.customFooter || ''
+    });
+
+    await lineService.pushMessage(targetUserId, flex);
+
+    return res.status(200).json({
+      success: true,
+      message: 'ส่งข้อความตัวอย่างเข้าแชท LINE ของคุณเรียบร้อยแล้ว'
+    });
+  } catch (error) {
+    console.error('Error sending test push:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 15. ดึงประวัติการส่งแจ้งเตือนล่าสุด
+ */
+async function getReminderLogs(req, res) {
+  try {
+    const limit = parseInt(req.query.limit) || 15;
+    const logs = await sheetsService.getRecentReminderLogs(limit);
+    return res.status(200).json({ success: true, logs });
+  } catch (error) {
+    console.error('Error getting reminder logs:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   getAdminStats,
   getContracts,
@@ -374,5 +461,9 @@ module.exports = {
   getDebtors,
   getAdmins,
   saveAdmin,
-  deleteAdmin
+  deleteAdmin,
+  getReminderSettings,
+  saveReminderSettings,
+  sendTestReminderPush,
+  getReminderLogs
 };

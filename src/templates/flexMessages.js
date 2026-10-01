@@ -18,21 +18,24 @@ function createReminderFlex({
   dueDate,
   reminderType = 'DUE_TODAY',
   bankAccount = 'กสิกรไทย (KBANK) 123-4-56789-0',
-  accountName = 'ชื่อบัญชีผู้รับโอน'
+  accountName = 'ชื่อบัญชีผู้รับโอน',
+  promptPayNumber = '',
+  tone = 'POLITE',
+  customFooter = ''
 }) {
   let badgeText = 'แจ้งเตือนครบกำหนดชำระ';
   let badgeColor = '#06C755';
   let headerTitle = 'แจ้งเตือนรอบชำระหนี้';
   let subText = `ถึงกำหนดชำระวันที่ ${dueDate}`;
 
-  if (reminderType === 'DUE_BEFORE_1_DAY') {
-    badgeText = 'เตือนล่วงหน้า 1 วัน';
-    badgeColor = '#FFA500';
-    headerTitle = 'แจ้งเตือนชำระวันพรุ่งนี้';
-    subText = `ครบกำหนดชำระในวันพรุ่งนี้ (${dueDate})`;
+  if (reminderType && reminderType.startsWith('DUE_BEFORE')) {
+    badgeText = 'เตือนล่วงหน้า';
+    badgeColor = '#F59E0B';
+    headerTitle = 'แจ้งเตือนชำระล่วงหน้า';
+    subText = `ครบกำหนดชำระวันที่ ${dueDate}`;
   } else if (reminderType === 'OVERDUE') {
     badgeText = 'เกินกำหนดชำระ!';
-    badgeColor = '#D93025';
+    badgeColor = '#EF4444';
     headerTitle = 'แจ้งเตือนเกินกำหนดชำระ';
     subText = `เกินกำหนดชำระตั้งแต่วันที่ ${dueDate} กรุณาดำเนินการ`;
   } else {
@@ -40,6 +43,19 @@ function createReminderFlex({
     badgeColor = '#06C755';
     headerTitle = 'ครบกำหนดชำระวันนี้';
     subText = `ครบกำหนดชำระภายในวันนี้ (${dueDate})`;
+  }
+
+  // ปรับตาม Tone (ระดับความเข้มงวดของข้อความ)
+  if (tone === 'URGENT') {
+    badgeColor = '#DC2626';
+    badgeText = '⚠️ เตือนเร่งด่วน!';
+    headerTitle = 'แจ้งเตือนยอดชำระเร่งด่วน';
+    subText = `กรุณาชำระเงินและส่งหลักฐานทันทีเพื่อรักษาสิทธิ์ของท่าน`;
+  } else if (tone === 'FORMAL') {
+    badgeColor = '#2563EB';
+    badgeText = 'แจ้งยอดชำระ';
+    headerTitle = 'แจ้งยอดครบกำหนดตามสัญญา';
+    subText = `สัญญาเงินกู้เลขที่ ${debtId || '-'} ครบกำหนดชำระวันที่ ${dueDate}`;
   }
 
   return {
@@ -175,7 +191,15 @@ function createReminderFlex({
                 size: 'xs',
                 color: '#475569',
                 margin: 'xxs'
-              }
+              },
+              ...(promptPayNumber ? [{
+                type: 'text',
+                text: `พร้อมเพย์: ${promptPayNumber}`,
+                size: 'xs',
+                weight: 'bold',
+                color: '#0284C7',
+                margin: 'xs'
+              }] : [])
             ]
           }
         ]
@@ -199,11 +223,12 @@ function createReminderFlex({
           },
           {
             type: 'text',
-            text: '💡 เมื่อโอนเงินแล้ว กรุณาส่งรูปสลิปเข้ามาในแชทนี้ได้ทันที',
+            text: customFooter || '💡 เมื่อโอนเงินแล้ว กรุณาส่งรูปสลิปเข้ามาในแชทนี้ได้ทันที',
             size: 'xxs',
             color: '#94A3B8',
             align: 'center',
-            margin: 'xs'
+            margin: 'xs',
+            wrap: true
           }
         ]
       }
@@ -616,10 +641,96 @@ function createPaymentStatusFlex({
   };
 }
 
+/**
+ * 6. Flex Message: สรุปผลการแจ้งเตือนหนี้ประจำวันส่งให้ Admin
+ */
+function createAdminDailySummaryFlex({
+  triggerType = 'อัตโนมัติ (Cron Job)',
+  totalCandidates = 0,
+  sent = 0,
+  skipped = 0,
+  failed = 0,
+  time = ''
+}) {
+  return {
+    type: 'flex',
+    altText: `📊 [สรุปแจ้งเตือน] ส่งสำเร็จ ${sent} ราย`,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#0F172A',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '📊 สรุปผลการยิงแจ้งเตือนหนี้',
+            weight: 'bold',
+            size: 'md',
+            color: '#38BDF8'
+          },
+          {
+            type: 'text',
+            text: `รอบทำงาน: ${triggerType} (${time || 'วันนี้'})`,
+            size: 'xs',
+            color: '#94A3B8',
+            margin: 'xs'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              { type: 'text', text: 'ตรวจพบรายการ:', color: '#64748B', size: 'sm', flex: 3 },
+              { type: 'text', text: `${totalCandidates} ราย`, color: '#FFFFFF', size: 'sm', weight: 'bold', align: 'end', flex: 2 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: '✅ ส่งสำเร็จ:', color: '#10B981', size: 'sm', flex: 3 },
+              { type: 'text', text: `${sent} ราย`, color: '#10B981', size: 'sm', weight: 'bold', align: 'end', flex: 2 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: '⏭️ ข้าม (ส่งไปแล้ว):', color: '#F59E0B', size: 'sm', flex: 3 },
+              { type: 'text', text: `${skipped} ราย`, color: '#F59E0B', size: 'sm', weight: 'bold', align: 'end', flex: 2 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: '❌ ผิดพลาด:', color: '#EF4444', size: 'sm', flex: 3 },
+              { type: 'text', text: `${failed} ราย`, color: '#EF4444', size: 'sm', weight: 'bold', align: 'end', flex: 2 }
+            ]
+          }
+        ]
+      }
+    }
+  };
+}
+
 module.exports = {
   createReminderFlex,
   createSlipReceivedFlex,
   createDebtSummaryFlex,
   createWelcomeFlex,
-  createPaymentStatusFlex
+  createPaymentStatusFlex,
+  createAdminDailySummaryFlex
 };

@@ -65,17 +65,23 @@
           </div>
         </div>
 
-        <!-- Quick Remind Trigger -->
+        <!-- Quick Remind Trigger & Settings Link -->
         <div class="panel-card">
-          <div class="panel-header">
-            <div class="panel-title">⏰ ระบบแจ้งเตือนอัตโนมัติ (08:00 น.)</div>
+          <div class="panel-header" style="margin-bottom: 8px;">
+            <div class="panel-title">⏰ ระบบแจ้งเตือนอัตโนมัติ</div>
+            <span id="overviewReminderStatusBadge" style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10B981; padding: 2px 8px; border-radius: 10px;">เปิดใช้งาน (08:00 น.)</span>
           </div>
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-            ระบบทำงานอัตโนมัติทุกเช้า 08:00 น. หากต้องการสั่งให้ระบบสแกนและยิงข้อความเตือนลูกหนี้ทันที สามารถกดปุ่มด้านล่างได้ครับ
+          <p id="overviewReminderDesc" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+            ระบบทำงานอัตโนมัติทุกเช้า 08:00 น. (เตือนล่วงหน้า 1 วัน, วันครบกำหนด, และค้างชำระ)
           </p>
-          <button class="btn-primary-admin" id="btnTriggerCronNow">
-            🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)
-          </button>
+          <div style="display: flex; gap: 8px; flex-direction: column;">
+            <button class="btn-primary-admin" id="btnTriggerCronNow" style="background: #0284C7;">
+              🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)
+            </button>
+            <button class="btn-primary-admin" onclick="switchView('view-admin-reminders')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #FFFFFF; margin-top: 0;">
+              ⚙️ ตั้งค่าระบบแจ้งเตือนแบบละเอียด
+            </button>
+          </div>
         </div>
       </section>
 
@@ -176,29 +182,219 @@
       </section>
 
       <!-- ========================================== -->
-      <!-- SUB-VIEW 4: REMINDERS & LOGS              -->
+      <!-- SUB-VIEW 4: REMINDERS & DETAILED SETTINGS  -->
       <!-- ========================================== -->
       <section id="view-admin-reminders" class="sub-view">
+        
+        <!-- Header & Master Toggle Card -->
         <div class="panel-card">
-          <div class="panel-title" style="margin-bottom: 10px;">⏰ แดชบอร์ดระบบแจ้งเตือน</div>
-          <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
-            สถานะ Cron Job: <strong style="color: #10B981;">กำลังทำงาน (08:00 น. ทุกวัน)</strong><br>
-            โซนเวลา: <strong>Asia/Bangkok</strong>
-          </p>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div>
+              <div class="panel-title" style="font-size: 15px;">⚙️ ตั้งค่าระบบแจ้งเตือนอัตโนมัติ</div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+                กำหนดเวลา เงื่อนไข 3 ระยะ และรูปแบบข้อความทวงถามหนี้
+              </div>
+            </div>
+            <label class="switch-toggle" title="เปิด/ปิดระบบแจ้งเตือนทั้งหมด">
+              <input type="checkbox" id="cfgEnabled" checked>
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+          <div id="masterStatusBadge" style="font-size: 11.5px; padding: 4px 10px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); color: #10B981; display: inline-block;">
+            🟢 สถานะ: กำลังเปิดทำงานอัตโนมัติ
+          </div>
         </div>
 
+        <!-- 1. Schedule Settings -->
         <div class="panel-card">
-          <div class="panel-title" style="margin-bottom: 12px;">📲 ยิงแจ้งเตือนรายบุคคล (Manual Push)</div>
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-            คุณสามารถกดส่งข้อความทวงถามไปยังลูกหนี้เฉพาะรายคนได้จากแท็บ <strong>"สัญญา"</strong> หรือใส่รหัสสัญญาด้านล่างนี้:
+          <div class="panel-title" style="margin-bottom: 12px; font-size: 14px;">⏰ รอบเวลาในการทำงาน (Schedule)</div>
+          
+          <div class="form-group">
+            <label class="form-label">รอบเวลาหลัก (ทุกเช้า) <span style="color: #EF4444;">*</span></label>
+            <input type="time" id="cfgPrimaryTime" class="form-control" value="08:00">
+            <span style="font-size: 11px; color: var(--text-muted);">เวลาที่ระบบเริ่มสแกนและส่งข้อความเตือน (เวลาไทย GMT+7)</span>
+          </div>
+
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 12px; margin-top: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div>
+                <label class="form-label" style="margin-bottom: 0;">รอบเวลาเสริม (รอบเย็น / ค่ำ)</label>
+                <div style="font-size: 11px; color: var(--text-muted);">เปิดรอบย้ำเตือนหรือส่งสรุปเพิ่มเติมในแต่ละวัน</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="cfgSecondaryTimeEnabled">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div id="secondaryTimeWrapper" style="display: none; margin-top: 8px;">
+              <input type="time" id="cfgSecondaryTime" class="form-control" value="18:00">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Rules 3 Stages -->
+        <div class="panel-card">
+          <div class="panel-title" style="margin-bottom: 12px; font-size: 14px;">🎯 เงื่อนไขการแจ้งเตือน 3 ระยะ (3-Stage Rules)</div>
+
+          <!-- Stage 1: Pre-due -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <strong style="font-size: 13px; color: #60A5FA;">1. แจ้งเตือนก่อนถึงกำหนด (Pre-due)</strong>
+              <label class="switch-toggle">
+                <input type="checkbox" id="cfgRemindBeforeEnabled" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">
+              แจ้งเตือนล่วงหน้าเพื่อให้ลูกหนี้เตรียมพร้อมยอดเงินชำระ
+            </div>
+            <div id="remindBeforeDaysWrapper" style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; color: #CBD5E1;">แจ้งเตือนล่วงหน้า:</span>
+              <select id="cfgRemindBeforeDays" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;">
+                <option value="1">1 วัน</option>
+                <option value="2">2 วัน</option>
+                <option value="3">3 วัน</option>
+                <option value="5">5 วัน</option>
+                <option value="7">7 วัน (1 สัปดาห์)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Stage 2: Due Today -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <strong style="font-size: 13px; color: #34D399;">2. แจ้งเตือนในวันครบกำหนด (Due Today)</strong>
+              <label class="switch-toggle">
+                <input type="checkbox" id="cfgRemindDueTodayEnabled" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted);">
+              แจ้งเตือนเช้าวันครบกำหนดชำระตรงวัน พร้อมยอดชำระและข้อมูลบัญชีโอน
+            </div>
+          </div>
+
+          <!-- Stage 3: Overdue -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <strong style="font-size: 13px; color: #F87171;">3. แจ้งเตือนยอดค้างชำระ (Overdue)</strong>
+              <label class="switch-toggle">
+                <input type="checkbox" id="cfgRemindOverdueEnabled" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">
+              ติดตามยอดกรณีเกินกำหนดชำระ เพื่อไม่ให้ตกหล่น
+            </div>
+            <div id="overdueFrequencyWrapper" style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; color: #CBD5E1;">ความถี่ในการติดตาม:</span>
+              <select id="cfgOverdueFrequency" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;">
+                <option value="DAILY">ทุกวัน (Daily)</option>
+                <option value="EVERY_2_DAYS">ทุก 2 วัน</option>
+                <option value="EVERY_3_DAYS">ทุก 3 วัน</option>
+                <option value="WEEKLY">สัปดาห์ละ 1 ครั้ง</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 3. Message Tone & Payment Details -->
+        <div class="panel-card">
+          <div class="panel-title" style="margin-bottom: 12px; font-size: 14px;">💬 รูปแบบข้อความ & ข้อมูลการชำระเงิน</div>
+
+          <div class="form-group">
+            <label class="form-label">ระดับน้ำเสียงข้อความ (Message Tone)</label>
+            <select id="cfgTone" class="form-control">
+              <option value="POLITE">🟢 สุภาพเป็นมิตร (Polite & Friendly) - แนะนำ</option>
+              <option value="FORMAL">🔵 กึ่งทางการ (Formal & Business)</option>
+              <option value="URGENT">🔴 เร่งรัดเคร่งครัด (Urgent / Strict)</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">ชื่อธนาคาร</label>
+              <input type="text" id="cfgBankName" class="form-control" placeholder="เช่น ธนาคารกสิกรไทย (KBANK)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">เลขที่บัญชี</label>
+              <input type="text" id="cfgAccountNumber" class="form-control" placeholder="เช่น 123-4-56789-0">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">ชื่อบัญชีผู้รับโอน</label>
+              <input type="text" id="cfgAccountName" class="form-control" placeholder="เช่น นาย สมชาย ใจดี">
+            </div>
+            <div class="form-group">
+              <label class="form-label">เบอร์พร้อมเพย์ (ถ้ามี)</label>
+              <input type="text" id="cfgPromptPay" class="form-control" placeholder="เช่น 0812345678">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">ข้อความหมายเหตุด้านล่าง (Custom Footer Note)</label>
+            <textarea id="cfgCustomFooter" class="form-control" rows="2" placeholder="เช่น เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"></textarea>
+          </div>
+        </div>
+
+        <!-- 4. Admin Summary & Actions -->
+        <div class="panel-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #FFFFFF;">🔔 ส่งสรุปผลให้แอดมินทาง LINE</div>
+              <div style="font-size: 11px; color: var(--text-muted);">ส่งการ์ดสรุปยอดแจ้งเตือนประจำวันเข้า LINE แอดมินเมื่อระบบทำงานเสร็จ</div>
+            </div>
+            <label class="switch-toggle">
+              <input type="checkbox" id="cfgNotifyAdmin" checked>
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="btn-primary-admin" id="btnSaveReminderSettings" style="background: #10B981; font-weight: 600;">
+              💾 บันทึกการตั้งค่าระบบแจ้งเตือน
+            </button>
+            <button class="btn-primary-admin" id="btnTestPushToAdmin" style="background: #6366F1; margin-top: 0;">
+              📲 ส่งตัวอย่างเข้า LINE ฉัน (Test Preview)
+            </button>
+            <button class="btn-primary-admin" id="btnTriggerCronFromSettings" style="background: #0284C7; margin-top: 0;">
+              🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)
+            </button>
+          </div>
+        </div>
+
+        <!-- 5. Recent Logs -->
+        <div class="panel-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div class="panel-title" style="font-size: 14px;">📋 ประวัติการส่งแจ้งเตือนล่าสุด</div>
+            <button id="btnRefreshLogs" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #CBD5E1; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;">
+              🔄 รีเฟรช
+            </button>
+          </div>
+          <div id="reminderLogsContainer" style="max-height: 250px; overflow-y: auto;">
+            <div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 12px;">
+              กำลังโหลดประวัติการแจ้งเตือน...
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Manual Push Single Debt -->
+        <div class="panel-card">
+          <div class="panel-title" style="margin-bottom: 8px; font-size: 14px;">📨 ยิงแจ้งเตือนรายบุคคล (Manual Push)</div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+            ใส่รหัสสัญญาเพื่อยิงแจ้งเตือนลูกหนี้เฉพาะคนทันที:
           </p>
           <div style="display: flex; gap: 8px;">
             <input type="text" id="manualDebtIdInput" class="form-control" placeholder="รหัสสัญญา เช่น DB-202610-001">
-            <button class="btn-primary-admin" id="btnManualPushSingle" style="width: auto; margin-top: 0; white-space: nowrap;">
+            <button class="btn-primary-admin" id="btnManualPushSingle" style="width: auto; margin-top: 0; white-space: nowrap; background: #0EA5E9;">
               ส่งข้อความ
             </button>
           </div>
         </div>
+
       </section>
 
       <!-- ========================================== -->
@@ -392,6 +588,6 @@
 
   </div>
 
-  <script src="js/admin.js?v=4.3"></script>
+  <script src="js/admin.js?v=4.5"></script>
 </body>
 </html>

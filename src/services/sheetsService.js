@@ -729,6 +729,64 @@ async function logReminder({ debtId, userId, reminderType, status = 'SUCCESS' })
 }
 
 /**
+ * ดึงประวัติการแจ้งเตือนล่าสุด
+ */
+async function getRecentReminderLogs(limit = 15) {
+  if (sheetId) {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAMES.REMINDER_LOGS}`;
+      const fetchRes = await fetch(url);
+      if (fetchRes.ok) {
+        const csvText = await fetchRes.text();
+        const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length > 1) {
+          const logs = [];
+          for (let i = lines.length - 1; i >= 1 && logs.length < limit; i--) {
+            const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+            if (clean[0]) {
+              logs.push({
+                logId: clean[0],
+                debtId: clean[1] || '',
+                userId: clean[2] || '',
+                reminderType: clean[3] || '',
+                sentAt: clean[4] || '',
+                status: clean[5] || 'SUCCESS'
+              });
+            }
+          }
+          return logs;
+        }
+      }
+    } catch (csvErr) {
+      console.warn('Error reading ReminderLogs via CSV:', csvErr.message);
+    }
+  }
+
+  if (sheets && sheetId) {
+    try {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${SHEET_NAMES.REMINDER_LOGS}!A2:F`
+      });
+      const rows = res.data.values || [];
+      return rows.slice(-limit).reverse().map(r => ({
+        logId: r[0] || '',
+        debtId: r[1] || '',
+        userId: r[2] || '',
+        reminderType: r[3] || '',
+        sentAt: r[4] || '',
+        status: r[5] || 'SUCCESS'
+      }));
+    } catch (err) {
+      console.warn('Sheets API getRecentReminderLogs note:', err.message);
+    }
+  }
+
+  return [];
+}
+
+/**
  * ==============================================================================
  * ฟังก์ชันจัดการผู้ดูแลระบบ (Admin Management Services)
  * ==============================================================================
@@ -930,6 +988,7 @@ module.exports = {
   getDueDebtsForReminder,
   hasBeenRemindedToday,
   logReminder,
+  getRecentReminderLogs,
   getAllAdmins,
   saveAdmin,
   deleteAdmin

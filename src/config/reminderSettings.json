@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "primaryTime": "08:00",
+  "secondaryTimeEnabled": false,
+  "secondaryTime": "18:00",
+  "timezone": "Asia/Bangkok",
+  "rules": {
+    "remindBeforeEnabled": true,
+    "remindBeforeDays": 1,
+    "remindDueTodayEnabled": true,
+    "remindOverdueEnabled": true,
+    "overdueFrequency": "DAILY"
+  },
+  "template": {
+    "tone": "POLITE",
+    "bankName": "ธนาคารกสิกรไทย (KBANK)",
+    "accountNumber": "123-4-56789-0",
+    "accountName": "ชื่อบัญชีผู้รับโอน",
+    "promptPayNumber": "",
+    "customFooter": "เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"
+  },
+  "notifyAdminOnRun": true
+}

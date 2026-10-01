@@ -12,7 +12,11 @@ const {
   getDebtors,
   getAdmins,
   saveAdmin,
-  deleteAdmin
+  deleteAdmin,
+  getReminderSettings,
+  saveReminderSettings,
+  sendTestReminderPush,
+  getReminderLogs
 } = require('../controllers/adminController');
 const { runDailyReminderCheck } = require('../services/reminderService');
 
@@ -20,7 +24,7 @@ const { isUserAdmin, requireAdminAuth, getAdminUserIds } = require('../middlewar
 
 const router = express.Router();
 
-router.get('/version', (req, res) => res.json({ version: '2.4.0', time: new Date() }));
+router.get('/version', (req, res) => res.json({ version: '2.5.0', time: new Date() }));
 
 // -------------------------------------------------------------
 // 1. Client Portal Endpoints
@@ -60,6 +64,12 @@ router.post('/admin/remind/:debtId', requireAdminAuth, remindSingleDebt);
 router.get('/admin/admins', requireAdminAuth, getAdmins);
 router.post('/admin/admins', requireAdminAuth, saveAdmin);
 router.delete('/admin/admins/:userId', requireAdminAuth, deleteAdmin);
+
+// Advanced Reminder Configurations & Logs
+router.get('/admin/reminder/settings', requireAdminAuth, getReminderSettings);
+router.post('/admin/reminder/settings', requireAdminAuth, saveReminderSettings);
+router.post('/admin/reminder/test-push', requireAdminAuth, sendTestReminderPush);
+router.get('/admin/reminder/logs', requireAdminAuth, getReminderLogs);
 
 // -------------------------------------------------------------
 // 3. Automated Reminder Control
