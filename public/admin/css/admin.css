@@ -1225,6 +1225,26 @@ body {
   pointer-events: auto;
 }
 
+.toast.success {
+  background: #047857;
+  border-color: #6EE7B7;
+}
+
+.toast.error {
+  background: #BE123C;
+  border-color: #FDA4AF;
+}
+
+.toast.warning {
+  background: #B45309;
+  border-color: #FCD34D;
+}
+
+.toast.info {
+  background: #090D16;
+  border-color: var(--surface-border);
+}
+
 /* Auth Overlay */
 .auth-overlay {
   position: fixed;

@@ -144,11 +144,11 @@ const modalAdminTitle = document.getElementById('modalAdminTitle');
 // ==============================================================================
 // 2. Helpers & API Fetcher
 // ==============================================================================
-function showToast(msg, icon = 'ℹ️') {
+function showToast(msg, type = 'info') {
   if (!toast) return;
   toastMessage.textContent = msg;
-  toastIcon.textContent = icon;
-  toast.classList.add('show');
+  if (toastIcon) toastIcon.textContent = '';
+  toast.className = 'toast show ' + type;
   setTimeout(() => {
     toast.classList.remove('show');
   }, 2800);
@@ -161,7 +161,7 @@ async function adminFetch(url, options = {}) {
   }
   const res = await fetch(url, { ...options, headers });
   if (res.status === 403) {
-    showToast('ไม่มีสิทธิ์เข้าถึงฟังก์ชันนี้ (403 Forbidden)', '⛔');
+    showToast('ไม่มีสิทธิ์เข้าถึงฟังก์ชันนี้ (403 Forbidden)', 'error');
     if (adminAuthOverlay) {
       adminAuthOverlay.classList.remove('hidden');
       showDeniedState(currentAdminUser || { displayName: 'ไม่ทราบ', userId: '-' });
@@ -263,7 +263,7 @@ function showDeniedState(profile, reason) {
 
 async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลระบบ (Local Mode)') {
   if (!userId || !userId.trim()) {
-    showToast('กรุณาระบุ LINE User ID ของแอดมิน', '⚠️');
+    showToast('กรุณาระบุ LINE User ID ของแอดมิน', 'warning');
     return;
   }
   const cleanId = userId.trim();
@@ -276,13 +276,13 @@ async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลร
       currentAdminUser = userObj;
       localStorage.setItem('debt_admin_session', JSON.stringify(userObj));
       unlockAdminView(userObj);
-      showToast(`เข้าสู่ระบบสำเร็จ: ${displayName}`, '✅');
+      showToast(`เข้าสู่ระบบสำเร็จ: ${displayName}`, 'success');
     } else {
-      showToast('LINE User ID นี้ไม่มีสิทธิ์แอดมินในระบบ', '⛔');
-      alert(`⛔ ปฏิเสธการเข้าถึง:\nLINE User ID: ${cleanId}\nไม่พบในรายการแอดมินที่ได้รับอนุญาตใน .env หรือ Google Sheet`);
+      showToast('LINE User ID นี้ไม่มีสิทธิ์แอดมินในระบบ', 'error');
+      alert(`ปฏิเสธการเข้าถึง:\nLINE User ID: ${cleanId}\nไม่พบในรายการแอดมินที่ได้รับอนุญาตใน .env หรือ Google Sheet`);
     }
   } catch (err) {
-    showToast('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์: ' + err.message, '❌');
+    showToast('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์: ' + err.message, 'error');
   }
 }
 
@@ -305,7 +305,7 @@ if (btnLocalAdminLogin && inputLocalAdminUserId) {
 
 if (btnQuickAdminLogin) {
   btnQuickAdminLogin.addEventListener('click', () => {
-    loginAsLocalAdmin('U16565ee5abb9acecbbaf08d123f06cd2', '😾POND-IT😸 (Admin หลัก)');
+    loginAsLocalAdmin('U16565ee5abb9acecbbaf08d123f06cd2', 'POND-IT (Admin หลัก)');
   });
 }
 
