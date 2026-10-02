@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/client.css?v=7.2">
+  <link rel="stylesheet" href="css/client.css?v=7.3">
   <!-- LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
@@ -49,6 +49,23 @@
             <p>กดเพื่อเชื่อมต่อบัญชีจริง และดูยอดหนี้ของคุณ</p>
           </div>
           <button class="banner-btn" id="btnBannerLogin">เข้าสู่ระบบ</button>
+        </div>
+
+        <!-- Total Debt Portfolio Summary (Multi-Contract) -->
+        <div class="portfolio-summary-bar" id="portfolioSummaryBar" style="display: none;">
+          <div class="portfolio-info">
+            <span class="portfolio-label">ยอดหนี้รวมทุกสัญญา (คงเหลือสุทธิ)</span>
+            <div class="portfolio-amount" id="portfolioTotalAmount">฿0.00</div>
+          </div>
+          <div class="portfolio-badge" id="portfolioBadge">0 สัญญา</div>
+        </div>
+
+        <!-- Contract Selector Scrollable Chips -->
+        <div class="contract-selector-container" id="contractSelectorContainer" style="display: none;">
+          <div class="selector-hint">
+            <span>📑 เลือกสัญญาที่ต้องการดู:</span>
+          </div>
+          <div class="contract-chips-scroll" id="contractChipsList"></div>
         </div>
 
         <!-- Virtual Glass Credit Card (Apple Wallet Minimalist) -->
@@ -141,6 +158,17 @@
         <div class="upload-card">
           <div class="section-title">แนบหลักฐานการโอนเงิน (สลิป)</div>
           <p class="section-subtitle">รูปภาพจะถูกบีบอัดและส่งเข้า Google Drive อัตโนมัติ</p>
+
+          <!-- Contract Selector for Payment -->
+          <div class="form-field" style="margin-bottom: 14px;">
+            <label for="selectPayDebt" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>ชำระเข้าสัญญาฉบับใด?</span>
+              <span id="badgeSelectedDebtInstallment" style="font-size: 11px; color: var(--primary); font-weight: 700;"></span>
+            </label>
+            <select id="selectPayDebt" class="form-input" style="font-size: 14px; padding: 10px 12px; cursor: pointer;">
+              <option value="">-- กำลังโหลดสัญญา... --</option>
+            </select>
+          </div>
 
           <input type="file" id="slipFileInput" accept="image/*" style="display: none;">
           
@@ -274,6 +302,6 @@
 
   </div>
 
-  <script type="module" src="js/client.js?v=7.2"></script>
+  <script type="module" src="js/client.js?v=7.3"></script>
 </body>
 </html>

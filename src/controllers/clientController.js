@@ -34,7 +34,11 @@ async function getClientData(req, res) {
       }
     }
 
-    const activeDebt = await sheetsService.getActiveDebtByUserId(userId);
+    const debts = await sheetsService.getDebtsByUserId(userId);
+    const activeDebts = debts.filter(d => d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE');
+    const activeDebt = activeDebts.length > 0 ? activeDebts[0] : (debts.length > 0 ? debts[0] : null);
+
+    const totalRemainingAll = activeDebts.reduce((sum, d) => sum + (Number(d.remainingBalance) || 0), 0);
     const payments = await sheetsService.getPaymentsByUserId(userId);
 
     return res.status(200).json({
@@ -42,6 +46,10 @@ async function getClientData(req, res) {
       data: {
         debtor,
         activeDebt,
+        debts,
+        totalRemainingAll,
+        totalContractsCount: debts.length,
+        activeContractsCount: activeDebts.length,
         payments
       }
     });

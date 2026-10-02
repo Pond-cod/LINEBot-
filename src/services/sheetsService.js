@@ -234,6 +234,26 @@ async function getActiveDebtByUserId(userId) {
 }
 
 /**
+ * ดึงรายการสัญญาหนี้ทั้งหมดของลูกหนี้รายนี้ (เรียง Active/Overdue ขึ้นก่อน)
+ */
+async function getDebtsByUserId(userId) {
+  try {
+    const debts = await getAllDebts();
+    const matched = debts.filter(r => r.userId === userId);
+    return matched.sort((a, b) => {
+      const aActive = a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE';
+      const bActive = b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE';
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+      return (b.rowIndex || 0) - (a.rowIndex || 0);
+    });
+  } catch (error) {
+    console.error('Error fetching debts by userId:', error.message);
+    return [];
+  }
+}
+
+/**
  * ดึงข้อมูลลูกหนี้ (ผ่าน Cache / GViz Fast Stream)
  */
 async function getDebtorByUserId(userId) {
@@ -1422,6 +1442,7 @@ module.exports = {
   registerDebtor,
   createDebt,
   getActiveDebtByUserId,
+  getDebtsByUserId,
   getDebtorByUserId,
   getAllDebtors,
   recordPayment,

@@ -1,7 +1,7 @@
 /**
  * Client Portal: Pay & Upload Slip Sub-View (#/pay)
- * Handles Bank Info Copying, Drag & Drop Image Selection,
- * WebP Compression, and Slip Submission
+ * Handles Contract Selection for Payment, Bank Info Copying,
+ * Drag & Drop Image Selection, WebP Compression, and Slip Submission
  */
 
 import { store, eventBus, clearCachedData } from '../core/clientState.js';
@@ -16,6 +16,7 @@ export function initPayView() {
   const slipFileInput = document.getElementById('slipFileInput');
   const btnRemovePreview = document.getElementById('btnRemovePreview');
   const btnSubmitSlip = document.getElementById('btnSubmitSlip');
+  const selectPayDebt = document.getElementById('selectPayDebt');
 
   // 1. Copy Bank Account Number
   if (btnCopyAcc && bankAccNo) {
@@ -30,7 +31,25 @@ export function initPayView() {
     });
   }
 
-  // 2. Dropzone & File Input Listeners
+  // 2. Contract Selector Listener
+  if (selectPayDebt) {
+    selectPayDebt.addEventListener('change', () => {
+      const debtId = selectPayDebt.value;
+      if (debtId) {
+        store.setSelectedDebtId(debtId);
+        const debt = store.getSelectedDebt();
+        if (debt) {
+          const slipAmountInput = document.getElementById('slipAmountInput');
+          if (slipAmountInput) {
+            slipAmountInput.value = debt.installmentAmount || '';
+          }
+          updateInstallmentBadge(debt);
+        }
+      }
+    });
+  }
+
+  // 3. Dropzone & File Input Listeners
   if (dropzoneArea && slipFileInput) {
     dropzoneArea.addEventListener('click', () => {
       slipFileInput.click();
@@ -60,7 +79,7 @@ export function initPayView() {
     });
   }
 
-  // 3. Remove Image Preview
+  // 4. Remove Image Preview
   if (btnRemovePreview) {
     btnRemovePreview.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -68,9 +87,73 @@ export function initPayView() {
     });
   }
 
-  // 4. Submit Slip
+  // 5. Submit Slip
   if (btnSubmitSlip) {
     btnSubmitSlip.addEventListener('click', submitSlip);
+  }
+
+  // Listen for data updates to re-populate the contract selector
+  eventBus.on('data:updated', () => renderPayViewDebtSelect());
+  eventBus.on('debt:selected', () => syncPayViewDebtSelect());
+
+  renderPayViewDebtSelect();
+}
+
+function renderPayViewDebtSelect() {
+  const selectPayDebt = document.getElementById('selectPayDebt');
+  if (!selectPayDebt) return;
+
+  const debts = store.clientData?.debts || [];
+  const selectedDebt = store.getSelectedDebt();
+
+  if (debts.length === 0) {
+    selectPayDebt.innerHTML = '<option value="">-- ยังไม่มีสัญญาหนี้ที่เปิดอยู่ --</option>';
+    selectPayDebt.disabled = true;
+    updateInstallmentBadge(null);
+    return;
+  }
+
+  selectPayDebt.disabled = false;
+  selectPayDebt.innerHTML = debts.map(d => {
+    const isCurrent = selectedDebt && d.debtId === selectedDebt.debtId;
+    const remain = Number(d.remainingBalance) || 0;
+    const install = Number(d.installmentAmount) || 0;
+    return `
+      <option value="${d.debtId}" ${isCurrent ? 'selected' : ''}>
+        📑 ${d.debtId} (ยอดค้าง: ฿${remain.toLocaleString('th-TH')} | งวดละ: ฿${install.toLocaleString('th-TH')})
+      </option>
+    `;
+  }).join('');
+
+  if (selectedDebt) {
+    updateInstallmentBadge(selectedDebt);
+    const slipAmountInput = document.getElementById('slipAmountInput');
+    if (slipAmountInput && !slipAmountInput.value) {
+      slipAmountInput.value = selectedDebt.installmentAmount || '';
+    }
+  }
+}
+
+function syncPayViewDebtSelect() {
+  const selectPayDebt = document.getElementById('selectPayDebt');
+  const selectedDebt = store.getSelectedDebt();
+  if (selectPayDebt && selectedDebt) {
+    selectPayDebt.value = selectedDebt.debtId;
+    updateInstallmentBadge(selectedDebt);
+    const slipAmountInput = document.getElementById('slipAmountInput');
+    if (slipAmountInput) {
+      slipAmountInput.value = selectedDebt.installmentAmount || '';
+    }
+  }
+}
+
+function updateInstallmentBadge(debt) {
+  const badge = document.getElementById('badgeSelectedDebtInstallment');
+  if (!badge) return;
+  if (debt && debt.installmentAmount) {
+    badge.textContent = `ค่างวด: ฿${Number(debt.installmentAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+  } else {
+    badge.textContent = '';
   }
 }
 
@@ -125,9 +208,18 @@ export function resetSlipUploadState() {
 async function submitSlip() {
   const btnSubmitSlip = document.getElementById('btnSubmitSlip');
   const slipAmountInput = document.getElementById('slipAmountInput');
+  const selectPayDebt = document.getElementById('selectPayDebt');
 
   if (!store.currentSlipBase64) {
     showToast('กรุณาเลือกไฟล์สลิปก่อนครับ', '⚠️');
+    return;
+  }
+
+  const selectedDebt = store.getSelectedDebt();
+  const targetDebtId = selectPayDebt?.value || selectedDebt?.debtId || '';
+
+  if (!targetDebtId) {
+    showToast('กรุณาเลือกสัญญาที่ต้องการชำระเงิน', '⚠️');
     return;
   }
 
@@ -138,7 +230,7 @@ async function submitSlip() {
 
   const payload = {
     userId: store.currentUser.userId,
-    debtId: store.clientData.activeDebt?.debtId || '',
+    debtId: targetDebtId,
     amount: slipAmountInput ? slipAmountInput.value : 0,
     imageBase64: store.currentSlipBase64
   };
