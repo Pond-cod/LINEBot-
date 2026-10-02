@@ -1,17 +1,17 @@
 /**
- * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.1 Modular ES)
+ * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.2 Modular ES)
  * Coordinates HashRouter, LIFF Auth, SWR Caching, and Sub-views
  */
 
-import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.1';
-import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.1';
-import { initLiffAuth } from './core/clientAuth.js?v=7.1';
-import { clientRouter } from './core/clientRouter.js?v=7.1';
+import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.2';
+import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.2';
+import { initLiffAuth } from './core/clientAuth.js?v=7.2';
+import { clientRouter } from './core/clientRouter.js?v=7.2';
 
-import { initDashboardView } from './views/dashboardView.js?v=7.1';
-import { initPayView } from './views/payView.js?v=7.1';
-import { initHistoryView } from './views/historyView.js?v=7.1';
-import { initProfileView } from './views/profileView.js?v=7.1';
+import { initDashboardView } from './views/dashboardView.js?v=7.2';
+import { initPayView } from './views/payView.js?v=7.2';
+import { initHistoryView } from './views/historyView.js?v=7.2';
+import { initProfileView } from './views/profileView.js?v=7.2';
 
 /**
  * 1. Data Loading with Stale-While-Revalidate (SWR) (0ms instant render)
@@ -36,7 +36,6 @@ export async function loadClientData() {
   } catch (err) {
     console.warn('Network revalidation notice:', err.message);
     if (!store.clientData.activeDebt && !store.clientData.debtor) {
-      // Ensure UI reflects empty/guest state gracefully
       store.setClientData(store.clientData);
     }
   }
@@ -76,28 +75,27 @@ function applyClientTheme(theme) {
 window.addEventListener('DOMContentLoaded', async () => {
   initClientTheme();
 
-  // Initialize Sub-views
+  // 1. Initialize Sub-views (DOM event listeners)
   initDashboardView();
   initPayView();
   initHistoryView();
   initProfileView();
 
-  // Initialize Hash Router
+  // 2. Initialize Hash Router
   clientRouter.init();
 
-  // Re-fetch client data when a slip is submitted
+  // 3. Re-fetch client data when a slip is submitted
   eventBus.on('slip:submitted', () => {
     loadClientData();
   });
 
-  // Initialize Auth & LIFF
-  let shouldProceed = false;
+  // 4. Initialize Auth & LIFF
   try {
-    shouldProceed = await initLiffAuth();
+    await initLiffAuth();
   } catch (authErr) {
     console.warn('Auth init caught exception:', authErr);
   }
 
-  // Always load client data so UI never stays stuck
+  // 5. Always load client data
   await loadClientData();
 });

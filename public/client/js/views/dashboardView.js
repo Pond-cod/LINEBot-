@@ -19,6 +19,11 @@ export function initDashboardView() {
     renderDashboard(data);
   });
 
+  // Re-render when user profile/login state changes
+  eventBus.on('user:updated', () => {
+    renderDashboard(store.clientData);
+  });
+
   // Initial render from current store
   renderDashboard(store.clientData);
 }
@@ -34,7 +39,8 @@ export function renderDashboard(data) {
   const slipAmountInput = document.getElementById('slipAmountInput');
 
   const debt = data?.activeDebt;
-  const isLoggedIn = typeof liff !== 'undefined' && liff.isLoggedIn();
+  // Safe authentication check from store without calling liff before init
+  const isLoggedIn = store.currentUser && store.currentUser.userId && !store.currentUser.userId.startsWith('U_');
 
   if (debt) {
     if (heroDebtId) heroDebtId.textContent = `สัญญาเลขที่: ${debt.debtId}`;
