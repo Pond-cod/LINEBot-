@@ -64,7 +64,6 @@ async function runDailyReminderCheck(options = {}) {
   const debtorsMap = new Map();
   debtors.forEach(d => debtorsMap.set(d.userId, d));
 
-  const todayDateObj = dayjs().tz(tz);
   const todayStr = todayDateObj.format('YYYY-MM-DD');
   const todayDay = todayDateObj.date();
   const isLastDayOfMonth = todayDateObj.endOf('month').format('YYYY-MM-DD') === todayStr;

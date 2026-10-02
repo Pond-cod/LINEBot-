@@ -41,8 +41,28 @@ app.get('/health', (req, res) => {
   });
 });
 
-// เริ่มต้นการทำงานของเซิร์ฟเวอร์ (สำหรับ Local / VPS)
-if (process.env.VERCEL !== '1') {
+// 6. Global 404 Handler for API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'NOT_FOUND',
+    message: `API route not found: ${req.method} ${req.originalUrl}`
+  });
+});
+
+// 7. Global Express Error Handler (Always returns JSON, never HTML or plain text)
+app.use((err, req, res, next) => {
+  console.error('Unhandled Application Error:', err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    success: false,
+    error: err.code || 'SERVER_ERROR',
+    message: err.message || 'Internal Server Error'
+  });
+});
+
+// เริ่มต้นการทำงานของเซิร์ฟเวอร์ (สำหรับ Local / VPS เมื่อสั่งรัน node src/app.js โดยตรง)
+if (!process.env.VERCEL && require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`🌐 LIFF URL: https://liff.line.me/${process.env.LIFF_ID || 'NOT_SET'}`);

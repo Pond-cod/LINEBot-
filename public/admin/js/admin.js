@@ -181,6 +181,26 @@ async function adminFetch(url, options = {}) {
       showDeniedState(currentAdminUser || { displayName: 'ไม่ทราบ', userId: '-' });
     }
   }
+
+  // ป้องกันการ throw Unexpected token เมื่อเซิร์ฟเวอร์คืน HTML หรือ Plain text 500 Error
+  const originalJson = res.json.bind(res);
+  res.json = async () => {
+    try {
+      return await originalJson();
+    } catch (parseErr) {
+      try {
+        const text = await res.clone().text();
+        console.error(`Server returned non-JSON response from ${url}:`, text);
+        if (res.status >= 500) {
+          throw new Error(`เซิร์ฟเวอร์ทำงานผิดพลาด (${res.status}): ${text.slice(0, 120)}`);
+        }
+        throw new Error(`รูปแบบข้อมูลไม่ถูกต้อง (${res.status})`);
+      } catch (cloneErr) {
+        throw new Error(`การเชื่อมต่อเซิร์ฟเวอร์ผิดพลาด (${res.status})`);
+      }
+    }
+  };
+
   return res;
 }
 

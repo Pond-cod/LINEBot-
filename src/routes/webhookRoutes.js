@@ -5,8 +5,16 @@ const { handleWebhookEvent } = require('../controllers/webhookController');
 const router = express.Router();
 
 // LINE Webhook Endpoint
-// ใช้ lineMiddleware เพื่อตรวจสอบ X-Line-Signature
-router.post('/', lineMiddleware, async (req, res) => {
+// ใช้ safeLineMiddleware เพื่อตรวจสอบ X-Line-Signature อย่างปลอดภัย
+const safeLineMiddleware = (req, res, next) => {
+  if (typeof lineMiddleware === 'function') {
+    return lineMiddleware(req, res, next);
+  }
+  console.warn('⚠️ LINE Webhook received but LINE_CHANNEL_SECRET is not configured.');
+  return res.status(503).json({ error: 'LINE_CONFIG_MISSING', message: 'LINE Channel Secret is not configured' });
+};
+
+router.post('/', safeLineMiddleware, async (req, res) => {
   try {
     const events = req.body?.events || [];
     if (!Array.isArray(events) || events.length === 0) {
