@@ -8,17 +8,21 @@ const router = express.Router();
 // ใช้ lineMiddleware เพื่อตรวจสอบ X-Line-Signature
 router.post('/', lineMiddleware, async (req, res) => {
   try {
-    const events = req.body.events;
+    const events = req.body?.events || [];
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(200).json({ status: 'ok' });
+    }
 
-    // ประมวลผลทุก Events ที่ส่งเข้ามา
-    await Promise.all(
+    // ประมวลผลทุก Events ที่ส่งเข้ามาแบบ allSettled เพื่อไม่ให้ error ตัวเดียวทำให้ตัวอื่นล้ม
+    await Promise.allSettled(
       events.map(event => handleWebhookEvent(event))
     );
 
     return res.status(200).json({ status: 'ok' });
   } catch (error) {
     console.error('❌ Webhook Processing Error:', error);
-    return res.status(500).end();
+    // ตอบ 200 เสมอเมื่อ Signature ถูกต้องแล้ว เพื่อป้องกัน LINE Retry Loop
+    return res.status(200).json({ status: 'error', message: error.message });
   }
 });
 

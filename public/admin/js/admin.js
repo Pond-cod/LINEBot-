@@ -3,7 +3,21 @@
  * Fully supports Desktop PC layout, New Contract Wizard, and Flexible Reminder Engine
  */
 
-const LIFF_ID = '2011816015-RfpKwHVZ';
+let LIFF_ID = '2011816015-RfpKwHVZ';
+
+async function resolveLiffId() {
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    if (data && data.liffId) {
+      LIFF_ID = data.liffId;
+    }
+  } catch (e) {
+    console.warn('Using default LIFF ID fallback:', e.message);
+  }
+  return LIFF_ID;
+}
+
 let currentAdminUser = null;
 let allContracts = [];
 let allDebtors = [];
@@ -144,11 +158,11 @@ const modalAdminTitle = document.getElementById('modalAdminTitle');
 // ==============================================================================
 // 2. Helpers & API Fetcher
 // ==============================================================================
-function showToast(msg, type = 'info') {
+function showToast(msg, icon = 'ℹ️') {
   if (!toast) return;
   toastMessage.textContent = msg;
-  if (toastIcon) toastIcon.textContent = '';
-  toast.className = 'toast show ' + type;
+  toastIcon.textContent = icon;
+  toast.classList.add('show');
   setTimeout(() => {
     toast.classList.remove('show');
   }, 2800);
@@ -161,7 +175,7 @@ async function adminFetch(url, options = {}) {
   }
   const res = await fetch(url, { ...options, headers });
   if (res.status === 403) {
-    showToast('ไม่มีสิทธิ์เข้าถึงฟังก์ชันนี้ (403 Forbidden)', 'error');
+    showToast('ไม่มีสิทธิ์เข้าถึงฟังก์ชันนี้ (403 Forbidden)', '⛔');
     if (adminAuthOverlay) {
       adminAuthOverlay.classList.remove('hidden');
       showDeniedState(currentAdminUser || { displayName: 'ไม่ทราบ', userId: '-' });
@@ -202,6 +216,7 @@ async function initAdminAuth() {
 
   // 2. ตรวจสอบผ่าน LINE LIFF SDK
   try {
+    await resolveLiffId();
     await liff.init({ liffId: LIFF_ID });
 
     if (liff.isLoggedIn()) {
@@ -263,7 +278,7 @@ function showDeniedState(profile, reason) {
 
 async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลระบบ (Local Mode)') {
   if (!userId || !userId.trim()) {
-    showToast('กรุณาระบุ LINE User ID ของแอดมิน', 'warning');
+    showToast('กรุณาระบุ LINE User ID ของแอดมิน', '⚠️');
     return;
   }
   const cleanId = userId.trim();
@@ -276,13 +291,13 @@ async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลร
       currentAdminUser = userObj;
       localStorage.setItem('debt_admin_session', JSON.stringify(userObj));
       unlockAdminView(userObj);
-      showToast(`เข้าสู่ระบบสำเร็จ: ${displayName}`, 'success');
+      showToast(`เข้าสู่ระบบสำเร็จ: ${displayName}`, '✅');
     } else {
-      showToast('LINE User ID นี้ไม่มีสิทธิ์แอดมินในระบบ', 'error');
-      alert(`ปฏิเสธการเข้าถึง:\nLINE User ID: ${cleanId}\nไม่พบในรายการแอดมินที่ได้รับอนุญาตใน .env หรือ Google Sheet`);
+      showToast('LINE User ID นี้ไม่มีสิทธิ์แอดมินในระบบ', '⛔');
+      alert(`⛔ ปฏิเสธการเข้าถึง:\nLINE User ID: ${cleanId}\nไม่พบในรายการแอดมินที่ได้รับอนุญาตใน .env หรือ Google Sheet`);
     }
   } catch (err) {
-    showToast('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์: ' + err.message, 'error');
+    showToast('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์: ' + err.message, '❌');
   }
 }
 
@@ -305,7 +320,7 @@ if (btnLocalAdminLogin && inputLocalAdminUserId) {
 
 if (btnQuickAdminLogin) {
   btnQuickAdminLogin.addEventListener('click', () => {
-    loginAsLocalAdmin('U16565ee5abb9acecbbaf08d123f06cd2', 'POND-IT (Admin หลัก)');
+    loginAsLocalAdmin('U16565ee5abb9acecbbaf08d123f06cd2', '😾POND-IT😸 (Admin หลัก)');
   });
 }
 

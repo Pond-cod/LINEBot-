@@ -27,7 +27,7 @@
         </div>
       </div>
       <div class="header-right-actions">
-        <button class="client-theme-toggle" id="btnClientThemeToggle" title="สลับโหมด สีสว่าง / มืด">&#9788;</button>
+        <button class="client-theme-toggle" id="btnClientThemeToggle" title="สลับโหมด สีสว่าง / มืด">☀️</button>
         <button class="header-badge" id="clientStatusBadge">กำลังตรวจสอบ</button>
       </div>
     </header>
@@ -42,7 +42,7 @@
         <!-- Login Banner (shown when not logged in with LINE) -->
         <div class="action-banner" id="loginNoticeBanner" style="display: none;">
           <div class="banner-text">
-            <h4>เข้าสู่ระบบด้วย LINE</h4>
+            <h4>💬 เข้าสู่ระบบด้วย LINE</h4>
             <p>กดเพื่อเชื่อมต่อบัญชีจริง และดูยอดหนี้ของคุณ</p>
           </div>
           <button class="banner-btn" id="btnBannerLogin">เข้าสู่ระบบ</button>
@@ -81,12 +81,12 @@
         <!-- Metrics Grid -->
         <div class="metrics-grid">
           <div class="metric-card">
-            <div class="metric-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div class="metric-icon">📅</div>
             <div class="metric-title">วันครบกำหนดชำระ</div>
             <div class="metric-value alert" id="metricDueDate">-</div>
           </div>
           <div class="metric-card">
-            <div class="metric-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            <div class="metric-icon">💵</div>
             <div class="metric-title">ค่างวดต่องวด</div>
             <div class="metric-value highlight" id="metricInstallment">฿0.00</div>
           </div>
@@ -103,7 +103,7 @@
 
         <!-- Notice / Tips -->
         <div class="tip-box">
-          <div class="tip-title">คำแนะนำการชำระ</div>
+          <div class="tip-title">💡 คำแนะนำการชำระ</div>
           <div class="tip-desc">
             • ระบบจะส่งแจ้งเตือนยอดชำระล่วงหน้าเวลา 08:00 น.<br>
             • คุณสามารถส่งรูปสลิปในแชท LINE หรือแนบผ่านหน้านี้ได้ตลอด 24 ชม.
@@ -129,7 +129,7 @@
               <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">ชื่อบัญชี: บจก. จัดการหนี้สิน</div>
             </div>
             <button class="btn-copy" id="btnCopyAcc">
-              <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span> คัดลอก
+              <span>📋</span> คัดลอก
             </button>
           </div>
         </div>
@@ -142,7 +142,7 @@
           <input type="file" id="slipFileInput" accept="image/*" style="display: none;">
           
           <div class="dropzone" id="dropzoneArea">
-            <div class="dropzone-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            <div class="dropzone-icon">📸</div>
             <div class="dropzone-title">แตะเพื่อถ่ายรูป หรือเลือกไฟล์สลิป</div>
             <div class="dropzone-hint">รองรับไฟล์ JPG, PNG, WebP (สูงสุด 10MB)</div>
           </div>
@@ -158,7 +158,7 @@
           </div>
 
           <button class="btn-primary" id="btnSubmitSlip" disabled>
-            <span>ส่งสลิปชำระเงิน</span>
+            <span>🚀 ส่งสลิปชำระเงิน</span>
           </button>
         </div>
       </section>
@@ -195,7 +195,7 @@
             <span class="field-label">LINE User ID</span>
             <div style="display: flex; align-items: center; gap: 6px;">
               <span class="field-val" id="profileUserId" style="font-size: 11px; font-family: monospace;">-</span>
-              <button id="btnCopyUserId" title="คัดลอก LINE ID" style="background: none; border: none; cursor: pointer; font-size: 13px; color: var(--text-dim);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+              <button id="btnCopyUserId" title="คัดลอก LINE ID" style="background: none; border: none; cursor: pointer; font-size: 13px; color: var(--text-dim);">📋</button>
             </div>
           </div>
           <div class="profile-field-row">
@@ -223,15 +223,15 @@
         <!-- Auth Action Buttons -->
         <div style="margin-top: 14px;">
           <button id="btnLoginLine" class="btn-primary" style="display: none; background: #06C755; color: #FFFFFF; width: 100%;">
-            <span>เข้าสู่ระบบด้วย LINE (LINE Login)</span>
+            <span>💬 เข้าสู่ระบบด้วย LINE (LINE Login)</span>
           </button>
           <button id="btnLogoutLine" style="display: none; width: 100%; padding: 12px; border: 1.5px solid var(--danger); color: var(--danger); border-radius: var(--radius-md); font-weight: 600; cursor: pointer; background: transparent; font-family: inherit; font-size: 14px;">
-            <span>ออกจากระบบ LINE</span>
+            <span>🚪 ออกจากระบบ LINE</span>
           </button>
         </div>
 
         <div class="tip-box" style="margin-top: 14px;">
-          <div class="tip-title">ศูนย์ช่วยเหลือและติดต่อ</div>
+          <div class="tip-title">📞 ศูนย์ช่วยเหลือและติดต่อ</div>
           <div class="tip-desc">
             หากมีข้อสงสัยเกี่ยวกับยอดเงิน หรือต้องการปรับโครงสร้างหนี้ สามารถพิมพ์ข้อความในแชท LINE เพื่อพูดคุยกับเจ้าหน้าที่ได้ตลอดเวลาครับ
           </div>
@@ -265,7 +265,7 @@
 
     <!-- Notification Toast -->
     <div id="toast" class="toast">
-      <span id="toastIcon"></span>
+      <span id="toastIcon">ℹ️</span>
       <span id="toastMessage">ข้อความแจ้งเตือน</span>
     </div>
 

@@ -153,6 +153,7 @@ function safeJsonParse(str, fallback = {}) {
  * บันทึกโปรไฟล์ลง local JSON file
  */
 function saveToLocalJson(profiles) {
+  if (process.env.VERCEL === '1') return;
   try {
     const dir = path.dirname(LOCAL_PROFILES_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -354,7 +355,16 @@ async function saveProfile(data) {
   saveToLocalJson(updatedList);
   cache.set('reminder_profiles_all', updatedList, 30);
 
-  // 2. บันทึกลง Google Sheets
+  // 2. บันทึกลง Google Apps Script (ถ้าเชื่อมต่อไว้)
+  if (isGasConfigured()) {
+    try {
+      await callGas('saveReminderProfile', profile, 1);
+    } catch (gasErr) {
+      console.warn('callGas saveReminderProfile notice:', gasErr.message);
+    }
+  }
+
+  // 3. บันทึกลง Google Sheets ผ่าน Service Account (ถ้ามี)
   if (sheets && sheetId) {
     try {
       const res = await sheets.spreadsheets.values.get({
@@ -419,6 +429,16 @@ async function deleteProfile(profileId) {
   saveToLocalJson(filtered);
   cache.set('reminder_profiles_all', filtered, 30);
 
+  // 1. ลบผ่าน Google Apps Script (ถ้าเชื่อมต่อไว้)
+  if (isGasConfigured()) {
+    try {
+      await callGas('deleteReminderProfile', { profileId }, 1);
+    } catch (gasErr) {
+      console.warn('callGas deleteReminderProfile notice:', gasErr.message);
+    }
+  }
+
+  // 2. ลบผ่าน Service Account (ถ้ามี)
   if (sheets && sheetId) {
     try {
       const res = await sheets.spreadsheets.values.get({

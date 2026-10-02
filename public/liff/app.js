@@ -1,5 +1,18 @@
 // Configuration
-const LIFF_ID = '2011816015-RfpKwHVZ';
+let LIFF_ID = '2011816015-RfpKwHVZ'; // Fallback default
+
+async function resolveLiffId() {
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    if (data && data.liffId) {
+      LIFF_ID = data.liffId;
+    }
+  } catch (e) {
+    console.warn('Using default LIFF ID fallback:', e.message);
+  }
+  return LIFF_ID;
+}
 
 let currentProfile = null;
 
@@ -25,6 +38,7 @@ const debtDetailsEl = document.getElementById('debtDetails');
  */
 async function initializeLiff() {
   try {
+    await resolveLiffId();
     await liff.init({ liffId: LIFF_ID });
 
     if (!liff.isLoggedIn()) {

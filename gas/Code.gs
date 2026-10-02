@@ -143,6 +143,26 @@ function doPost(e) {
         result = handleUpdateDebtReminderConfig(contents);
         break;
 
+      case 'getSettings':
+        result = handleGetSettings();
+        break;
+
+      case 'saveSettings':
+        result = handleSaveSettings(contents);
+        break;
+
+      case 'getReminderProfiles':
+        result = handleGetReminderProfiles();
+        break;
+
+      case 'saveReminderProfile':
+        result = handleSaveReminderProfile(contents);
+        break;
+
+      case 'deleteReminderProfile':
+        result = handleDeleteReminderProfile(contents.profileId);
+        break;
+
       default:
         throw new Error('Unknown action: ' + action);
     }
@@ -644,12 +664,21 @@ function handleApprovePayment(data) {
         const newRemaining = Math.max(0, currentRemaining - paidAmount);
         const newStatus = newRemaining === 0 ? 'PAID' : dValues[j][7];
         const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+        const cycleDays = Number(dValues[j][6]) || 30;
+        const currentDueDate = dValues[j][5] ? Utilities.formatDate(new Date(dValues[j][5]), 'Asia/Bangkok', 'yyyy-MM-dd') : '';
+        let nextDueDate = currentDueDate;
+        if (newRemaining > 0 && currentDueDate) {
+          const d = new Date(currentDueDate);
+          d.setDate(d.getDate() + cycleDays);
+          nextDueDate = Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd');
+        }
 
         dSheet.getRange(dRow, 5).setValue(newRemaining);
+        dSheet.getRange(dRow, 6).setValue(nextDueDate);
         dSheet.getRange(dRow, 8).setValue(newStatus);
         dSheet.getRange(dRow, 10).setValue(nowStr);
 
-        updatedDebt = { debtId: targetDebtId, remainingBalance: newRemaining, debtStatus: newStatus };
+        updatedDebt = { debtId: targetDebtId, remainingBalance: newRemaining, dueDate: nextDueDate, debtStatus: newStatus };
         break;
       }
     }
@@ -776,10 +805,11 @@ function handleHasBeenRemindedToday(debtId, reminderType) {
 
   for (let i = 1; i < values.length; i++) {
     const rDebtId = values[i][1];
-    const rType = values[i][3];
+    const rawType = String(values[i][3] || '').trim();
+    const cleanType = rawType.split(' [')[0].trim();
     const rSentAt = values[i][4] ? String(values[i][4]) : '';
 
-    if (rDebtId === debtId && rType === reminderType && rSentAt.indexOf(todayStr) !== -1) {
+    if (rDebtId === debtId && (cleanType === reminderType || rawType === reminderType) && rSentAt.indexOf(todayStr) !== -1) {
       return true;
     }
   }
@@ -966,3 +996,136 @@ function handleUpdateDebtReminderConfig(data) {
   }
   return { success: false, message: 'Debt not found' };
 }
+
+/**
+ * ดึงการตั้งค่าระบบแจ้งเตือน (Settings)
+ */
+function handleGetSettings() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty('REMINDER_SETTINGS');
+  if (raw) {
+    try {
+      return { reminderSettings: JSON.parse(raw) };
+    } catch (e) {}
+  }
+  return { reminderSettings: null };
+}
+
+/**
+ * บันทึกการตั้งค่าระบบแจ้งเตือน (Settings)
+ */
+function handleSaveSettings(data) {
+  if (!data || !data.reminderSettings) throw new Error('Missing reminderSettings payload');
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('REMINDER_SETTINGS', JSON.stringify(data.reminderSettings));
+  return { success: true, saved: true };
+}
+
+/**
+ * ดึงโปรไฟล์แจ้งเตือนทั้งหมดจากชีต ReminderProfiles
+ */
+function handleGetReminderProfiles() {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.REMINDER_PROFILES);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_NAMES.REMINDER_PROFILES);
+    sheet.appendRow(HEADERS.ReminderProfiles);
+    return [];
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const list = [];
+  for (let i = 1; i < values.length; i++) {
+    const r = values[i];
+    if (r[0] && String(r[0]).startsWith('PRF-')) {
+      let sched = {};
+      let rules = {};
+      let tpl = {};
+      try { sched = typeof r[3] === 'string' ? JSON.parse(r[3]) : r[3] || {}; } catch(e) {}
+      try { rules = typeof r[6] === 'string' ? JSON.parse(r[6]) : r[6] || {}; } catch(e) {}
+      try { tpl = typeof r[7] === 'string' ? JSON.parse(r[7]) : r[7] || {}; } catch(e) {}
+
+      list.push({
+        profileId: r[0],
+        name: r[1] || 'รูปแบบแจ้งเตือน',
+        frequencyType: r[2] || 'DAILY',
+        scheduleConfig: sched,
+        primaryTime: r[4] || '08:00',
+        secondaryTime: r[5] || '',
+        rulesConfig: rules,
+        templateConfig: tpl,
+        isDefault: r[8] === 'TRUE' || r[8] === true,
+        status: (r[9] || 'ACTIVE').toUpperCase(),
+        createdAt: r[10] || '',
+        updatedAt: r[11] || ''
+      });
+    }
+  }
+  return list;
+}
+
+/**
+ * บันทึกหรืออัปเดตโปรไฟล์แจ้งเตือนในชีต ReminderProfiles
+ */
+function handleSaveReminderProfile(data) {
+  if (!data || !data.profileId) throw new Error('Missing profileId');
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.REMINDER_PROFILES);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_NAMES.REMINDER_PROFILES);
+    sheet.appendRow(HEADERS.ReminderProfiles);
+  }
+
+  const values = sheet.getDataRange().getValues();
+  let foundRow = -1;
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim() === String(data.profileId).trim()) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+  const rowData = [
+    data.profileId,
+    data.name || 'รูปแบบแจ้งเตือน',
+    data.frequencyType || 'DAILY',
+    typeof data.scheduleConfig === 'object' ? JSON.stringify(data.scheduleConfig) : data.scheduleConfig || '{}',
+    data.primaryTime || '08:00',
+    data.secondaryTime || '',
+    typeof data.rulesConfig === 'object' ? JSON.stringify(data.rulesConfig) : data.rulesConfig || '{}',
+    typeof data.templateConfig === 'object' ? JSON.stringify(data.templateConfig) : data.templateConfig || '{}',
+    data.isDefault ? 'TRUE' : 'FALSE',
+    (data.status || 'ACTIVE').toUpperCase(),
+    data.createdAt || nowStr,
+    nowStr
+  ];
+
+  if (foundRow > -1) {
+    sheet.getRange(foundRow, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+
+  return { success: true, profileId: data.profileId };
+}
+
+/**
+ * ลบโปรไฟล์แจ้งเตือนออกจากชีต ReminderProfiles
+ */
+function handleDeleteReminderProfile(profileId) {
+  if (!profileId) throw new Error('Missing profileId');
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.REMINDER_PROFILES);
+  if (!sheet) return { deleted: false, message: 'Sheet not found' };
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim() === String(profileId).trim()) {
+      sheet.deleteRow(i + 1);
+      return { deleted: true, profileId: profileId };
+    }
+  }
+  return { deleted: false, message: 'Profile not found' };
+}
+

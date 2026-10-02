@@ -115,6 +115,14 @@ async function handleWebhookEvent(event) {
         }
       }
 
+      if (['ส่งสลิป', 'แนบสลิป', 'ส่งรูปสลิป', 'แจ้งโอน', 'แนบรูป'].some(kw => text.includes(kw))) {
+        const liffUrl = `https://liff.line.me/${process.env.LIFF_ID || ''}`;
+        return await lineService.replyMessage(replyToken, {
+          type: 'text',
+          text: `📸 คุณสามารถถ่ายภาพหรือแนบรูปสลิปส่งเข้ามาในแชทนี้ได้เลยครับ ระบบจะบันทึกเข้า Google Drive และตัดยอดให้อัตโนมัติครับ ✨\n\nหรือกดส่งและตรวจสอบยอดผ่านระบบได้ที่:\n${liffUrl}`
+        });
+      }
+
       if (['วิธีชำระเงิน', 'เลขบัญชี', 'โอนเงิน', 'ชำระเงิน'].some(kw => text.includes(kw))) {
         return await lineService.replyMessage(replyToken, {
           type: 'text',

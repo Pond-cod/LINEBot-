@@ -1,4 +1,5 @@
 const dayjs = require('dayjs');
+const { getTodayStringBangkok, getNowStringBangkok, normalizeDate } = require('../utils/dateHelper');
 const sheetsService = require('../services/sheetsService');
 const lineService = require('../services/lineService');
 const { createPaymentStatusFlex, createReminderFlex, createNewContractFlex } = require('../templates/flexMessages');
@@ -12,7 +13,7 @@ async function getAdminStats(req, res) {
     const payments = await sheetsService.getAllPayments();
     const debtors = await sheetsService.getAllDebtors();
 
-    const todayStr = dayjs().format('YYYY-MM-DD');
+    const todayStr = getTodayStringBangkok();
 
     let totalPrincipal = 0;
     let totalRemaining = 0;
@@ -26,10 +27,11 @@ async function getAdminStats(req, res) {
         totalRemaining += d.remainingBalance || 0;
         activeCount++;
 
-        if (d.dueDate === todayStr) {
+        const normDueDate = normalizeDate(d.dueDate);
+        if (normDueDate === todayStr) {
           dueTodayCount++;
         }
-        if (d.debtStatus === 'OVERDUE' || (d.dueDate && dayjs(d.dueDate).isBefore(dayjs(), 'day'))) {
+        if (d.debtStatus === 'OVERDUE' || (normDueDate && dayjs(normDueDate).isBefore(dayjs(todayStr), 'day'))) {
           overdueCount++;
         }
       }
@@ -481,6 +483,14 @@ async function saveReminderSettings(req, res) {
   try {
     const reminderSettingsService = require('../services/reminderSettingsService');
     const updated = await reminderSettingsService.saveSettings(req.body);
+
+    try {
+      const { rescheduleDailyReminderCron } = require('../jobs/dailyReminderJob');
+      rescheduleDailyReminderCron();
+    } catch (cronErr) {
+      console.warn('Could not reschedule cron:', cronErr.message);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'บันทึกการตั้งค่าระบบแจ้งเตือนเรียบร้อยแล้ว',

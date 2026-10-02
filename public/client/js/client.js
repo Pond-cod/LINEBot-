@@ -1,5 +1,18 @@
 // Client Portal JavaScript Controller (Unified v3.5 - Real LINE Login Support)
-const LIFF_ID = '2011816015-RfpKwHVZ';
+let LIFF_ID = '2011816015-RfpKwHVZ';
+
+async function resolveLiffId() {
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    if (data && data.liffId) {
+      LIFF_ID = data.liffId;
+    }
+  } catch (e) {
+    console.warn('Using default LIFF ID fallback:', e.message);
+  }
+  return LIFF_ID;
+}
 
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm0 14c-2.03 0-4.43-.82-6.14-2.88C7.55 15.8 9.68 15 12 15s4.45.8 6.14 2.12C16.43 19.18 14.03 20 12 20z'/></svg>";
 
@@ -332,6 +345,7 @@ function setLoginUiState(isLoggedIn) {
  */
 async function initApp() {
   try {
+    await resolveLiffId();
     await liff.init({ liffId: LIFF_ID });
 
     const urlParams = new URLSearchParams(window.location.search);

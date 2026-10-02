@@ -4,6 +4,7 @@ const timezone = require('dayjs/plugin/timezone');
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const { normalizeDate } = require('../utils/dateHelper');
 const sheetsService = require('./sheetsService');
 const lineService = require('./lineService');
 const reminderSettingsService = require('./reminderSettingsService');
@@ -112,18 +113,19 @@ async function runDailyReminderCheck(options = {}) {
 
     const beforeDays = Number(rules.remindBeforeDays) || 1;
     const beforeTargetDate = todayDateObj.add(beforeDays, 'day').format('YYYY-MM-DD');
+    const normDueDate = normalizeDate(d.dueDate);
 
     // Rule A: เตือนตรงวันครบกำหนด (Due Today)
-    if (rules.remindDueTodayEnabled && d.dueDate === todayStr) {
+    if (rules.remindDueTodayEnabled && normDueDate === todayStr) {
       reminderType = 'DUE_TODAY';
     }
     // Rule B: เตือนล่วงหน้า (Pre-due)
-    else if (rules.remindBeforeEnabled && d.dueDate === beforeTargetDate) {
+    else if (rules.remindBeforeEnabled && normDueDate === beforeTargetDate) {
       reminderType = `DUE_BEFORE_${beforeDays}_DAYS`;
     }
     // Rule C: เตือนเกินกำหนด (Overdue)
-    else if (rules.remindOverdueEnabled && dayjs(d.dueDate).isBefore(todayDateObj, 'day')) {
-      const daysOverdue = todayDateObj.diff(dayjs(d.dueDate), 'day');
+    else if (rules.remindOverdueEnabled && normDueDate && dayjs(normDueDate).isBefore(todayDateObj, 'day')) {
+      const daysOverdue = todayDateObj.diff(dayjs(normDueDate), 'day');
       const overdueFreq = rules.overdueFrequency || 'DAILY';
 
       let shouldRemind = false;

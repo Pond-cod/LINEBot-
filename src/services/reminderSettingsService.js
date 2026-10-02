@@ -113,13 +113,15 @@ async function saveSettings(newSettings) {
   cachedSettings = merged;
   lastCacheTime = Date.now();
 
-  // 1. บันทึกลง Local JSON File
-  try {
-    const dir = path.dirname(LOCAL_CONFIG_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(LOCAL_CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf8');
-  } catch (err) {
-    console.warn('Could not write local reminderSettings.json:', err.message);
+  // 1. บันทึกลง Local JSON File (เฉพาะเมื่อไม่ใช่ Vercel)
+  if (process.env.VERCEL !== '1') {
+    try {
+      const dir = path.dirname(LOCAL_CONFIG_PATH);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(LOCAL_CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf8');
+    } catch (err) {
+      console.warn('Could not write local reminderSettings.json:', err.message);
+    }
   }
 
   // 2. บันทึกลง GAS Cloud Storage

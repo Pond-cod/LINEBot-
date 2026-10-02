@@ -2,6 +2,7 @@ const { sheets, sheetId } = require('../config/google');
 const { isGasConfigured, callGas } = require('./gasService');
 const cache = require('../utils/cache');
 const dayjs = require('dayjs');
+const { getNowStringBangkok, getTodayStringBangkok, normalizeDate, calculateNextDueDate } = require('../utils/dateHelper');
 
 const SHEET_NAMES = {
   DEBTORS: 'Debtors',
@@ -588,7 +589,7 @@ async function getAllDebts() {
                 totalAmount: Number(clean[2]) || 0,
                 installmentAmount: Number(clean[3]) || 0,
                 remainingBalance: Number(clean[4]) || 0,
-                dueDate: clean[5] || '',
+                dueDate: normalizeDate(clean[5]),
                 cycleDays: Number(clean[6]) || 30,
                 debtStatus: clean[7] || 'ACTIVE',
                 createdAt: clean[8] || '',
@@ -614,7 +615,10 @@ async function getAllDebts() {
     try {
       const gasDebts = await callGas('getAllDebts');
       if (Array.isArray(gasDebts) && gasDebts.length > 0) {
-        list = gasDebts;
+        list = gasDebts.map(d => ({
+          ...d,
+          dueDate: normalizeDate(d.dueDate)
+        }));
         cache.set(cacheKey, list, 30);
         return deduplicateDebts(list);
       }
@@ -645,7 +649,7 @@ async function getAllDebts() {
         totalAmount: Number(r[2]) || 0,
         installmentAmount: Number(r[3]) || 0,
         remainingBalance: Number(r[4]) || 0,
-        dueDate: r[5] || '',
+        dueDate: normalizeDate(r[5]),
         cycleDays: Number(r[6]) || 30,
         debtStatus: r[7] || 'ACTIVE',
         createdAt: r[8] || '',
@@ -787,7 +791,12 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
       const currentRemaining = Number(dRows[dIndex][4]) || 0;
       const newRemaining = Math.max(0, currentRemaining - paidAmount);
       const newStatus = newRemaining === 0 ? 'PAID' : dRows[dIndex][7];
-      const now = dayjs().format('YYYY-MM-DD HH:mm:ss');
+      const now = getNowStringBangkok();
+      const currentDueDate = dRows[dIndex][5] || '';
+      const cycleDays = Number(dRows[dIndex][6]) || 30;
+      const nextDueDate = (newRemaining > 0 && currentDueDate)
+        ? calculateNextDueDate(currentDueDate, cycleDays)
+        : currentDueDate;
 
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
@@ -796,8 +805,8 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
         requestBody: {
           values: [[
             newRemaining,
-            dRows[dIndex][5],
-            dRows[dIndex][6],
+            nextDueDate,
+            cycleDays,
             newStatus,
             dRows[dIndex][8],
             now
@@ -808,6 +817,7 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
       updatedDebt = {
         debtId,
         remainingBalance: newRemaining,
+        dueDate: nextDueDate,
         debtStatus: newStatus
       };
     }
@@ -890,8 +900,8 @@ async function getDueDebtsForReminder() {
       });
     }
 
-    const todayStr = dayjs().format('YYYY-MM-DD');
-    const tomorrowStr = dayjs().add(1, 'day').format('YYYY-MM-DD');
+    const todayStr = getTodayStringBangkok();
+    const tomorrowStr = dayjs(todayStr).add(1, 'day').format('YYYY-MM-DD');
     const dueList = [];
 
     for (const r of debtRows) {
@@ -899,7 +909,7 @@ async function getDueDebtsForReminder() {
       const userId = r[1];
       const installmentAmount = Number(r[3]) || 0;
       const remainingBalance = Number(r[4]) || 0;
-      const dueDate = r[5];
+      const dueDate = normalizeDate(r[5]);
       const debtStatus = r[7];
 
       if (!dueDate || debtStatus === 'PAID' || debtStatus === 'SETTLED') continue;
@@ -909,7 +919,7 @@ async function getDueDebtsForReminder() {
         reminderType = 'DUE_TODAY';
       } else if (dueDate === tomorrowStr) {
         reminderType = 'DUE_BEFORE_1_DAY';
-      } else if (dayjs(dueDate).isBefore(dayjs(), 'day')) {
+      } else if (dayjs(dueDate).isBefore(dayjs(todayStr), 'day')) {
         reminderType = 'OVERDUE';
       }
 
@@ -952,13 +962,14 @@ async function hasBeenRemindedToday(debtId, reminderType) {
     });
 
     const rows = res.data.values || [];
-    const todayStr = dayjs().format('YYYY-MM-DD');
+    const todayStr = getTodayStringBangkok();
 
     return rows.some(r => {
       const rDebtId = r[1];
-      const rType = r[3];
-      const rSentAt = r[4] || '';
-      return rDebtId === debtId && rType === reminderType && rSentAt.startsWith(todayStr);
+      const rawType = String(r[3] || '').trim();
+      const cleanType = rawType.split(' [')[0].trim();
+      const rSentAt = String(r[4] || '');
+      return rDebtId === debtId && (cleanType === reminderType || rawType === reminderType) && rSentAt.startsWith(todayStr);
     });
   } catch (error) {
     console.error('Error checking reminder logs:', error.message);
@@ -976,7 +987,7 @@ async function logReminder({ debtId, userId, reminderType, status = 'SUCCESS' })
 
   if (!sheets || !sheetId) return;
 
-  const now = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  const now = getNowStringBangkok();
   const logId = `LOG-${dayjs().format('YYYYMMDD')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   try {

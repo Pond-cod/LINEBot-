@@ -94,11 +94,31 @@ router.patch('/admin/debtors/:userId/reminder', requireAdminAuth, updateDebtorRe
 router.patch('/admin/contracts/:debtId/reminder', requireAdminAuth, updateContractReminder);
 
 // -------------------------------------------------------------
-// 3. Automated Reminder Control
+// 3. System Configuration & Automated Reminder Control
 // -------------------------------------------------------------
-router.post('/reminder/trigger-now', async (req, res) => {
+router.get('/config', (req, res) => {
+  return res.status(200).json({
+    success: true,
+    liffId: process.env.LIFF_ID || '',
+    timezone: process.env.TIMEZONE || 'Asia/Bangkok'
+  });
+});
+
+async function handleTriggerReminder(req, res) {
   try {
-    const summary = await runDailyReminderCheck(req.body || {});
+    // ตรวจสอบ CRON_SECRET หากมีการตั้งค่าไว้ใน Environment
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers['authorization'];
+      const querySecret = req.query.secret;
+      const isValid = (authHeader && authHeader === `Bearer ${cronSecret}`) || (querySecret && querySecret === cronSecret);
+      if (!isValid) {
+        return res.status(401).json({ success: false, message: 'Unauthorized: Invalid Cron Secret' });
+      }
+    }
+
+    const payload = req.method === 'POST' ? (req.body || {}) : (req.query || {});
+    const summary = await runDailyReminderCheck(payload);
     return res.status(200).json({
       success: true,
       message: 'รันการตรวจสอบและแจ้งเตือนเรียบร้อยแล้ว',
@@ -110,6 +130,11 @@ router.post('/reminder/trigger-now', async (req, res) => {
       message: error.message
     });
   }
-});
+}
+
+router.route('/reminder/trigger-now')
+  .get(handleTriggerReminder)
+  .post(handleTriggerReminder);
 
 module.exports = router;
+
