@@ -181,7 +181,8 @@ debtForm.addEventListener('submit', async (e) => {
     totalAmount: document.getElementById('totalAmount').value,
     installmentAmount: document.getElementById('installmentAmount').value,
     dueDate: document.getElementById('dueDate').value,
-    cycleDays: document.getElementById('cycleDays').value
+    cycleDays: document.getElementById('cycleDays').value,
+    pdpaConsent: document.getElementById('pdpaConsent')?.checked ? 'ACCEPTED' : 'PENDING'
   };
 
   try {

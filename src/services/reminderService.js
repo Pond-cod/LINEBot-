@@ -4,7 +4,7 @@ const timezone = require('dayjs/plugin/timezone');
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const { normalizeDate } = require('../utils/dateHelper');
+const { normalizeDate, isLegalDebtCollectionTime } = require('../utils/dateHelper');
 const sheetsService = require('./sheetsService');
 const lineService = require('./lineService');
 const reminderSettingsService = require('./reminderSettingsService');
@@ -32,6 +32,20 @@ async function runDailyReminderCheck(options = {}) {
     return {
       disabled: true,
       message: 'ระบบแจ้งเตือนหลักถูกปิดการใช้งานอยู่ในการตั้งค่า'
+    };
+  }
+
+  const todayDateObj = dayjs().tz(tz);
+
+  // ตรวจสอบช่วงเวลาที่กฎหมายทวงถามหนี้ พ.ร.บ. 2558 อนุญาต (08:00-20:00 ในวันธรรมดา และ 08:00-18:00 ในวันหยุด)
+  const legalCheck = isLegalDebtCollectionTime(todayDateObj);
+  if (!legalCheck.allowed && !options.forceRun && !options.bypassLegalHours) {
+    console.warn(`⚖️ [Legal Guard] Debt collection reminders paused: ${legalCheck.reason}`);
+    return {
+      paused: true,
+      legalGuard: true,
+      reason: legalCheck.reason,
+      message: `ระบบระงับการแจ้งเตือนชั่วคราวตาม พ.ร.บ. การทวงถามหนี้ พ.ศ. 2558: ${legalCheck.reason}`
     };
   }
 

@@ -27,6 +27,11 @@ app.use(express.static(path.join(__dirname, '../public')));
 // 4. REST API Routes
 app.use('/api', apiRoutes);
 
+// Direct receipt view route
+app.get('/receipt/:paymentId', (req, res) => {
+  res.redirect(`/api/receipt/${req.params.paymentId}`);
+});
+
 // 5. Health Check & Root Route
 app.get('/health', (req, res) => {
   res.json({

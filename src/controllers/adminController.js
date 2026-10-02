@@ -2,6 +2,7 @@ const dayjs = require('dayjs');
 const { getTodayStringBangkok, getNowStringBangkok, normalizeDate } = require('../utils/dateHelper');
 const sheetsService = require('../services/sheetsService');
 const lineService = require('../services/lineService');
+const { getRecentAuditLogs } = require('../services/auditService');
 const { createPaymentStatusFlex, createReminderFlex, createNewContractFlex } = require('../templates/flexMessages');
 
 /**
@@ -181,23 +182,31 @@ async function approveSlip(req, res) {
       return res.status(400).json({ success: false, message: 'Missing paymentId' });
     }
 
+    const operatorId = req.headers['x-line-userid'] || req.body.operatorName || 'Admin';
+
     const result = await sheetsService.approvePayment({
       paymentId,
       confirmedAmount,
-      note: note || 'อนุมัติผ่านระบบแอดมิน'
+      note: note || 'อนุมัติผ่านระบบแอดมิน',
+      approvedBy: operatorId
     });
 
-    // ส่ง LINE Push แจ้งลูกหนี้
+    // ส่ง LINE Push แจ้งลูกหนี้ พร้อมลิงก์ e-Receipt
     if (result.userId) {
       try {
         const debtor = await sheetsService.getDebtorByUserId(result.userId);
+        const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const receiptUrl = `${baseUrl}/receipt/${result.paymentId}`;
+
         const flex = createPaymentStatusFlex({
           debtorName: debtor?.fullName || 'คุณลูกค้า',
           paymentId: result.paymentId,
           debtId: result.debtId,
           status: 'VERIFIED',
           amount: result.paidAmount,
-          remainingBalance: result.updatedDebt?.remainingBalance
+          remainingBalance: result.updatedDebt?.remainingBalance,
+          receiptNo: result.receiptNo,
+          receiptUrl
         });
         await lineService.pushMessage(result.userId, flex);
       } catch (pushErr) {
@@ -703,6 +712,20 @@ async function updateContractReminder(req, res) {
   }
 }
 
+/**
+ * 20. ดึงประวัติ Audit Logs
+ */
+async function getAuditLogs(req, res) {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 100;
+    const logs = await getRecentAuditLogs(limit);
+    return res.status(200).json({ success: true, data: logs });
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   getAdminStats,
   getContracts,
@@ -727,5 +750,6 @@ module.exports = {
   deleteReminderProfile,
   toggleReminderProfile,
   updateDebtorReminder,
-  updateContractReminder
+  updateContractReminder,
+  getAuditLogs
 };

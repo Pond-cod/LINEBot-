@@ -73,11 +73,59 @@ function calculateNextDueDate(currentDueDate, cycleDays = 30) {
   return validBase.add(Number(cycleDays) || 30, 'day').format('YYYY-MM-DD');
 }
 
+/**
+ * ตรวจสอบว่าเวลาปัจจุบันอยู่ในช่วงเวลาที่กฎหมายอนุญาตให้ทวงถามหนี้หรือไม่
+ * ตาม พ.ร.บ. การทวงถามหนี้ พ.ศ. 2558 มาตรา 9:
+ * - วันจันทร์ ถึง วันศุกร์: 08:00 - 20:00 น.
+ * - วันเสาร์ อาทิตย์ และวันหยุดราชการ: 08:00 - 18:00 น.
+ * 
+ * @param {dayjs.Dayjs} [dateObj] วัตถุ dayjs (ค่าเริ่มต้นคือเวลาไทยปัจจุบัน)
+ * @returns {{ allowed: boolean, reason?: string, currentHour: number, dayOfWeek: number }}
+ */
+function isLegalDebtCollectionTime(dateObj = null) {
+  const now = dateObj ? dateObj.tz(TIMEZONE) : getNowBangkok();
+  const dayOfWeek = now.day(); // 0 = อาทิตย์, 1 = จันทร์, ..., 6 = เสาร์
+  const currentHour = now.hour();
+  const currentMinute = now.minute();
+  const timeInMinutes = currentHour * 60 + currentMinute;
+
+  const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+  const startMinutes = 8 * 60; // 08:00
+  const endMinutes = isWeekend ? (18 * 60) : (20 * 60); // 18:00 ในวันหยุด, 20:00 ในวันธรรมดา
+
+  if (timeInMinutes < startMinutes) {
+    return {
+      allowed: false,
+      reason: `อยู่นอกเวลาที่กฎหมายอนุญาต (ก่อน 08:00 น.) ปัจจุบันเวลา ${now.format('HH:mm')} น.`,
+      currentHour,
+      dayOfWeek
+    };
+  }
+
+  if (timeInMinutes >= endMinutes) {
+    const limitStr = isWeekend ? '18:00' : '20:00';
+    return {
+      allowed: false,
+      reason: `อยู่นอกเวลาที่กฎหมายอนุญาต (หลัง ${limitStr} น.) ปัจจุบันเวลา ${now.format('HH:mm')} น.`,
+      currentHour,
+      dayOfWeek
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: 'อยู่ในช่วงเวลาที่ได้รับอนุญาตตามกฎหมาย',
+    currentHour,
+    dayOfWeek
+  };
+}
+
 module.exports = {
   TIMEZONE,
   getNowBangkok,
   getTodayStringBangkok,
   getNowStringBangkok,
   normalizeDate,
-  calculateNextDueDate
+  calculateNextDueDate,
+  isLegalDebtCollectionTime
 };

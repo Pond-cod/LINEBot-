@@ -3,6 +3,8 @@ const { isGasConfigured, callGas } = require('./gasService');
 const cache = require('../utils/cache');
 const dayjs = require('dayjs');
 const { getNowStringBangkok, getTodayStringBangkok, normalizeDate, calculateNextDueDate } = require('../utils/dateHelper');
+const { generateReceiptNo } = require('./receiptService');
+const { logAuditAction } = require('./auditService');
 
 const SHEET_NAMES = {
   DEBTORS: 'Debtors',
@@ -10,16 +12,18 @@ const SHEET_NAMES = {
   PAYMENTS: 'Payments',
   REMINDER_LOGS: 'ReminderLogs',
   ADMINS: 'admin',
-  REMINDER_PROFILES: 'ReminderProfiles'
+  REMINDER_PROFILES: 'ReminderProfiles',
+  AUDIT_LOGS: 'AuditLogs'
 };
 
 const HEADERS = {
-  [SHEET_NAMES.DEBTORS]: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled'],
+  [SHEET_NAMES.DEBTORS]: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled', 'pdpaConsent', 'pdpaConsentAt'],
   [SHEET_NAMES.DEBTS]: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled'],
-  [SHEET_NAMES.PAYMENTS]: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote'],
+  [SHEET_NAMES.PAYMENTS]: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote', 'receiptNo', 'approvedBy', 'approvedAt'],
   [SHEET_NAMES.REMINDER_LOGS]: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
   [SHEET_NAMES.ADMINS]: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status'],
-  [SHEET_NAMES.REMINDER_PROFILES]: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt']
+  [SHEET_NAMES.REMINDER_PROFILES]: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt'],
+  [SHEET_NAMES.AUDIT_LOGS]: ['logId', 'timestamp', 'operatorUserId', 'operatorName', 'action', 'targetType', 'targetId', 'details', 'ipAddress']
 };
 
 /**
@@ -736,20 +740,30 @@ async function deleteDebt(debtId) {
 /**
  * [Admin] อนุมัติสลิป และหักลดยอดหนี้คงเหลือ
  */
-async function approvePayment({ paymentId, confirmedAmount, note = 'อนุมัติเรียบร้อย' }) {
+async function approvePayment({ paymentId, confirmedAmount, note = 'อนุมัติเรียบร้อย', approvedBy = 'Admin' }) {
   cache.delByPattern(/^(payments_|debts_)/);
+  const receiptNo = generateReceiptNo();
+  const now = getNowStringBangkok();
 
   if (isGasConfigured()) {
-    const res = await callGas('approvePayment', { paymentId, confirmedAmount, note });
+    const res = await callGas('approvePayment', { paymentId, confirmedAmount, note, receiptNo, approvedBy });
     cache.delByPattern(/^(payments_|debts_)/);
-    return res;
+    logAuditAction({
+      operatorUserId: approvedBy,
+      operatorName: approvedBy,
+      action: 'APPROVE_PAYMENT',
+      targetType: 'PAYMENT',
+      targetId: paymentId,
+      details: { confirmedAmount, note, receiptNo, updatedDebt: res.updatedDebt }
+    });
+    return { ...res, receiptNo: res.receiptNo || receiptNo, approvedBy, approvedAt: now };
   }
 
   if (!sheets || !sheetId) throw new Error('Sheets not configured');
 
   const paymentsRes = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `${SHEET_NAMES.PAYMENTS}!A2:I`
+    range: `${SHEET_NAMES.PAYMENTS}!A2:L`
   });
   const pRows = paymentsRes.data.values || [];
   const pIndex = pRows.findIndex(r => r[0] === paymentId);
@@ -763,16 +777,19 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range: `${SHEET_NAMES.PAYMENTS}!D${pRowNum}:I${pRowNum}`,
+    range: `${SHEET_NAMES.PAYMENTS}!D${pRowNum}:L${pRowNum}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[
         paidAmount,
-        pRows[pIndex][4],
-        pRows[pIndex][5],
-        pRows[pIndex][6],
+        pRows[pIndex][4] || '',
+        pRows[pIndex][5] || '',
+        pRows[pIndex][6] || '',
         'VERIFIED',
-        note
+        note,
+        receiptNo,
+        approvedBy,
+        now
       ]]
     }
   });
@@ -791,7 +808,6 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
       const currentRemaining = Number(dRows[dIndex][4]) || 0;
       const newRemaining = Math.max(0, currentRemaining - paidAmount);
       const newStatus = newRemaining === 0 ? 'PAID' : dRows[dIndex][7];
-      const now = getNowStringBangkok();
       const currentDueDate = dRows[dIndex][5] || '';
       const cycleDays = Number(dRows[dIndex][6]) || 30;
       const nextDueDate = (newRemaining > 0 && currentDueDate)
@@ -823,19 +839,36 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
     }
   }
 
+  logAuditAction({
+    operatorUserId: approvedBy,
+    operatorName: approvedBy,
+    action: 'APPROVE_PAYMENT',
+    targetType: 'PAYMENT',
+    targetId: paymentId,
+    details: { paidAmount, debtId, receiptNo, updatedDebt }
+  });
+
   cache.delByPattern(/^(payments_|debts_)/);
-  return { paymentId, debtId, userId, paidAmount, status: 'VERIFIED', updatedDebt };
+  return { paymentId, debtId, userId, paidAmount, status: 'VERIFIED', receiptNo, approvedBy, approvedAt: now, updatedDebt };
 }
 
 /**
  * [Admin] ปฏิเสธสลิป
  */
-async function rejectPayment({ paymentId, reason = 'ยอดเงินหรือสลิปไม่ถูกต้อง' }) {
+async function rejectPayment({ paymentId, reason = 'ยอดเงินหรือสลิปไม่ถูกต้อง', rejectedBy = 'Admin' }) {
   cache.delByPattern(/^payments_/);
 
   if (isGasConfigured()) {
     const res = await callGas('rejectPayment', { paymentId, reason });
     cache.delByPattern(/^payments_/);
+    logAuditAction({
+      operatorUserId: rejectedBy,
+      operatorName: rejectedBy,
+      action: 'REJECT_PAYMENT',
+      targetType: 'PAYMENT',
+      targetId: paymentId,
+      details: { reason }
+    });
     return res;
   }
 
@@ -861,6 +894,15 @@ async function rejectPayment({ paymentId, reason = 'ยอดเงินหร�
     requestBody: {
       values: [['REJECTED', reason]]
     }
+  });
+
+  logAuditAction({
+    operatorUserId: rejectedBy,
+    operatorName: rejectedBy,
+    action: 'REJECT_PAYMENT',
+    targetType: 'PAYMENT',
+    targetId: paymentId,
+    details: { reason, debtId, userId }
   });
 
   cache.delByPattern(/^payments_/);

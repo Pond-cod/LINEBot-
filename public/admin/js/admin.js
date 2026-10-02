@@ -360,7 +360,8 @@ const viewTitleMap = {
   'view-admin-slips': 'ตรวจสอบสลิปโอนเงิน',
   'view-admin-debtors': 'สมุดรายชื่อลูกหนี้',
   'view-admin-reminders': 'ระบบแจ้งเตือนอัตโนมัติ',
-  'view-admin-managers': 'จัดการทีมแอดมิน'
+  'view-admin-managers': 'จัดการทีมแอดมิน',
+  'view-admin-audit': 'บันทึกประวัติระบบ (Audit Trail)'
 };
 
 function switchView(targetViewId) {
@@ -412,6 +413,7 @@ function switchView(targetViewId) {
     loadReminderLogs();
   }
   if (targetViewId === 'view-admin-managers') loadAdmins();
+  if (targetViewId === 'view-admin-audit') loadAuditLogs();
 }
 
 window.switchView = switchView;
@@ -961,8 +963,13 @@ function renderSlips() {
             </button>
           </div>
         ` : `
-          <div style="font-size: 12px; color: var(--text-muted); text-align: center; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
-            บันทึกผลแล้ว: ${s.adminNote || s.verificationStatus}
+          <div style="font-size: 12px; color: var(--text-muted); text-align: center; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <span>บันทึกผลแล้ว: ${s.adminNote || s.verificationStatus}</span>
+            ${s.verificationStatus === 'VERIFIED' ? `
+              <a href="/receipt/${s.paymentId}" target="_blank" style="padding: 4px 10px; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; font-size: 11.5px; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                📄 ใบเสร็จ
+              </a>
+            ` : ''}
           </div>
         `}
       </div>
@@ -2019,6 +2026,55 @@ function applyTheme(theme) {
       themeToggleText.textContent = 'โหมดสว่าง';
     }
   }
+}
+
+// ==============================================================================
+// 12. Audit Trail Logs
+// ==============================================================================
+async function loadAuditLogs() {
+  const tableBody = document.getElementById('auditTableBody');
+  if (!tableBody) return;
+  tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 25px; color: var(--text-muted);"><div class="spinner" style="margin: 0 auto 10px;"></div>กำลังโหลดประวัติระบบ...</td></tr>`;
+
+  try {
+    const res = await adminFetch('/api/admin/audit-logs');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      if (data.data.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">ยังไม่มีบันทึกประวัติในระบบ</td></tr>`;
+        return;
+      }
+      tableBody.innerHTML = data.data.map(log => {
+        let actionBadge = `<span class="badge-status" style="background: rgba(100,116,139,0.15); color: #64748B;">${log.action}</span>`;
+        if (log.action.includes('APPROVE')) actionBadge = `<span class="badge-status active">✅ ${log.action}</span>`;
+        if (log.action.includes('REJECT')) actionBadge = `<span class="badge-status overdue">❌ ${log.action}</span>`;
+        if (log.action.includes('CREATE')) actionBadge = `<span class="badge-status" style="background: rgba(2,132,199,0.15); color: #0284C7;">➕ ${log.action}</span>`;
+
+        return `
+          <tr>
+            <td style="font-size: 12px; font-family: monospace; white-space: nowrap;">${log.timestamp || '-'}</td>
+            <td><strong>${log.operatorName || log.operatorUserId || '-'}</strong></td>
+            <td>${actionBadge}</td>
+            <td style="font-family: monospace; font-size: 12px;">${log.targetType ? `${log.targetType}: ${log.targetId}` : '-'}</td>
+            <td style="font-size: 12px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.details || ''}">${log.details || '-'}</td>
+            <td style="font-size: 11px; color: var(--text-muted); font-family: monospace;">${log.ipAddress || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 25px; color: var(--danger);">ไม่สามารถโหลดประวัติระบบได้</td></tr>`;
+    }
+  } catch (err) {
+    tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 25px; color: var(--danger);">เกิดข้อผิดพลาดในการโหลดประวัติ</td></tr>`;
+  }
+}
+
+const btnRefreshAuditLogs = document.getElementById('btnRefreshAuditLogs');
+if (btnRefreshAuditLogs) {
+  btnRefreshAuditLogs.addEventListener('click', () => {
+    loadAuditLogs();
+    showToast('รีเฟรชประวัติระบบเรียบร้อย', '🔄');
+  });
 }
 
 // ==============================================================================

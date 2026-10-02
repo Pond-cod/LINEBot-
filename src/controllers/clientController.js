@@ -2,6 +2,7 @@ const dayjs = require('dayjs');
 const sheetsService = require('../services/sheetsService');
 const driveService = require('../services/driveService');
 const lineService = require('../services/lineService');
+const { checkDuplicateSlip } = require('../services/slipVerificationService');
 const { createSlipReceivedFlex } = require('../templates/flexMessages');
 
 /**
@@ -62,6 +63,21 @@ async function uploadSlipWeb(req, res) {
         success: false,
         message: 'กรุณาส่ง userId และไฟล์รูปภาพสลิป (imageBase64)'
       });
+    }
+
+    // ตรวจสอบสลิปซ้ำ (Anti-Fraud Duplicate Detection)
+    try {
+      const existingPayments = await sheetsService.getAllPayments();
+      const dupCheck = checkDuplicateSlip(imageBase64, amount, existingPayments);
+      if (dupCheck.isDuplicate) {
+        return res.status(400).json({
+          success: false,
+          isDuplicate: true,
+          message: dupCheck.reason || 'รูปภาพสลิปนี้เคยถูกส่งเข้าระบบแล้ว กรุณาตรวจสอบหรือติดต่อเจ้าหน้าที่'
+        });
+      }
+    } catch (checkErr) {
+      console.warn('Duplicate check warning:', checkErr.message);
     }
 
     // แปลง base64 เป็น Buffer

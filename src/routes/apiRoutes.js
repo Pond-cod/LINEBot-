@@ -25,9 +25,13 @@ const {
   deleteReminderProfile,
   toggleReminderProfile,
   updateDebtorReminder,
-  updateContractReminder
+  updateContractReminder,
+  getAuditLogs
 } = require('../controllers/adminController');
 const { runDailyReminderCheck } = require('../services/reminderService');
+const sheetsService = require('../services/sheetsService');
+const reminderSettingsService = require('../services/reminderSettingsService');
+const { generateReceiptHtml } = require('../services/receiptService');
 
 const { isUserAdmin, requireAdminAuth, getAdminUserIds } = require('../middleware/adminAuth');
 
@@ -92,6 +96,36 @@ router.patch('/admin/reminder/profiles/:profileId/toggle', requireAdminAuth, tog
 // Granular Reminder Overrides (Per Debtor & Per Contract)
 router.patch('/admin/debtors/:userId/reminder', requireAdminAuth, updateDebtorReminder);
 router.patch('/admin/contracts/:debtId/reminder', requireAdminAuth, updateContractReminder);
+
+// Audit Trail Logs
+router.get('/admin/audit-logs', requireAdminAuth, getAuditLogs);
+
+// Official e-Receipt Viewer
+router.get('/receipt/:paymentId', async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const payments = await sheetsService.getAllPayments();
+    const payment = payments.find(p => p.paymentId === paymentId);
+    if (!payment) {
+      return res.status(404).send('<h2 style="font-family: sans-serif; text-align: center; margin-top: 50px; color: #DC2626;">❌ ไม่พบข้อมูลใบเสร็จรับเงินสำหรับรหัสนี้</h2>');
+    }
+
+    const debts = await sheetsService.getAllDebts();
+    const debt = debts.find(d => d.debtId === payment.debtId) || {};
+
+    const debtors = await sheetsService.getAllDebtors();
+    const debtor = debtors.find(d => d.userId === payment.userId) || {};
+
+    const settings = await reminderSettingsService.getSettings();
+
+    const html = generateReceiptHtml({ payment, debt, debtor, settings });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err) {
+    console.error('Error rendering receipt:', err);
+    return res.status(500).send('<h2 style="font-family: sans-serif; text-align: center; margin-top: 50px; color: #DC2626;">เกิดข้อผิดพลาดในการโหลดใบเสร็จ</h2>');
+  }
+});
 
 // -------------------------------------------------------------
 // 3. System Configuration & Automated Reminder Control

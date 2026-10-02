@@ -561,10 +561,12 @@ function createPaymentStatusFlex({
   status, // 'VERIFIED' | 'REJECTED'
   amount,
   remainingBalance,
-  reason
+  reason,
+  receiptNo,
+  receiptUrl
 }) {
   const isApproved = status === 'VERIFIED';
-  const headerBg = isApproved ? '#06C755' : '#EF4444';
+  const headerBg = isApproved ? '#047857' : '#DC2626';
   const title = isApproved ? '🎉 ยืนยันการชำระเงินสำเร็จ' : '❌ สลิปไม่ผ่านการตรวจสอบ';
   const subtitle = isApproved ? 'ยอดเงินได้ถูกตัดออกจากยอดหนี้เรียบร้อยแล้ว' : (reason || 'กรุณาตรวจสอบสลิปแล้วส่งใหม่อีกครั้ง');
 
@@ -602,9 +604,23 @@ function createPaymentStatusFlex({
         layout: 'vertical',
         paddingAll: '20px',
         contents: [
+          ...(receiptNo ? [{
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'none',
+            contents: [
+              { type: 'text', text: 'เลขที่ใบเสร็จ:', color: '#047857', size: 'sm', weight: 'bold', flex: 2 },
+              { type: 'text', text: receiptNo, color: '#047857', size: 'sm', weight: 'bold', align: 'end', flex: 4 }
+            ]
+          }, {
+            type: 'separator',
+            margin: 'md',
+            color: '#E2E8F0'
+          }] : []),
           {
             type: 'box',
             layout: 'horizontal',
+            margin: receiptNo ? 'md' : 'none',
             contents: [
               { type: 'text', text: 'รหัสชำระเงิน:', color: '#64748B', size: 'sm', flex: 2 },
               { type: 'text', text: paymentId, color: '#0F172A', size: 'sm', weight: 'bold', align: 'end', flex: 4 }
@@ -625,7 +641,7 @@ function createPaymentStatusFlex({
             margin: 'md',
             contents: [
               { type: 'text', text: 'ยอดที่ชำระ:', color: '#64748B', size: 'sm', flex: 2 },
-              { type: 'text', text: `฿${formatMoney(amount)}`, color: '#06C755', size: 'sm', weight: 'bold', align: 'end', flex: 4 }
+              { type: 'text', text: `฿${formatMoney(amount)}`, color: '#047857', size: 'sm', weight: 'bold', align: 'end', flex: 4 }
             ]
           }] : []),
           ...(isApproved && remainingBalance !== undefined ? [{
@@ -642,7 +658,26 @@ function createPaymentStatusFlex({
             ]
           }] : [])
         ]
-      }
+      },
+      footer: (isApproved && receiptUrl) ? {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        paddingAll: '15px',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#047857',
+            height: 'sm',
+            action: {
+              type: 'uri',
+              label: '📄 ใบเสร็จรับเงิน (e-Receipt)',
+              uri: receiptUrl
+            }
+          }
+        ]
+      } : undefined
     }
   };
 }

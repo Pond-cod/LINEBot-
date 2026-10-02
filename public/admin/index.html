@@ -86,6 +86,13 @@
             <span>จัดการทีมแอดมิน</span>
           </div>
         </button>
+
+        <button class="sidebar-nav-item" data-target="view-admin-audit">
+          <div class="nav-left">
+            <span class="nav-icon">📜</span>
+            <span>ประวัติระบบ (Audit)</span>
+          </div>
+        </button>
       </div>
 
       <!-- Sidebar Footer (Profile & Logout) -->
@@ -814,6 +821,45 @@
                   <tr>
                     <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
                       กำลังโหลดรายชื่อผู้ดูแลระบบ...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 7: AUDIT TRAIL LOGS (ประวัติการใช้งานระบบ) -->
+        <!-- ========================================== -->
+        <section id="view-admin-audit" class="sub-view">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">📜 บันทึกประวัติระบบ (Audit Trail Logs)</h2>
+              <p class="view-desc">ตรวจสอบทุกกิจกรรมทางการเงินและการตั้งค่าในระบบ ยืนยันความโปร่งใสและตรวจสอบย้อนหลังได้ 100%</p>
+            </div>
+            <button class="topbar-btn" id="btnRefreshAuditLogs">
+              <span>🔄 รีเฟรชประวัติ</span>
+            </button>
+          </div>
+
+          <div class="admin-card">
+            <div class="table-container">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>วันเวลา</th>
+                    <th>ผู้ดำเนินการ</th>
+                    <th>การกระทำ (Action)</th>
+                    <th>เป้าหมาย</th>
+                    <th>รายละเอียด</th>
+                    <th>IP Address</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                      กำลังโหลดประวัติระบบ...
                     </td>
                   </tr>
                 </tbody>

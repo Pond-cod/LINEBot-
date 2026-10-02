@@ -536,6 +536,7 @@ function renderHistory() {
         </div>
         <div class="history-card-right">
           <span class="history-badge ${status}">${statusText}</span>
+          ${status === 'VERIFIED' ? `<a href="/receipt/${p.paymentId}" target="_blank" style="font-size: 11px; background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; padding: 3px 8px; border-radius: 5px; text-decoration: none; margin-top: 5px; display: inline-flex; align-items: center; gap: 3px; font-weight: 600;">📄 ใบเสร็จ (e-Receipt)</a>` : ''}
           ${p.slipViewUrl ? `<a href="${p.slipViewUrl}" target="_blank" style="font-size: 11px; color: var(--primary); text-decoration: none; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">🔍 ดูสลิป</a>` : ''}
         </div>
       </div>

@@ -15,17 +15,19 @@ const CONFIG = {
     PAYMENTS: 'Payments',
     REMINDER_LOGS: 'ReminderLogs',
     ADMINS: 'admin',
-    REMINDER_PROFILES: 'ReminderProfiles'
+    REMINDER_PROFILES: 'ReminderProfiles',
+    AUDIT_LOGS: 'AuditLogs'
   }
 };
 
 const HEADERS = {
-  Debtors: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled'],
+  Debtors: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled', 'pdpaConsent', 'pdpaConsentAt'],
   Debts: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled'],
-  Payments: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote'],
+  Payments: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote', 'receiptNo', 'approvedBy', 'approvedAt'],
   ReminderLogs: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
   admin: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status'],
-  ReminderProfiles: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt']
+  ReminderProfiles: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt'],
+  AuditLogs: ['logId', 'timestamp', 'operatorUserId', 'operatorName', 'action', 'targetType', 'targetId', 'details', 'ipAddress']
 };
 
 /**
@@ -161,6 +163,14 @@ function doPost(e) {
 
       case 'deleteReminderProfile':
         result = handleDeleteReminderProfile(contents.profileId);
+        break;
+
+      case 'logAudit':
+        result = handleLogAudit(contents);
+        break;
+
+      case 'getAuditLogs':
+        result = handleGetAuditLogs(contents);
         break;
 
       default:
@@ -648,9 +658,17 @@ function handleApprovePayment(data) {
   if (paymentRow === -1) throw new Error('Payment not found');
 
   const paidAmount = Number(data.confirmedAmount) || originalAmount;
+  const nowBangkok = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+  const yyyymm = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMM');
+  const receiptNo = data.receiptNo || ('RC-' + yyyymm + '-' + Math.floor(1000 + Math.random() * 9000));
+  const approvedBy = data.approvedBy || 'Admin';
+
   pSheet.getRange(paymentRow, 4).setValue(paidAmount);
   pSheet.getRange(paymentRow, 8).setValue('VERIFIED');
   pSheet.getRange(paymentRow, 9).setValue(data.note || 'อนุมัติเรียบร้อย');
+  pSheet.getRange(paymentRow, 10).setValue(receiptNo);
+  pSheet.getRange(paymentRow, 11).setValue(approvedBy);
+  pSheet.getRange(paymentRow, 12).setValue(nowBangkok);
 
   let updatedDebt = null;
   if (targetDebtId) {
@@ -663,7 +681,6 @@ function handleApprovePayment(data) {
         const currentRemaining = Number(dValues[j][4]) || 0;
         const newRemaining = Math.max(0, currentRemaining - paidAmount);
         const newStatus = newRemaining === 0 ? 'PAID' : dValues[j][7];
-        const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
         const cycleDays = Number(dValues[j][6]) || 30;
         const currentDueDate = dValues[j][5] ? Utilities.formatDate(new Date(dValues[j][5]), 'Asia/Bangkok', 'yyyy-MM-dd') : '';
         let nextDueDate = currentDueDate;
@@ -676,7 +693,7 @@ function handleApprovePayment(data) {
         dSheet.getRange(dRow, 5).setValue(newRemaining);
         dSheet.getRange(dRow, 6).setValue(nextDueDate);
         dSheet.getRange(dRow, 8).setValue(newStatus);
-        dSheet.getRange(dRow, 10).setValue(nowStr);
+        dSheet.getRange(dRow, 10).setValue(nowBangkok);
 
         updatedDebt = { debtId: targetDebtId, remainingBalance: newRemaining, dueDate: nextDueDate, debtStatus: newStatus };
         break;
@@ -690,6 +707,9 @@ function handleApprovePayment(data) {
     userId: targetUserId,
     paidAmount: paidAmount,
     status: 'VERIFIED',
+    receiptNo: receiptNo,
+    approvedBy: approvedBy,
+    approvedAt: nowBangkok,
     updatedDebt: updatedDebt
   };
 }
@@ -1127,5 +1147,69 @@ function handleDeleteReminderProfile(profileId) {
     }
   }
   return { deleted: false, message: 'Profile not found' };
+}
+
+/**
+ * บันทึกประวัติการกระทำลงในแท็บ AuditLogs
+ */
+function handleLogAudit(data) {
+  if (!data) return { success: false };
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.AUDIT_LOGS);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_NAMES.AUDIT_LOGS);
+    sheet.appendRow(HEADERS.AuditLogs);
+    const headerRange = sheet.getRange(1, 1, 1, HEADERS.AuditLogs.length);
+    headerRange.setFontWeight('bold').setBackground('#1E293B').setFontColor('#FFFFFF');
+  }
+
+  const nowBangkok = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+  const logId = data.logId || ('AUD-' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd') + '-' + Math.floor(1000 + Math.random() * 9000));
+  const detailsStr = typeof data.details === 'object' ? JSON.stringify(data.details) : String(data.details || '');
+
+  sheet.appendRow([
+    logId,
+    data.timestamp || nowBangkok,
+    data.operatorUserId || 'SYSTEM',
+    data.operatorName || 'ระบบอัตโนมัติ',
+    data.action || 'GENERAL_ACTION',
+    data.targetType || '',
+    data.targetId || '',
+    detailsStr,
+    data.ipAddress || '-'
+  ]);
+
+  return { success: true, logId: logId };
+}
+
+/**
+ * ดึงประวัติ Audit Logs
+ */
+function handleGetAuditLogs(data) {
+  const limit = (data && data.limit) ? Number(data.limit) : 100;
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.AUDIT_LOGS);
+  if (!sheet) return { logs: [] };
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return { logs: [] };
+
+  const logs = [];
+  for (let i = values.length - 1; i >= 1 && logs.length < limit; i--) {
+    const row = values[i];
+    logs.push({
+      logId: row[0],
+      timestamp: row[1],
+      operatorUserId: row[2],
+      operatorName: row[3],
+      action: row[4],
+      targetType: row[5],
+      targetId: row[6],
+      details: row[7],
+      ipAddress: row[8]
+    });
+  }
+
+  return { logs: logs };
 }
 
