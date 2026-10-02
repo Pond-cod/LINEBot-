@@ -28,6 +28,16 @@ async function initializeLiff() {
     await liff.init({ liffId: LIFF_ID });
 
     if (!liff.isLoggedIn()) {
+      if (window.location.protocol === 'http:' && !liff.isInClient()) {
+        console.warn('Cannot auto-login with LINE on HTTP localhost. Using demo offline mode.');
+        userNameEl.textContent = '😾POND-IT😸 (โหมดทดสอบ Local)';
+        userIdInput.value = 'U16565ee5abb9acecbbaf08d123f06cd2';
+        displayNameInput.value = '😾POND-IT😸';
+        const today = new Date();
+        today.setDate(today.getDate() + 30);
+        document.getElementById('dueDate').value = today.toISOString().split('T')[0];
+        return;
+      }
       liff.login();
       return;
     }

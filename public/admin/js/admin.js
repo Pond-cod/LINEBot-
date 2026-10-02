@@ -123,9 +123,31 @@ async function adminFetch(url, options = {}) {
 }
 
 /**
- * 1. ตรวจสอบสิทธิ์การเข้าใช้งาน Admin ผ่าน LIFF และ LINE User ID
+ * 1. ตรวจสอบสิทธิ์การเข้าใช้งาน Admin ผ่าน LIFF, LINE User ID หรือ Local Session
  */
 async function initAdminAuth() {
+  // 1.1 ตรวจสอบว่ามี Local Admin Session ที่บันทึกไว้ใน Browser หรือไม่ (สำหรับโหมดทดสอบ / Localhost)
+  const savedSession = localStorage.getItem('debt_admin_session');
+  if (savedSession) {
+    try {
+      const parsed = JSON.parse(savedSession);
+      if (parsed && parsed.userId) {
+        const res = await fetch(`/api/admin/verify-access?userId=${encodeURIComponent(parsed.userId)}`);
+        const authData = await res.json();
+        if (authData.authorized) {
+          currentAdminUser = parsed;
+          unlockAdminView(parsed);
+          return;
+        } else {
+          localStorage.removeItem('debt_admin_session');
+        }
+      }
+    } catch (e) {
+      localStorage.removeItem('debt_admin_session');
+    }
+  }
+
+  // 1.2 ตรวจสอบผ่าน LINE LIFF SDK
   try {
     await liff.init({ liffId: LIFF_ID });
 
@@ -138,10 +160,8 @@ async function initAdminAuth() {
       const authData = await res.json();
 
       if (authData.authorized) {
-        // มีสิทธิ์ถูกต้องในชีตหรือ env -> ปลดล็อกหน้าแอดมิน
         unlockAdminView(profile);
       } else {
-        // บัญชีไม่อยู่ในรายการที่อนุญาต หรือชีตยังว่างเปล่า -> ปฏิเสธการเข้าถึงเด็ดขาด!
         const reason = authData.adminCount === 0
           ? 'ยังไม่มีรายชื่อผู้ดูแลระบบใน Google Sheet (แท็บ <code>admin</code> ยังว่างเปล่า)'
           : 'บัญชี LINE ของคุณไม่มีสิทธิ์เข้าใช้งานในส่วนผู้ดูแลระบบ';
@@ -149,10 +169,8 @@ async function initAdminAuth() {
       }
     } else {
       if (liff.isInClient()) {
-        // หากเปิดใน LINE App ให้ redirect login อัตโนมัติ
         liff.login({ redirectUri: window.location.href });
       } else {
-        // เปิดผ่านเบราว์เซอร์ทั่วไป ให้แสดงปุ่มล็อกอิน LINE
         showLoginState();
       }
     }
@@ -186,17 +204,69 @@ function showDeniedState(profile, reason) {
   if (authDeniedState) authDeniedState.style.display = 'block';
 }
 
+// ฟังก์ชันยืนยันสิทธิ์สำหรับ Local Admin Login
+async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลระบบ (Local Mode)') {
+  if (!userId || !userId.trim()) {
+    showToast('กรุณาระบุ LINE User ID ของแอดมิน', '⚠️');
+    return;
+  }
+  const cleanId = userId.trim();
+  try {
+    const res = await fetch(`/api/admin/verify-access?userId=${encodeURIComponent(cleanId)}`);
+    const authData = await res.json();
+
+    if (authData.authorized) {
+      const userObj = { userId: cleanId, displayName };
+      currentAdminUser = userObj;
+      localStorage.setItem('debt_admin_session', JSON.stringify(userObj));
+      unlockAdminView(userObj);
+      showToast(`เข้าสู่ระบบสำเร็จในชื่อ: ${displayName}`, '✅');
+    } else {
+      showToast('LINE User ID นี้ไม่มีสิทธิ์แอดมินในระบบ', '⛔');
+      alert(`⛔ ปฏิเสธการเข้าถึง:\nLINE User ID: ${cleanId}\nไม่พบในรายการแอดมินที่ได้รับอนุญาตใน .env หรือ Google Sheet`);
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์: ' + err.message, '❌');
+  }
+}
+
 // ผูก Event Listeners สำหรับระบบความปลอดภัย
 if (btnAdminLoginLine) {
   btnAdminLoginLine.addEventListener('click', () => {
+    if (window.location.protocol === 'http:') {
+      alert('⚠️ LINE Login ไม่อนุญาตให้ Redirect กลับมาที่ http://localhost ได้โดยตรงตามข้อกำหนดของ LINE\n\n👉 บนเครื่องคอมฯ: กรุณาใช้ปุ่ม "เข้าสู่ระบบในเครื่อง (Localhost Mode)" ด้านล่าง เพื่อเข้าใช้งานได้ทันทีครับ\n\n🌐 หากต้องการทดสอบ LINE Login จริง ให้เปิดผ่าน HTTPS ด้วย Ngrok');
+      return;
+    }
     liff.login({ redirectUri: window.location.href });
+  });
+}
+
+// ผูก Event ปุ่ม Local Login
+const btnLocalAdminLogin = document.getElementById('btnLocalAdminLogin');
+const inputLocalAdminUserId = document.getElementById('inputLocalAdminUserId');
+const btnQuickAdminLogin = document.getElementById('btnQuickAdminLogin');
+
+if (btnLocalAdminLogin && inputLocalAdminUserId) {
+  btnLocalAdminLogin.addEventListener('click', () => {
+    loginAsLocalAdmin(inputLocalAdminUserId.value, 'ผู้ดูแลระบบ');
+  });
+}
+
+if (btnQuickAdminLogin) {
+  btnQuickAdminLogin.addEventListener('click', () => {
+    loginAsLocalAdmin('U16565ee5abb9acecbbaf08d123f06cd2', '😾POND-IT😸 (Admin หลัก)');
   });
 }
 
 if (btnAdminLogout) {
   btnAdminLogout.addEventListener('click', () => {
     if (confirm('ต้องการออกจากระบบผู้ดูแลระบบใช่หรือไม่?')) {
-      liff.logout();
+      localStorage.removeItem('debt_admin_session');
+      try {
+        if (typeof liff !== 'undefined' && liff.isLoggedIn()) {
+          liff.logout();
+        }
+      } catch (e) {}
       window.location.reload();
     }
   });
@@ -204,8 +274,13 @@ if (btnAdminLogout) {
 
 if (btnSwitchAccount) {
   btnSwitchAccount.addEventListener('click', () => {
-    liff.logout();
-    liff.login({ redirectUri: window.location.href });
+    localStorage.removeItem('debt_admin_session');
+    try {
+      if (typeof liff !== 'undefined' && liff.isLoggedIn()) {
+        liff.logout();
+      }
+    } catch (e) {}
+    window.location.reload();
   });
 }
 

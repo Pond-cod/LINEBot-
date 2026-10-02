@@ -247,6 +247,10 @@ function resetSlipUpload() {
  */
 function handleLineLogin() {
   if (!liff.isLoggedIn()) {
+    if (window.location.protocol === 'http:') {
+      alert('⚠️ LINE Login ไม่อนุญาตให้ใช้งานผ่าน http://localhost ได้โดยตรงตามข้อกำหนดของ LINE\n\n👉 ระบบเปิดหน้าต่างพรีวิวและฟังก์ชันส่งสลิปให้ทดสอบได้ทันที\n🌐 หากต้องการทดสอบระบบ LINE Login จริง ให้เปิดผ่าน HTTPS ด้วย Ngrok');
+      return;
+    }
     showToast('กำลังนำไปสู่หน้า LINE Login...', '⏳');
     liff.login({ redirectUri: window.location.origin + window.location.pathname });
   }
@@ -334,12 +338,23 @@ async function initApp() {
         };
         setLoginUiState(false);
       } else {
-        // บังคับ Redirect ไปหน้า LINE Login ทันที!
-        if (userNameEl) userNameEl.textContent = 'กำลังเข้าสู่ระบบ LINE...';
-        if (clientStatusBadge) clientStatusBadge.textContent = '⏳ เข้าสู่ระบบ...';
-        showToast('กำลังนำเข้าสู่ระบบ LINE...', '⏳');
-        liff.login({ redirectUri: window.location.origin + window.location.pathname });
-        return;
+        // หากเปิดบน HTTP Localhost ให้เปิดโหมดทดสอบ Local ทันที ไม่ redirect ไปติด 400 Bad Request
+        if (window.location.protocol === 'http:' && !liff.isInClient()) {
+          console.warn('Cannot auto-redirect to LINE Login on HTTP localhost. Using local client demo session.');
+          currentUser = {
+            userId: 'U16565ee5abb9acecbbaf08d123f06cd2',
+            displayName: '😾POND-IT😸 (โหมดทดสอบ Local)',
+            pictureUrl: DEFAULT_AVATAR
+          };
+          setLoginUiState(false);
+        } else {
+          // บังคับ Redirect ไปหน้า LINE Login เมื่ออยู่บน HTTPS / Production
+          if (userNameEl) userNameEl.textContent = 'กำลังเข้าสู่ระบบ LINE...';
+          if (clientStatusBadge) clientStatusBadge.textContent = '⏳ เข้าสู่ระบบ...';
+          showToast('กำลังนำเข้าสู่ระบบ LINE...', '⏳');
+          liff.login({ redirectUri: window.location.origin + window.location.pathname });
+          return;
+        }
       }
     }
   } catch (err) {
