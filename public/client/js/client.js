@@ -3,15 +3,15 @@
  * Coordinates HashRouter, LIFF Auth, SWR Caching, and Sub-views
  */
 
-import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.3';
-import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.3';
-import { initLiffAuth } from './core/clientAuth.js?v=7.3';
-import { clientRouter } from './core/clientRouter.js?v=7.3';
+import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.4';
+import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.4';
+import { initLiffAuth } from './core/clientAuth.js?v=7.4';
+import { clientRouter } from './core/clientRouter.js?v=7.4';
 
-import { initDashboardView } from './views/dashboardView.js?v=7.3';
-import { initPayView } from './views/payView.js?v=7.3';
-import { initHistoryView } from './views/historyView.js?v=7.3';
-import { initProfileView } from './views/profileView.js?v=7.3';
+import { initDashboardView } from './views/dashboardView.js?v=7.4';
+import { initPayView } from './views/payView.js?v=7.4';
+import { initHistoryView } from './views/historyView.js?v=7.4';
+import { initProfileView } from './views/profileView.js?v=7.4';
 
 /**
  * 1. Data Loading with Stale-While-Revalidate (SWR) (0ms instant render)

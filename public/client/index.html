@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/client.css?v=7.3">
+  <link rel="stylesheet" href="css/client.css?v=7.4">
   <!-- LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
@@ -69,7 +69,7 @@
         </div>
 
         <!-- Virtual Glass Credit Card (Apple Wallet Minimalist) -->
-        <div class="balance-hero-card">
+        <div class="balance-hero-card" id="balanceHeroCard">
           <div class="card-top-row">
             <div class="card-chip">
               <div class="emv-chip"></div>
@@ -84,12 +84,12 @@
             </div>
           </div>
 
-          <div class="hero-label">ยอดหนี้คงเหลือปัจจุบัน</div>
+          <div class="hero-label" id="heroLabel">ยอดหนี้คงเหลือปัจจุบัน</div>
           <div class="hero-amount" id="heroRemaining">฿0.00</div>
 
           <div class="progress-container">
             <div class="progress-labels">
-              <span>ความคืบหน้าการชำระ</span>
+              <span id="progressTitle">ความคืบหน้าการชำระ</span>
               <span id="progressPercent">0%</span>
             </div>
             <div class="progress-bar-bg">
@@ -102,23 +102,37 @@
         <div class="metrics-grid">
           <div class="metric-card">
             <div class="metric-icon">📅</div>
-            <div class="metric-title">วันครบกำหนดชำระ</div>
+            <div class="metric-title" id="metricDueDateTitle">วันครบกำหนดชำระ</div>
             <div class="metric-value alert" id="metricDueDate">-</div>
           </div>
           <div class="metric-card">
             <div class="metric-icon">💵</div>
-            <div class="metric-title">ค่างวดต่องวด</div>
+            <div class="metric-title" id="metricInstallmentTitle">ค่างวดต่องวด</div>
             <div class="metric-value highlight" id="metricInstallment">฿0.00</div>
           </div>
         </div>
 
         <!-- Quick Action Banner -->
-        <div class="action-banner">
+        <div class="action-banner" id="dashboardActionBanner">
           <div class="banner-text">
-            <h4>พร้อมชำระเงินงวดนี้?</h4>
-            <p>โอนเงินและแนบสลิปผ่านระบบได้ทันที</p>
+            <h4 id="actionBannerTitle">พร้อมชำระเงินงวดนี้?</h4>
+            <p id="actionBannerSubtitle">โอนเงินและแนบสลิปผ่านระบบได้ทันที</p>
           </div>
           <button class="banner-btn" id="btnGoToPay">ชำระเงินเลย</button>
+        </div>
+
+        <!-- Section: All Contracts Breakdown & Pay Individual Debt Cards -->
+        <div class="debts-breakdown-section" id="debtsBreakdownSection" style="display: none;">
+          <div class="section-header-row">
+            <div class="section-title-wrap">
+              <h3 class="section-title">📑 รายการสัญญาหนี้ทั้งหมด (<span id="debtsListCount">0</span>)</h3>
+              <p class="section-subtitle">เลือกดูหนี้ทั้งหมด หรือเลือกชำระแต่ละสัญญา</p>
+            </div>
+            <button type="button" class="btn-toggle-view-all" id="btnToggleAllOverview">
+              📊 ดูหนี้รวมทั้งหมด
+            </button>
+          </div>
+          <div class="debts-cards-list" id="debtsCardsList"></div>
         </div>
 
         <!-- Notice / Tips -->
@@ -302,6 +316,6 @@
 
   </div>
 
-  <script type="module" src="js/client.js?v=7.3"></script>
+  <script type="module" src="js/client.js?v=7.4"></script>
 </body>
 </html>

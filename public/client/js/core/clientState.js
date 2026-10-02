@@ -34,8 +34,10 @@ export const store = {
     
     // Automatically select a debt if none selected or if selected is no longer valid
     const allDebts = this.clientData.debts || [];
-    if (!this.selectedDebtId || !allDebts.some(d => d.debtId === this.selectedDebtId)) {
-      if (allDebts.length > 0) {
+    if (!this.selectedDebtId || (this.selectedDebtId !== 'ALL' && !allDebts.some(d => d.debtId === this.selectedDebtId))) {
+      if (allDebts.length > 1) {
+        this.selectedDebtId = 'ALL';
+      } else if (allDebts.length === 1) {
         this.selectedDebtId = allDebts[0].debtId;
       } else if (this.clientData.activeDebt) {
         this.selectedDebtId = this.clientData.activeDebt.debtId;
@@ -54,11 +56,15 @@ export const store = {
 
   getSelectedDebt() {
     const allDebts = this.clientData.debts || [];
-    if (this.selectedDebtId) {
+    if (this.selectedDebtId && this.selectedDebtId !== 'ALL') {
       const found = allDebts.find(d => d.debtId === this.selectedDebtId);
       if (found) return found;
     }
     return this.clientData.activeDebt || (allDebts.length > 0 ? allDebts[0] : null);
+  },
+
+  isViewingAllDebts() {
+    return this.selectedDebtId === 'ALL';
   },
 
   setSlipBase64(base64) {
