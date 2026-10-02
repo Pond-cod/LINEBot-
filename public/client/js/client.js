@@ -21,6 +21,7 @@ let currentSlipBase64 = null;
 const userAvatarEl = document.getElementById('userAvatar');
 const userNameEl = document.getElementById('userName');
 const clientStatusBadge = document.getElementById('clientStatusBadge');
+const btnClientThemeToggle = document.getElementById('btnClientThemeToggle');
 
 // Sub-views & Nav Items
 const navItems = document.querySelectorAll('.nav-item');
@@ -590,5 +591,34 @@ if (btnSubmitSlip) {
   });
 }
 
+/**
+ * 12. Theme Management (Light / Dark)
+ */
+function initClientTheme() {
+  const savedTheme = localStorage.getItem('admin_theme') || 'light';
+  applyClientTheme(savedTheme);
+
+  if (btnClientThemeToggle) {
+    btnClientThemeToggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      applyClientTheme(newTheme);
+      showToast(`เปลี่ยนธีมเป็น: ${newTheme === 'dark' ? 'โหมดมืด (Dark)' : 'โหมดสว่าง (Light)'}`, '🎨');
+    });
+  }
+}
+
+function applyClientTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('admin_theme', theme);
+
+  if (btnClientThemeToggle) {
+    btnClientThemeToggle.textContent = theme === 'dark' ? '🌙' : '☀️';
+  }
+}
+
 // เริ่มต้นระบบ
-window.addEventListener('DOMContentLoaded', initApp);
+window.addEventListener('DOMContentLoaded', () => {
+  initClientTheme();
+  initApp();
+});

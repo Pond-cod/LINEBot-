@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ระบบจัดการหนี้ รับสลิป และแจ้งเตือนอัตโนมัติ</title>
+  <title>ระบบจัดการหนี้ รับสลิป และแจ้งเตือนอัตโนมัติ LINE</title>
   
   <!-- LIFF State Router: นำทางอัตโนมัติเมื่อ LINE Login หรือ LIFF ส่งกลับมาที่ Endpoint URL -->
   <script>
@@ -15,7 +15,6 @@
         const liffState = urlParams.get('liff.state') || urlParams.get('liffRedirectUri');
         if (liffState) {
           let target = decodeURIComponent(liffState);
-          // หาก liffState เป็น Full URL ให้ตัดเหลือเฉพาะ Path
           if (target.startsWith('http://') || target.startsWith('https://')) {
             try {
               const u = new URL(target);
@@ -25,7 +24,6 @@
           if (!target.startsWith('/')) target = '/' + target;
 
           const cleanPath = target.split('?')[0].split('#')[0];
-          // ป้องกันการ redirect วนลูปถ้า target เป็นหน้า root หรือ index.html
           if (cleanPath !== '/' && cleanPath !== '/index.html' && cleanPath !== '') {
             let dest = cleanPath;
             if (!dest.endsWith('/') && !dest.includes('.')) {
@@ -43,7 +41,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       box-sizing: border-box;
@@ -54,45 +52,70 @@
     }
 
     body {
-      background: radial-gradient(circle at top, #1E293B 0%, #0F172A 100%);
-      color: #FFFFFF;
+      background: radial-gradient(circle at 50% -10%, #ECFDF5 0%, #F8FAFC 50%, #F1F5F9 100%);
+      color: #0F172A;
       min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 24px 20px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Ambient Decorative Gradient */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 580px;
+      height: 380px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, rgba(14, 165, 233, 0.08) 50%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
     }
 
     .hub-container {
       width: 100%;
-      max-width: 440px;
+      max-width: 450px;
       text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    @keyframes floatBadge {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
     }
 
     .logo-badge {
-      width: 70px;
-      height: 70px;
-      background: linear-gradient(135deg, #06C755 0%, #10B981 100%);
-      border-radius: 20px;
+      width: 76px;
+      height: 76px;
+      background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+      border-radius: 22px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 34px;
-      box-shadow: 0 10px 25px rgba(6, 199, 85, 0.35);
+      font-size: 38px;
+      box-shadow: 0 12px 28px rgba(5, 150, 105, 0.28);
       margin-bottom: 20px;
+      animation: floatBadge 3.5s ease-in-out infinite;
     }
 
     h1 {
-      font-size: 22px;
+      font-size: 22.5px;
       font-weight: 700;
-      letter-spacing: -0.5px;
+      color: #0F172A;
+      letter-spacing: -0.4px;
       margin-bottom: 6px;
     }
 
     p.subtitle {
-      font-size: 13px;
-      color: #94A3B8;
-      margin-bottom: 30px;
+      font-size: 13.5px;
+      color: #64748B;
+      margin-bottom: 28px;
     }
 
     .portal-cards {
@@ -102,34 +125,35 @@
     }
 
     .portal-card {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
       border-radius: 20px;
       padding: 22px 20px;
       text-align: left;
       text-decoration: none;
-      color: #FFFFFF;
+      color: #0F172A;
       display: flex;
       align-items: center;
       gap: 16px;
-      transition: all 0.25s ease;
-      backdrop-filter: blur(10px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+      position: relative;
+      overflow: hidden;
     }
 
     .portal-card:hover, .portal-card:active {
       transform: translateY(-2px);
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.25);
+      box-shadow: 0 16px 32px -4px rgba(15, 23, 42, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
     }
 
     .portal-card.client:hover {
-      border-color: #06C755;
-      box-shadow: 0 10px 25px rgba(6, 199, 85, 0.2);
+      border-color: #10B981;
+      box-shadow: 0 14px 30px -4px rgba(16, 185, 129, 0.2);
     }
 
     .portal-card.admin:hover {
-      border-color: #0EA5E9;
-      box-shadow: 0 10px 25px rgba(14, 165, 233, 0.2);
+      border-color: #0284C7;
+      box-shadow: 0 14px 30px -4px rgba(2, 132, 199, 0.2);
     }
 
     .portal-icon {
@@ -141,49 +165,85 @@
       justify-content: center;
       font-size: 26px;
       flex-shrink: 0;
+      transition: transform 0.25s ease;
+    }
+
+    .portal-card:hover .portal-icon {
+      transform: scale(1.06);
     }
 
     .portal-card.client .portal-icon {
-      background: rgba(6, 199, 85, 0.15);
-      border: 1px solid rgba(6, 199, 85, 0.3);
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      color: #059669;
     }
 
     .portal-card.admin .portal-icon {
-      background: rgba(14, 165, 233, 0.15);
-      border: 1px solid rgba(14, 165, 233, 0.3);
+      background: #E0F2FE;
+      border: 1px solid #BAE6FD;
+      color: #0284C7;
+    }
+
+    .portal-info {
+      flex: 1;
+      min-width: 0;
     }
 
     .portal-info h3 {
       font-size: 16px;
-      font-weight: 600;
+      font-weight: 700;
+      color: #0F172A;
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
     .portal-info p {
-      font-size: 12px;
-      color: #94A3B8;
+      font-size: 12.5px;
+      color: #64748B;
       margin-top: 4px;
-      line-height: 1.4;
+      line-height: 1.45;
+    }
+
+    .liff-tag {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #059669;
+      background: #DCFCE7;
+      border: 1px solid #86EFAC;
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    .admin-tag {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #0284C7;
+      background: #E0F2FE;
+      border: 1px solid #BAE6FD;
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: 0.3px;
     }
 
     .portal-arrow {
       margin-left: auto;
-      font-size: 20px;
-      color: #64748B;
-      transition: transform 0.2s;
+      font-size: 22px;
+      color: #94A3B8;
+      transition: transform 0.2s ease, color 0.2s ease;
     }
 
     .portal-card:hover .portal-arrow {
       transform: translateX(4px);
-      color: #FFFFFF;
+      color: #0F172A;
     }
 
     .footer-note {
-      margin-top: 32px;
-      font-size: 11px;
-      color: #64748B;
+      margin-top: 36px;
+      font-size: 11.5px;
+      color: #94A3B8;
+      letter-spacing: 0.2px;
     }
   </style>
 </head>
@@ -198,7 +258,7 @@
       <a href="/client/" class="portal-card client">
         <div class="portal-icon">👤</div>
         <div class="portal-info">
-          <h3>ลูกหนี้ / ลูกค้า <span style="font-size: 11px; color: #06C755; background: rgba(6, 199, 85, 0.15); padding: 2px 6px; border-radius: 6px;">LIFF</span></h3>
+          <h3>ลูกหนี้ / ลูกค้า <span class="liff-tag">LIFF</span></h3>
           <p>ตรวจยอดคงเหลือ, วันครบกำหนด, แนบสลิปโอนเงิน และดูประวัติ</p>
         </div>
         <div class="portal-arrow">›</div>
@@ -208,7 +268,7 @@
       <a href="/admin/" class="portal-card admin">
         <div class="portal-icon">🛡️</div>
         <div class="portal-info">
-          <h3>เจ้าหนี้ / ผู้ดูแลระบบ</h3>
+          <h3>เจ้าหนี้ / ผู้ดูแลระบบ <span class="admin-tag">PC PORTAL</span></h3>
           <p>แดชบอร์ดสรุปยอด, สร้างสัญญา, อนุมัติสลิป และควบคุมการแจ้งเตือน</p>
         </div>
         <div class="portal-arrow">›</div>
