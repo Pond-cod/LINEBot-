@@ -381,53 +381,138 @@
           <div class="view-header">
             <div>
               <h2 class="view-title">📑 สัญญาหนี้ทั้งหมด (Contracts Directory)</h2>
-              <p class="view-desc">รายการสัญญาเงินกู้ทั้งหมด ตรวจสอบสถานะการผ่อน และสั่งยิงแจ้งเตือนรายบุคคล</p>
+              <p class="view-desc">ระบบจัดกลุ่มสัญญาแยกตามลูกหนี้ ต้องเลือกลูกหนี้ก่อนเพื่อเข้าดูสัญญาหนี้เฉพาะบุคคล</p>
             </div>
-            <button class="topbar-btn primary" onclick="switchView('view-admin-new-contract')">
-              ➕ เปิดสัญญาใหม่
-            </button>
+            <div style="display: flex; gap: 10px;">
+              <button class="topbar-btn" id="btnShowAllDebtorsList" onclick="clearSelectedContractDebtor()">
+                👥 เลือกลูกหนี้คนอื่น
+              </button>
+              <button class="topbar-btn primary" onclick="switchView('view-admin-new-contract')">
+                ➕ เปิดสัญญาใหม่
+              </button>
+            </div>
           </div>
 
-          <!-- Contracts Table Panel -->
-          <div class="panel-card">
-            <!-- Filter & Search Bar -->
-            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
-              <input type="text" id="contractSearchInput" class="form-control" placeholder="🔍 ค้นหาเลขที่สัญญา, ชื่อลูกหนี้, หรือ LINE ID..." style="flex: 2; min-width: 250px;">
-              <select id="contractFilterStatus" class="form-control" style="flex: 1; min-width: 150px;">
-                <option value="ALL">สถานะทั้งหมด</option>
-                <option value="ACTIVE">กำลังผ่อน (ACTIVE)</option>
-                <option value="OVERDUE">เกินกำหนด (OVERDUE)</option>
-                <option value="PAID">ชำระครบแล้ว (PAID)</option>
+          <!-- Top Debtor Selector Bar -->
+          <div class="panel-card" style="margin-bottom: 20px; padding: 14px 20px;">
+            <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-main); white-space: nowrap; font-size: 14px;">
+                <span style="font-size: 18px;">👤</span>
+                <span>เลือกลูกหนี้:</span>
+              </div>
+              <select id="contractDebtorFilter" class="form-control" style="flex: 2; min-width: 280px; font-weight: 600; border-color: var(--primary);">
+                <option value="">-- กรุณาเลือกลูกหนี้ก่อน --</option>
               </select>
-              <button id="btnRefreshContracts" class="topbar-btn">
+              <button id="btnClearContractDebtor" class="topbar-btn" style="display: none; padding: 8px 16px; font-size: 13px;" onclick="clearSelectedContractDebtor()">
+                🔄 เปลี่ยนลูกหนี้
+              </button>
+              <button id="btnRefreshContracts" class="topbar-btn" style="padding: 8px 16px; font-size: 13px;">
                 🔄 รีเฟรช
               </button>
             </div>
+          </div>
 
-            <!-- Full Width Data Table -->
-            <div class="table-responsive">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th>เลขที่สัญญา</th>
-                    <th>ผู้กู้ (ลูกหนี้)</th>
-                    <th>ยอดรวม</th>
-                    <th>ยอดคงเหลือ</th>
-                    <th>ค่างวด</th>
-                    <th>กำหนดชำระ</th>
-                    <th>สถานะ</th>
-                    <th>🔔 รูปแบบแจ้งเตือน</th>
-                    <th style="text-align: center;">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody id="contractsTableBody">
-                  <tr>
-                    <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
-                      กำลังโหลดข้อมูลสัญญาหนี้...
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          <!-- State 1: Debtor Selection View (เมื่อยังไม่ได้เลือกลูกหนี้) -->
+          <div id="contractsDebtorPickerContainer">
+            <div class="panel-card">
+              <div style="text-align: center; padding: 26px 16px 20px 16px; background: var(--primary-light); border: 1.5px dashed var(--primary-border); border-radius: var(--radius-md); margin-bottom: 20px;">
+                <div style="font-size: 36px; margin-bottom: 8px;">👥</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 700; color: var(--text-main);">กรุณาเลือกลูกหนี้เพื่อดูสัญญาหนี้</h3>
+                <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); max-width: 580px; margin: 0 auto; line-height: 1.5;">
+                  ระบบแยกสัญญาหนี้ตามรายชื่อลูกหนี้ กรุณาคลิกเลือกการ์ดลูกหนี้จากรายการด้านล่าง เพื่อเปิดดูรายละเอียดสัญญาหนี้ สถานะการผ่อน และสั่งยิงแจ้งเตือน
+                </p>
+                <div style="max-width: 440px; margin: 18px auto 0 auto;">
+                  <input type="text" id="debtorCardSearchInput" class="form-control" placeholder="🔍 พิมพ์ชื่อลูกหนี้, เบอร์โทร, หรือ LINE ID..." style="background: var(--surface); box-shadow: var(--shadow-sm); font-size: 13px;">
+                </div>
+              </div>
+
+              <!-- Interactive Debtor Cards Grid -->
+              <div id="debtorCardsGrid" class="debtor-select-grid">
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+                  กำลังโหลดรายชื่อลูกหนี้และยอดหนี้...
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- State 2: Selected Debtor Contracts View (เมื่อเลือกลูกหนี้แล้ว) -->
+          <div id="contractsTableContainer" style="display: none;">
+            <!-- Selected Debtor Profile Hero Card -->
+            <div id="selectedDebtorBanner" class="selected-debtor-hero">
+              <div class="hero-left">
+                <div class="debtor-avatar-circle" id="heroDebtorAvatar">👤</div>
+                <div>
+                  <div class="hero-title">
+                    <span id="heroDebtorName">ชื่อลูกหนี้</span>
+                    <span class="badge-status active" id="heroDebtorStatusBadge" style="font-size: 11px;">ลูกหนี้ปกติ</span>
+                  </div>
+                  <div class="hero-sub" id="heroDebtorUserId">U16565ee5abb9acecbbaf08d123f06cd2</div>
+                  <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="heroDebtorPhone">📞 เบอร์โทร: -</div>
+                </div>
+              </div>
+
+              <div class="debtor-stat-chips">
+                <div class="debtor-stat-chip">
+                  <span class="chip-label">📄 สัญญาทั้งหมด</span>
+                  <span class="chip-val" id="heroStatContractsCount">0 สัญญา</span>
+                </div>
+                <div class="debtor-stat-chip">
+                  <span class="chip-label">💵 ยอดหนี้รวม</span>
+                  <span class="chip-val" id="heroStatTotalAmount">฿0.00</span>
+                </div>
+                <div class="debtor-stat-chip">
+                  <span class="chip-label">⏳ ยอดคงเหลือสุทธิ</span>
+                  <span class="chip-val" id="heroStatRemainingAmount" style="color: var(--primary);">฿0.00</span>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="topbar-btn" onclick="clearSelectedContractDebtor()" style="font-size: 12.5px; padding: 9px 14px;">
+                  🔄 เปลี่ยนลูกหนี้
+                </button>
+                <button class="topbar-btn primary" id="btnHeroOpenContract" style="font-size: 12.5px; padding: 9px 14px;">
+                  ➕ เปิดสัญญาใหม่ให้คนนี้
+                </button>
+              </div>
+            </div>
+
+            <!-- Contracts Table Panel -->
+            <div class="panel-card">
+              <!-- Filter & Search Bar for Selected Debtor -->
+              <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                <input type="text" id="contractSearchInput" class="form-control" placeholder="🔍 ค้นหาเลขที่สัญญา (เช่น DB-...)..." style="flex: 2; min-width: 250px;">
+                <select id="contractFilterStatus" class="form-control" style="flex: 1; min-width: 150px;">
+                  <option value="ALL">สถานะทั้งหมด</option>
+                  <option value="ACTIVE">กำลังผ่อน (ACTIVE)</option>
+                  <option value="OVERDUE">เกินกำหนด (OVERDUE)</option>
+                  <option value="PAID">ชำระครบแล้ว (PAID)</option>
+                </select>
+              </div>
+
+              <!-- Full Width Data Table -->
+              <div class="table-responsive">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>เลขที่สัญญา</th>
+                      <th>ยอดรวม</th>
+                      <th>ยอดคงเหลือ</th>
+                      <th>ค่างวด</th>
+                      <th>กำหนดชำระ</th>
+                      <th>สถานะ</th>
+                      <th>🔔 รูปแบบแจ้งเตือน</th>
+                      <th style="text-align: center;">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="contractsTableBody">
+                    <tr>
+                      <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                        กำลังโหลดข้อมูลสัญญาหนี้...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>

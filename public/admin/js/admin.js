@@ -708,33 +708,337 @@ window.openContractForDebtor = function(userId, name, phone, idCard) {
 };
 
 // ==============================================================================
-// 7. Contracts Directory (Data Table)
+// 7. Contracts Directory (Grouped by Debtor - Selection Required)
 // ==============================================================================
+let contractSelectedDebtorId = ''; // ค่าเริ่มต้น: ต้องเลือกลูกหนี้ก่อน
+
+const contractDebtorFilter = document.getElementById('contractDebtorFilter');
+const btnClearContractDebtor = document.getElementById('btnClearContractDebtor');
+const contractsDebtorPickerContainer = document.getElementById('contractsDebtorPickerContainer');
+const contractsTableContainer = document.getElementById('contractsTableContainer');
+const debtorCardsGrid = document.getElementById('debtorCardsGrid');
+const debtorCardSearchInput = document.getElementById('debtorCardSearchInput');
+const selectedDebtorBanner = document.getElementById('selectedDebtorBanner');
+const heroDebtorAvatar = document.getElementById('heroDebtorAvatar');
+const heroDebtorName = document.getElementById('heroDebtorName');
+const heroDebtorUserId = document.getElementById('heroDebtorUserId');
+const heroDebtorPhone = document.getElementById('heroDebtorPhone');
+const heroStatContractsCount = document.getElementById('heroStatContractsCount');
+const heroStatTotalAmount = document.getElementById('heroStatTotalAmount');
+const heroStatRemainingAmount = document.getElementById('heroStatRemainingAmount');
+const btnHeroOpenContract = document.getElementById('btnHeroOpenContract');
+
+/**
+ * ดึงข้อมูลสัญญาและรายชื่อลูกหนี้
+ */
 async function loadContracts() {
-  if (!contractsTableBody) return;
-  contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดข้อมูลสัญญา...</td></tr>';
+  if (contractsTableBody) {
+    contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดข้อมูลสัญญา...</td></tr>';
+  }
+  if (debtorCardsGrid) {
+    debtorCardsGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">กำลังโหลดรายชื่อลูกหนี้และยอดหนี้...</div>';
+  }
 
   try {
-    const res = await adminFetch('/api/admin/contracts');
-    const data = await res.json();
+    const [contractsRes, debtorsRes] = await Promise.all([
+      adminFetch('/api/admin/contracts'),
+      adminFetch('/api/admin/debtors')
+    ]);
 
-    if (data.success && data.contracts) {
-      allContracts = data.contracts;
-      renderContractsTable();
+    const contractsData = await contractsRes.json();
+    const debtorsData = await debtorsRes.json();
+
+    if (contractsData.success && contractsData.contracts) {
+      allContracts = contractsData.contracts;
     }
+    if (debtorsData.success && debtorsData.debtors) {
+      allDebtors = debtorsData.debtors;
+    }
+
+    renderDebtorDropdownAndCards();
+    renderContractsView();
   } catch (err) {
     console.error('Error loading contracts:', err);
-    contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #EF4444; padding: 20px;">เกิดข้อผิดพลาดในการโหลดสัญญา</td></tr>';
+    if (contractsTableBody) {
+      contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #EF4444; padding: 20px;">เกิดข้อผิดพลาดในการโหลดสัญญา</td></tr>';
+    }
   }
 }
 
+/**
+ * รวมกลุ่มข้อมูลลูกหนี้และสัญญาเข้าด้วยกัน
+ */
+function getDebtorGroupMap() {
+  const map = new Map();
+
+  (allDebtors || []).forEach(d => {
+    map.set(d.userId, {
+      userId: d.userId,
+      fullName: d.fullName || d.displayName || 'คุณลูกค้า',
+      displayName: d.displayName || '',
+      phone: d.phone || '',
+      idCardNumber: d.idCardNumber || '',
+      contracts: [],
+      totalAmount: 0,
+      remainingBalance: 0,
+      activeCount: 0,
+      overdueCount: 0,
+      paidCount: 0
+    });
+  });
+
+  (allContracts || []).forEach(c => {
+    const uid = c.userId || 'UNKNOWN';
+    if (!map.has(uid)) {
+      map.set(uid, {
+        userId: uid,
+        fullName: c.debtorName || 'คุณลูกค้า',
+        displayName: c.debtorName || '',
+        phone: '',
+        idCardNumber: '',
+        contracts: [],
+        totalAmount: 0,
+        remainingBalance: 0,
+        activeCount: 0,
+        overdueCount: 0,
+        paidCount: 0
+      });
+    }
+
+    const debtor = map.get(uid);
+    debtor.contracts.push(c);
+    const total = Number(c.totalAmount) || 0;
+    const remaining = Number(c.remainingBalance) || 0;
+    debtor.totalAmount += total;
+    debtor.remainingBalance += remaining;
+
+    if (c.debtStatus === 'OVERDUE') debtor.overdueCount++;
+    else if (c.debtStatus === 'PAID') debtor.paidCount++;
+    else debtor.activeCount++;
+  });
+
+  return map;
+}
+
+/**
+ * อัปเดต Dropdown เลือกลูกหนี้ และเรนเดอร์การ์ดลูกหนี้ (State 1)
+ */
+function renderDebtorDropdownAndCards() {
+  const debtorMap = getDebtorGroupMap();
+  const debtorList = Array.from(debtorMap.values());
+
+  debtorList.sort((a, b) => {
+    if (b.remainingBalance !== a.remainingBalance) {
+      return b.remainingBalance - a.remainingBalance;
+    }
+    return b.contracts.length - a.contracts.length;
+  });
+
+  if (contractDebtorFilter) {
+    let options = '<option value="">-- กรุณาเลือกลูกหนี้ (เลือกก่อนดูสัญญา) --</option>';
+    debtorList.forEach(d => {
+      const remainingStr = d.remainingBalance > 0 ? ` (ค้าง ${formatMoney(d.remainingBalance)})` : '';
+      options += `<option value="${d.userId}">👤 ${d.fullName} [${d.contracts.length} สัญญา${remainingStr}]</option>`;
+    });
+    options += '<option value="ALL">🌐 ดูสัญญาหนี้ของลูกหนี้ทุกคน (โหมดรวมทั้งหมด)</option>';
+    contractDebtorFilter.innerHTML = options;
+    contractDebtorFilter.value = contractSelectedDebtorId || '';
+  }
+
+  renderDebtorCardsGrid();
+}
+
+/**
+ * เรนเดอร์การ์ดรายชื่อลูกหนี้ (State 1: Picker)
+ */
+function renderDebtorCardsGrid() {
+  if (!debtorCardsGrid) return;
+
+  const debtorMap = getDebtorGroupMap();
+  let debtorList = Array.from(debtorMap.values());
+  const query = (debtorCardSearchInput?.value || '').toLowerCase().trim();
+
+  if (query) {
+    debtorList = debtorList.filter(d => 
+      (d.fullName || '').toLowerCase().includes(query) ||
+      (d.displayName || '').toLowerCase().includes(query) ||
+      (d.phone || '').toLowerCase().includes(query) ||
+      (d.userId || '').toLowerCase().includes(query)
+    );
+  }
+
+  debtorList.sort((a, b) => {
+    if (b.remainingBalance !== a.remainingBalance) return b.remainingBalance - a.remainingBalance;
+    return b.contracts.length - a.contracts.length;
+  });
+
+  if (debtorList.length === 0) {
+    debtorCardsGrid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+        🔍 ไม่พบลูกหนี้ที่ตรงกับคำค้นหา "${query}"
+      </div>
+    `;
+    return;
+  }
+
+  debtorCardsGrid.innerHTML = debtorList.map(d => {
+    const contractsCount = d.contracts.length;
+    const initial = (d.fullName || d.displayName || 'U').charAt(0).toUpperCase();
+    const hasOverdue = d.overdueCount > 0;
+    const hasActive = d.activeCount > 0;
+
+    let badgeStatusHtml = `<span class="badge-status ${hasActive ? 'active' : 'paid'}">${contractsCount} สัญญา</span>`;
+    if (hasOverdue) {
+      badgeStatusHtml += ` <span class="badge-status overdue" style="margin-left: 4px;">เกินกำหนด ${d.overdueCount}</span>`;
+    }
+
+    return `
+      <div class="debtor-select-card" onclick="selectContractDebtor('${d.userId}')" title="คลิกเพื่อดูสัญญาหนี้ของคุณ ${d.fullName}">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px; overflow: hidden;">
+            <div class="debtor-avatar-circle">${initial}</div>
+            <div style="overflow: hidden;">
+              <div style="font-weight: 700; font-size: 15px; color: var(--text-main); white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                ${d.fullName}
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted); font-family: monospace; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                ${d.userId}
+              </div>
+              ${d.phone ? `<div style="font-size: 11px; color: var(--text-sub); margin-top: 1px;">📞 ${d.phone}</div>` : ''}
+            </div>
+          </div>
+          <div>${badgeStatusHtml}</div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; background: var(--surface-subtle); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 14px; border: 1px solid var(--surface-border);">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">ยอดหนี้รวม</div>
+            <div style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">${formatMoney(d.totalAmount)}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 11px; color: var(--text-muted);">ยอดคงเหลือสุทธิ</div>
+            <div style="font-weight: 700; font-size: 14px; color: var(--primary);">${formatMoney(d.remainingBalance)}</div>
+          </div>
+        </div>
+
+        <button type="button" class="btn-primary-admin" style="width: 100%; padding: 10px; font-size: 13px; justify-content: center; gap: 8px;">
+          <span>📂 เปิดดูสัญญาหนี้ (${contractsCount} สัญญา)</span>
+          <span style="font-size: 14px;">➔</span>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * สลับมุมมองตาม Debtor ที่ถูกเลือก
+ */
+function renderContractsView() {
+  if (!contractSelectedDebtorId) {
+    if (contractsDebtorPickerContainer) contractsDebtorPickerContainer.style.display = 'block';
+    if (contractsTableContainer) contractsTableContainer.style.display = 'none';
+    if (btnClearContractDebtor) btnClearContractDebtor.style.display = 'none';
+    if (contractDebtorFilter) contractDebtorFilter.value = '';
+    renderDebtorCardsGrid();
+  } else {
+    if (contractsDebtorPickerContainer) contractsDebtorPickerContainer.style.display = 'none';
+    if (contractsTableContainer) contractsTableContainer.style.display = 'block';
+    if (btnClearContractDebtor) btnClearContractDebtor.style.display = 'inline-block';
+    if (contractDebtorFilter) contractDebtorFilter.value = contractSelectedDebtorId;
+
+    updateSelectedDebtorHero();
+    renderContractsTable();
+  }
+}
+
+/**
+ * อัปเดตการ์ดโปรไฟล์ลูกหนี้ที่เลือก (Selected Debtor Hero Banner)
+ */
+function updateSelectedDebtorHero() {
+  if (!selectedDebtorBanner) return;
+
+  if (contractSelectedDebtorId === 'ALL') {
+    if (heroDebtorAvatar) heroDebtorAvatar.textContent = '🌐';
+    if (heroDebtorName) heroDebtorName.textContent = 'ลูกหนี้ทุกคน (โหมดรวมทั้งหมด)';
+    const statusBadge = document.getElementById('heroDebtorStatusBadge');
+    if (statusBadge) {
+      statusBadge.className = 'badge-status active';
+      statusBadge.textContent = 'แสดงสัญญาหนี้ทั้งหมด';
+    }
+    if (heroDebtorUserId) heroDebtorUserId.textContent = 'รวมข้อมูลทุกบัญชีลูกหนี้';
+    if (heroDebtorPhone) heroDebtorPhone.textContent = `จำนวนสัญญาในระบบทั้งหมด ${allContracts.length} ฉบับ`;
+
+    let totalAll = 0, remainingAll = 0;
+    allContracts.forEach(c => {
+      totalAll += Number(c.totalAmount) || 0;
+      remainingAll += Number(c.remainingBalance) || 0;
+    });
+
+    if (heroStatContractsCount) heroStatContractsCount.textContent = `${allContracts.length} สัญญา`;
+    if (heroStatTotalAmount) heroStatTotalAmount.textContent = formatMoney(totalAll);
+    if (heroStatRemainingAmount) heroStatRemainingAmount.textContent = formatMoney(remainingAll);
+    if (btnHeroOpenContract) {
+      btnHeroOpenContract.onclick = () => switchView('view-admin-new-contract');
+    }
+    return;
+  }
+
+  const debtorMap = getDebtorGroupMap();
+  const d = debtorMap.get(contractSelectedDebtorId) || {
+    userId: contractSelectedDebtorId,
+    fullName: 'คุณลูกค้า',
+    phone: '',
+    contracts: [],
+    totalAmount: 0,
+    remainingBalance: 0
+  };
+
+  const initial = (d.fullName || d.displayName || 'U').charAt(0).toUpperCase();
+  if (heroDebtorAvatar) heroDebtorAvatar.textContent = initial;
+  if (heroDebtorName) heroDebtorName.textContent = d.fullName;
+  const statusBadge = document.getElementById('heroDebtorStatusBadge');
+  if (statusBadge) {
+    if (d.overdueCount > 0) {
+      statusBadge.className = 'badge-status overdue';
+      statusBadge.textContent = '⚠️ มีสัญญาค้างชำระ';
+    } else if (d.contracts.length > 0) {
+      statusBadge.className = 'badge-status active';
+      statusBadge.textContent = '🟢 ปกติ (กำลังผ่อน)';
+    } else {
+      statusBadge.className = 'badge-status paid';
+      statusBadge.textContent = 'ไม่มีสัญญาค้าง';
+    }
+  }
+
+  if (heroDebtorUserId) heroDebtorUserId.textContent = d.userId;
+  if (heroDebtorPhone) heroDebtorPhone.textContent = d.phone ? `📞 เบอร์โทร: ${d.phone}` : '📞 ยังไม่ระบุเบอร์โทร';
+
+  if (heroStatContractsCount) heroStatContractsCount.textContent = `${d.contracts.length} สัญญา`;
+  if (heroStatTotalAmount) heroStatTotalAmount.textContent = formatMoney(d.totalAmount);
+  if (heroStatRemainingAmount) heroStatRemainingAmount.textContent = formatMoney(d.remainingBalance);
+
+  if (btnHeroOpenContract) {
+    btnHeroOpenContract.onclick = () => {
+      openContractForDebtor(d.userId, d.fullName, d.phone, d.idCardNumber);
+    };
+  }
+}
+
+/**
+ * เรนเดอร์แถวตารางสัญญาหนี้ (เฉพาะลูกหนี้ที่เลือก)
+ */
 function renderContractsTable() {
   if (!contractsTableBody) return;
 
   const query = (contractSearchInput?.value || '').toLowerCase().trim();
   const filterStatus = contractFilterStatus?.value || 'ALL';
 
-  const filtered = allContracts.filter(c => {
+  let filtered = allContracts;
+  if (contractSelectedDebtorId && contractSelectedDebtorId !== 'ALL') {
+    filtered = filtered.filter(c => c.userId === contractSelectedDebtorId);
+  }
+
+  filtered = filtered.filter(c => {
     const matchQuery = !query || 
       (c.debtId || '').toLowerCase().includes(query) ||
       (c.debtorName || '').toLowerCase().includes(query) ||
@@ -745,7 +1049,7 @@ function renderContractsTable() {
   });
 
   if (filtered.length === 0) {
-    contractsTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบสัญญาหนี้ที่ตรงกับเงื่อนไข</td></tr>';
+    contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบสัญญาหนี้ของลูกหนี้นี้ที่ตรงกับเงื่อนไข</td></tr>';
     return;
   }
 
@@ -762,22 +1066,18 @@ function renderContractsTable() {
 
     return `
       <tr>
-        <td><strong style="color: #38BDF8; font-family: monospace;">${c.debtId}</strong></td>
-        <td>
-          <div style="font-weight: 600; color: #FFFFFF;">${c.debtorName || 'คุณลูกค้า'}</div>
-          <div style="font-size: 11px; color: var(--text-muted); font-family: monospace;">${c.userId}</div>
-        </td>
+        <td><strong style="color: var(--primary); font-family: monospace;">${c.debtId}</strong></td>
         <td><strong>${formatMoney(total)}</strong></td>
         <td>
-          <div style="color: #38BDF8; font-weight: 600;">${formatMoney(remaining)}</div>
-          <div style="width: 100px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 4px; overflow: hidden;">
-            <div style="width: ${paidPercent}%; height: 100%; background: #10B981;"></div>
+          <div style="color: var(--primary); font-weight: 700;">${formatMoney(remaining)}</div>
+          <div style="width: 100px; height: 5px; background: rgba(0,0,0,0.08); border-radius: 3px; margin-top: 4px; overflow: hidden;">
+            <div style="width: ${paidPercent}%; height: 100%; background: var(--success);"></div>
           </div>
-          <span style="font-size: 10px; color: var(--text-muted);">${paidPercent}% ชำระแล้ว</span>
+          <span style="font-size: 10.5px; color: var(--text-muted);">${paidPercent}% ชำระแล้ว</span>
         </td>
-        <td><span style="color: #10B981; font-weight: 600;">${formatMoney(c.installmentAmount)}</span></td>
+        <td><span style="color: var(--success); font-weight: 600;">${formatMoney(c.installmentAmount)}</span></td>
         <td>
-          <div style="font-weight: 600; color: #F59E0B;">${c.dueDate || '-'}</div>
+          <div style="font-weight: 600; color: var(--warning);">${c.dueDate || '-'}</div>
           <small style="font-size: 10px; color: var(--text-muted);">รอบ ${c.cycleDays || 30} วัน</small>
         </td>
         <td>${statusBadge}</td>
@@ -805,6 +1105,31 @@ function renderContractsTable() {
   }).join('');
 }
 
+// Global functions for window
+window.selectContractDebtor = function(userId) {
+  contractSelectedDebtorId = userId;
+  renderContractsView();
+};
+
+window.clearSelectedContractDebtor = function() {
+  contractSelectedDebtorId = '';
+  renderContractsView();
+};
+
+window.viewContractsForDebtor = function(userId) {
+  contractSelectedDebtorId = userId;
+  switchView('view-admin-contracts');
+};
+
+if (contractDebtorFilter) {
+  contractDebtorFilter.addEventListener('change', () => {
+    contractSelectedDebtorId = contractDebtorFilter.value;
+    renderContractsView();
+  });
+}
+if (debtorCardSearchInput) {
+  debtorCardSearchInput.addEventListener('input', renderDebtorCardsGrid);
+}
 if (contractSearchInput) contractSearchInput.addEventListener('input', renderContractsTable);
 if (contractFilterStatus) contractFilterStatus.addEventListener('change', renderContractsTable);
 if (btnRefreshContracts) btnRefreshContracts.addEventListener('click', loadContracts);
@@ -1235,7 +1560,10 @@ function renderDebtorsTable() {
             </label>
           </div>
         </td>
-        <td style="text-align: center;">
+        <td style="text-align: center; white-space: nowrap;">
+          <button class="topbar-btn" style="padding: 5px 12px; font-size: 12px; margin-right: 6px;" onclick="viewContractsForDebtor('${d.userId}')" title="เปิดดูสัญญาหนี้ของลูกหนี้นี้">
+            📑 ดูสัญญา
+          </button>
           <button class="topbar-btn primary" style="padding: 5px 12px; font-size: 12px;" onclick="openContractForDebtor('${d.userId}', '${d.fullName || d.displayName || ''}', '${d.phone || ''}', '${d.idCardNumber || ''}')">
             ➕ เปิดสัญญา
           </button>
