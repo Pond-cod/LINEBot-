@@ -113,7 +113,9 @@ async function createContract(req, res) {
       totalAmount,
       installmentAmount,
       dueDate,
-      cycleDays: cycleDays || 30
+      cycleDays: cycleDays || 30,
+      reminderProfileId: req.body.reminderProfileId || '',
+      reminderEnabled: req.body.reminderEnabled !== undefined ? req.body.reminderEnabled : true
     });
 
     recentContractCreations.set(dedupeKey, {
@@ -545,6 +547,152 @@ async function getReminderLogs(req, res) {
   }
 }
 
+/**
+ * 16. ดึงรายการ Reminder Profiles ทั้งหมด
+ */
+async function getReminderProfiles(req, res) {
+  try {
+    const reminderProfileService = require('../services/reminderProfileService');
+    const profiles = await reminderProfileService.getAllProfiles();
+    return res.status(200).json({ success: true, profiles });
+  } catch (error) {
+    console.error('Error getting reminder profiles:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 17. สร้าง Reminder Profile ใหม่
+ */
+async function createReminderProfile(req, res) {
+  try {
+    const reminderProfileService = require('../services/reminderProfileService');
+    const profile = await reminderProfileService.createProfile(req.body);
+    return res.status(201).json({
+      success: true,
+      message: 'สร้างรูปแบบการแจ้งเตือนเรียบร้อยแล้ว',
+      profile
+    });
+  } catch (error) {
+    console.error('Error creating reminder profile:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 18. อัปเดต Reminder Profile
+ */
+async function updateReminderProfile(req, res) {
+  try {
+    const { profileId } = req.params;
+    const reminderProfileService = require('../services/reminderProfileService');
+    const profile = await reminderProfileService.updateProfile(profileId, req.body);
+    return res.status(200).json({
+      success: true,
+      message: 'อัปเดตรูปแบบการแจ้งเตือนเรียบร้อยแล้ว',
+      profile
+    });
+  } catch (error) {
+    console.error('Error updating reminder profile:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 19. ลบ Reminder Profile
+ */
+async function deleteReminderProfile(req, res) {
+  try {
+    const { profileId } = req.params;
+    const reminderProfileService = require('../services/reminderProfileService');
+    const result = await reminderProfileService.deleteProfile(profileId);
+    return res.status(200).json({
+      success: true,
+      message: 'ลบรูปแบบการแจ้งเตือนเรียบร้อยแล้ว',
+      result
+    });
+  } catch (error) {
+    console.error('Error deleting reminder profile:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 20. สลับสถานะเปิด/ปิด (Toggle Status) ของ Reminder Profile
+ */
+async function toggleReminderProfile(req, res) {
+  try {
+    const { profileId } = req.params;
+    const { status } = req.body;
+    const reminderProfileService = require('../services/reminderProfileService');
+    const profile = await reminderProfileService.toggleProfileStatus(profileId, status);
+    return res.status(200).json({
+      success: true,
+      message: `เปลี่ยนสถานะเป็น ${profile.status} สำเร็จ`,
+      profile
+    });
+  } catch (error) {
+    console.error('Error toggling reminder profile:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 21. อัปเดตการตั้งค่าแจ้งเตือนเฉพาะลูกหนี้ (Debtor Reminder Config)
+ */
+async function updateDebtorReminder(req, res) {
+  try {
+    const { userId } = req.params;
+    const { reminderProfileId, reminderEnabled } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'Missing userId' });
+    }
+
+    const result = await sheetsService.updateDebtorReminderConfig(userId, {
+      reminderProfileId,
+      reminderEnabled
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'อัปเดตการตั้งค่าแจ้งเตือนลูกหนี้เรียบร้อยแล้ว',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error updating debtor reminder config:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
+ * 22. อัปเดตการตั้งค่าแจ้งเตือนเฉพาะสัญญา (Contract Reminder Config)
+ */
+async function updateContractReminder(req, res) {
+  try {
+    const { debtId } = req.params;
+    const { reminderProfileId, reminderEnabled } = req.body;
+
+    if (!debtId) {
+      return res.status(400).json({ success: false, message: 'Missing debtId' });
+    }
+
+    const result = await sheetsService.updateDebtReminderConfig(debtId, {
+      reminderProfileId,
+      reminderEnabled
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'อัปเดตการตั้งค่าแจ้งเตือนสัญญาเรียบร้อยแล้ว',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error updating contract reminder config:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   getAdminStats,
   getContracts,
@@ -562,5 +710,12 @@ module.exports = {
   getReminderSettings,
   saveReminderSettings,
   sendTestReminderPush,
-  getReminderLogs
+  getReminderLogs,
+  getReminderProfiles,
+  createReminderProfile,
+  updateReminderProfile,
+  deleteReminderProfile,
+  toggleReminderProfile,
+  updateDebtorReminder,
+  updateContractReminder
 };

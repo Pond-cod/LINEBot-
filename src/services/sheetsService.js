@@ -8,15 +8,17 @@ const SHEET_NAMES = {
   DEBTS: 'Debts',
   PAYMENTS: 'Payments',
   REMINDER_LOGS: 'ReminderLogs',
-  ADMINS: 'admin'
+  ADMINS: 'admin',
+  REMINDER_PROFILES: 'ReminderProfiles'
 };
 
 const HEADERS = {
-  [SHEET_NAMES.DEBTORS]: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status'],
-  [SHEET_NAMES.DEBTS]: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt'],
+  [SHEET_NAMES.DEBTORS]: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled'],
+  [SHEET_NAMES.DEBTS]: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled'],
   [SHEET_NAMES.PAYMENTS]: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote'],
   [SHEET_NAMES.REMINDER_LOGS]: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
-  [SHEET_NAMES.ADMINS]: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status']
+  [SHEET_NAMES.ADMINS]: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status'],
+  [SHEET_NAMES.REMINDER_PROFILES]: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt']
 };
 
 /**
@@ -169,13 +171,13 @@ async function registerDebtor({ userId, displayName, fullName, phone, idCardNumb
 }
 
 /**
- * สร้างสัญญาหนี้ใหม่
+ * สร้างสัญญาหนี้ใหม่ (รองรับกำหนดรูปแบบแจ้งเตือนเฉพาะสัญญา)
  */
-async function createDebt({ userId, totalAmount, installmentAmount, dueDate, cycleDays = 30 }) {
+async function createDebt({ userId, totalAmount, installmentAmount, dueDate, cycleDays = 30, reminderProfileId = '', reminderEnabled = true }) {
   cache.delByPattern(/^debts_/);
 
   if (isGasConfigured()) {
-    const res = await callGas('createDebt', { userId, totalAmount, installmentAmount, dueDate, cycleDays });
+    const res = await callGas('createDebt', { userId, totalAmount, installmentAmount, dueDate, cycleDays, reminderProfileId, reminderEnabled });
     cache.delByPattern(/^debts_/);
     return res;
   }
@@ -187,7 +189,7 @@ async function createDebt({ userId, totalAmount, installmentAmount, dueDate, cyc
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: `${SHEET_NAMES.DEBTS}!A:J`,
+    range: `${SHEET_NAMES.DEBTS}!A:L`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[
@@ -200,13 +202,15 @@ async function createDebt({ userId, totalAmount, installmentAmount, dueDate, cyc
         Number(cycleDays),
         'ACTIVE',
         now,
-        now
+        now,
+        reminderProfileId || '',
+        reminderEnabled ? 'TRUE' : 'FALSE'
       ]]
     }
   });
 
   cache.delByPattern(/^debts_/);
-  return { debtId, userId, totalAmount, installmentAmount, dueDate };
+  return { debtId, userId, totalAmount, installmentAmount, dueDate, reminderProfileId, reminderEnabled };
 }
 
 /**
@@ -258,6 +262,7 @@ async function getAllDebtors() {
           for (let i = 1; i < lines.length; i++) {
             const clean = parseCsvLine(lines[i]);
             if (clean[0] && clean[0].startsWith('U')) {
+              const isRemindEnabled = clean[8] === undefined || clean[8] === '' || clean[8] === 'TRUE' || clean[8] === 'true' || clean[8] === true;
               debtors.push({
                 userId: clean[0],
                 displayName: clean[1] || '',
@@ -265,7 +270,9 @@ async function getAllDebtors() {
                 phone: clean[3] || '',
                 idCardNumber: clean[4] || '',
                 registeredAt: clean[5] || '',
-                status: clean[6] || 'ACTIVE'
+                status: clean[6] || 'ACTIVE',
+                reminderProfileId: clean[7] || '',
+                reminderEnabled: isRemindEnabled
               });
             }
           }
@@ -298,7 +305,7 @@ async function getAllDebtors() {
     try {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${SHEET_NAMES.DEBTORS}!A2:G`
+        range: `${SHEET_NAMES.DEBTORS}!A2:I`
       });
       const rows = res.data.values || [];
       const debtors = rows
@@ -310,7 +317,9 @@ async function getAllDebtors() {
           phone: r[3] || '',
           idCardNumber: r[4] || '',
           registeredAt: r[5] || '',
-          status: r[6] || 'ACTIVE'
+          status: r[6] || 'ACTIVE',
+          reminderProfileId: r[7] || '',
+          reminderEnabled: r[8] === undefined || r[8] === '' || r[8] === 'TRUE' || r[8] === 'true' || r[8] === true
         }));
       if (debtors.length > 0) {
         cache.set(cacheKey, debtors, 30);
@@ -568,6 +577,8 @@ async function getAllDebts() {
               const uId = clean[1] || '';
               const debtor = debtorMap.get(uId) || { name: 'ไม่ระบุชื่อ', phone: '' };
 
+              const isRemindEnabled = clean[11] === undefined || clean[11] === '' || clean[11] === 'TRUE' || clean[11] === 'true' || clean[11] === true;
+
               list.push({
                 rowIndex: i + 1,
                 debtId: clean[0],
@@ -581,7 +592,9 @@ async function getAllDebts() {
                 cycleDays: Number(clean[6]) || 30,
                 debtStatus: clean[7] || 'ACTIVE',
                 createdAt: clean[8] || '',
-                updatedAt: clean[9] || ''
+                updatedAt: clean[9] || '',
+                reminderProfileId: clean[10] || '',
+                reminderEnabled: isRemindEnabled
               });
             }
           }
@@ -614,8 +627,8 @@ async function getAllDebts() {
   if (sheets && sheetId) {
     try {
       const [debtsRes, debtorsRes] = await Promise.all([
-        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTS}!A2:J` }),
-        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:G` })
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTS}!A2:L` }),
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:I` })
       ]);
 
       const debtRows = debtsRes.data.values || [];
@@ -636,7 +649,9 @@ async function getAllDebts() {
         cycleDays: Number(r[6]) || 30,
         debtStatus: r[7] || 'ACTIVE',
         createdAt: r[8] || '',
-        updatedAt: r[9] || ''
+        updatedAt: r[9] || '',
+        reminderProfileId: r[10] || '',
+        reminderEnabled: r[11] === undefined || r[11] === '' || r[11] === 'TRUE' || r[11] === 'true' || r[11] === true
       }));
 
       if (list.length > 0) {
@@ -1246,6 +1261,108 @@ async function deleteAdmin(userId) {
   return { deleted: false, message: 'Admin not found' };
 }
 
+/**
+ * อัปเดตการตั้งค่าแจ้งเตือนระดับลูกหนี้ (Reminder Profile & Toggle)
+ */
+async function updateDebtorReminderConfig(userId, { reminderProfileId, reminderEnabled }) {
+  cache.delByPattern(/^debtors_/);
+
+  if (isGasConfigured()) {
+    try {
+      const res = await callGas('updateDebtorReminderConfig', { userId, reminderProfileId, reminderEnabled });
+      cache.delByPattern(/^debtors_/);
+      return res;
+    } catch (err) {
+      console.warn('callGas updateDebtorReminderConfig note:', err.message);
+    }
+  }
+
+  if (sheets && sheetId) {
+    try {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${SHEET_NAMES.DEBTORS}!A:I`
+      });
+
+      const rows = res.data.values || [];
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][0] === userId) {
+          const rowNum = i + 1;
+          const profileVal = reminderProfileId !== undefined ? (reminderProfileId || '') : (rows[i][7] || '');
+          const enabledVal = reminderEnabled !== undefined ? (reminderEnabled ? 'TRUE' : 'FALSE') : (rows[i][8] || 'TRUE');
+
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: `${SHEET_NAMES.DEBTORS}!H${rowNum}:I${rowNum}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[profileVal, enabledVal]]
+            }
+          });
+          cache.delByPattern(/^debtors_/);
+          return { success: true, userId, reminderProfileId: profileVal, reminderEnabled: enabledVal === 'TRUE' };
+        }
+      }
+    } catch (err) {
+      console.error('Sheets API updateDebtorReminderConfig error:', err.message);
+    }
+  }
+
+  cache.delByPattern(/^debtors_/);
+  return { success: true, userId, reminderProfileId, reminderEnabled };
+}
+
+/**
+ * อัปเดตการตั้งค่าแจ้งเตือนระดับสัญญา (Reminder Profile & Toggle)
+ */
+async function updateDebtReminderConfig(debtId, { reminderProfileId, reminderEnabled }) {
+  cache.delByPattern(/^debts_/);
+
+  if (isGasConfigured()) {
+    try {
+      const res = await callGas('updateDebtReminderConfig', { debtId, reminderProfileId, reminderEnabled });
+      cache.delByPattern(/^debts_/);
+      return res;
+    } catch (err) {
+      console.warn('callGas updateDebtReminderConfig note:', err.message);
+    }
+  }
+
+  if (sheets && sheetId) {
+    try {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${SHEET_NAMES.DEBTS}!A:L`
+      });
+
+      const rows = res.data.values || [];
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][0] === debtId) {
+          const rowNum = i + 1;
+          const profileVal = reminderProfileId !== undefined ? (reminderProfileId || '') : (rows[i][10] || '');
+          const enabledVal = reminderEnabled !== undefined ? (reminderEnabled ? 'TRUE' : 'FALSE') : (rows[i][11] || 'TRUE');
+
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: `${SHEET_NAMES.DEBTS}!K${rowNum}:L${rowNum}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[profileVal, enabledVal]]
+            }
+          });
+          cache.delByPattern(/^debts_/);
+          return { success: true, debtId, reminderProfileId: profileVal, reminderEnabled: enabledVal === 'TRUE' };
+        }
+      }
+    } catch (err) {
+      console.error('Sheets API updateDebtReminderConfig error:', err.message);
+    }
+  }
+
+  cache.delByPattern(/^debts_/);
+  return { success: true, debtId, reminderProfileId, reminderEnabled };
+}
+
 module.exports = {
   SHEET_NAMES,
   initializeSheets,
@@ -1268,5 +1385,7 @@ module.exports = {
   saveAdmin,
   deleteAdmin,
   deleteDebt,
-  syncDriveSlips
+  syncDriveSlips,
+  updateDebtorReminderConfig,
+  updateDebtReminderConfig
 };

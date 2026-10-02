@@ -38,17 +38,15 @@ app.get('/health', (req, res) => {
 
 // เริ่มต้นการทำงานของเซิร์ฟเวอร์ (สำหรับ Local / VPS)
 if (process.env.VERCEL !== '1') {
-  app.listen(PORT, async () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`🌐 LIFF URL: https://liff.line.me/${process.env.LIFF_ID || 'NOT_SET'}`);
     console.log(`👤 Client Portal: http://localhost:${PORT}/client/`);
     console.log(`🛡️ Admin Portal: http://localhost:${PORT}/admin/`);
 
-    try {
-      await initializeSheets();
-    } catch (err) {
+    initializeSheets().catch(err => {
       console.warn('Google Sheets initialization notice:', err.message);
-    }
+    });
 
     initDailyReminderCron();
   });

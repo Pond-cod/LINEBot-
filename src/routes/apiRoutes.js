@@ -18,7 +18,14 @@ const {
   getReminderSettings,
   saveReminderSettings,
   sendTestReminderPush,
-  getReminderLogs
+  getReminderLogs,
+  getReminderProfiles,
+  createReminderProfile,
+  updateReminderProfile,
+  deleteReminderProfile,
+  toggleReminderProfile,
+  updateDebtorReminder,
+  updateContractReminder
 } = require('../controllers/adminController');
 const { runDailyReminderCheck } = require('../services/reminderService');
 
@@ -75,12 +82,23 @@ router.post('/admin/reminder/settings', requireAdminAuth, saveReminderSettings);
 router.post('/admin/reminder/test-push', requireAdminAuth, sendTestReminderPush);
 router.get('/admin/reminder/logs', requireAdminAuth, getReminderLogs);
 
+// Reminder Profiles CRUD & Toggle
+router.get('/admin/reminder/profiles', requireAdminAuth, getReminderProfiles);
+router.post('/admin/reminder/profiles', requireAdminAuth, createReminderProfile);
+router.put('/admin/reminder/profiles/:profileId', requireAdminAuth, updateReminderProfile);
+router.delete('/admin/reminder/profiles/:profileId', requireAdminAuth, deleteReminderProfile);
+router.patch('/admin/reminder/profiles/:profileId/toggle', requireAdminAuth, toggleReminderProfile);
+
+// Granular Reminder Overrides (Per Debtor & Per Contract)
+router.patch('/admin/debtors/:userId/reminder', requireAdminAuth, updateDebtorReminder);
+router.patch('/admin/contracts/:debtId/reminder', requireAdminAuth, updateContractReminder);
+
 // -------------------------------------------------------------
 // 3. Automated Reminder Control
 // -------------------------------------------------------------
 router.post('/reminder/trigger-now', async (req, res) => {
   try {
-    const summary = await runDailyReminderCheck();
+    const summary = await runDailyReminderCheck(req.body || {});
     return res.status(200).json({
       success: true,
       message: 'รันการตรวจสอบและแจ้งเตือนเรียบร้อยแล้ว',

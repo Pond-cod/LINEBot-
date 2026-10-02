@@ -274,6 +274,21 @@
                   <input type="date" id="wizardDueDate" class="form-control" required>
                 </div>
 
+                <div class="form-row" style="margin-top: 14px;">
+                  <div class="form-group">
+                    <label class="form-label">🔔 รูปแบบการแจ้งเตือนสำหรับสัญญานี้ (Reminder Profile)</label>
+                    <select id="wizardReminderProfile" class="form-control">
+                      <option value="">⚙️ ใช้รูปแบบเริ่มต้น (Default Profile)</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                      <input type="checkbox" id="wizardReminderEnabled" checked style="width: 18px; height: 18px;">
+                      <span style="font-size: 13px; color: #FFFFFF; font-weight: 500;">เปิดระบบแจ้งเตือนอัตโนมัติ</span>
+                    </label>
+                  </div>
+                </div>
+
                 <div style="font-size: 14px; font-weight: 600; color: #38BDF8; margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
                   <span>3. ตัวเลือกการแจ้งเตือน (LINE Push Notification)</span>
                 </div>
@@ -332,6 +347,10 @@
                   <span class="preview-detail-value" id="prevCycle">ทุกๆ 30 วัน</span>
                 </div>
                 <div class="preview-detail-item">
+                  <span class="preview-detail-label">⏰ รูปแบบแจ้งเตือน:</span>
+                  <span class="preview-detail-value" id="prevReminderProfile" style="color: #A855F7;">รูปแบบเริ่มต้น</span>
+                </div>
+                <div class="preview-detail-item">
                   <span class="preview-detail-label">🔔 ส่งแจ้งเตือน LINE:</span>
                   <span class="preview-detail-value" id="prevSendPush" style="color: #38BDF8;">ส่งทันที</span>
                 </div>
@@ -386,12 +405,13 @@
                     <th>ค่างวด</th>
                     <th>กำหนดชำระ</th>
                     <th>สถานะ</th>
+                    <th>🔔 รูปแบบแจ้งเตือน</th>
                     <th style="text-align: center;">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody id="contractsTableBody">
                   <tr>
-                    <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
                       กำลังโหลดข้อมูลสัญญาหนี้...
                     </td>
                   </tr>
@@ -479,12 +499,13 @@
                     <th>เบอร์โทร</th>
                     <th>วันที่ลงทะเบียน</th>
                     <th>สถานะ</th>
+                    <th>🔔 รูปแบบแจ้งเตือน</th>
                     <th style="text-align: center;">ดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody id="debtorsTableBody">
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">
                       กำลังโหลดรายชื่อลูกหนี้...
                     </td>
                   </tr>
@@ -509,7 +530,7 @@
           </div>
 
           <!-- Master Switch Card -->
-          <div class="panel-card" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%); border-color: rgba(14, 165, 233, 0.3);">
+          <div class="panel-card" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%); border-color: rgba(14, 165, 233, 0.3); margin-bottom: 20px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div>
                 <h3 style="font-size: 16px; font-weight: 700; color: #FFFFFF;">🔔 เปิดใช้งานระบบแจ้งเตือนอัตโนมัติ (Master Switch)</h3>
@@ -521,6 +542,36 @@
                 <input type="checkbox" id="cfgEnabled" checked>
                 <span class="slider-toggle"></span>
               </label>
+            </div>
+          </div>
+
+          <!-- Section 1: Reminder Profiles Grid Panel -->
+          <div class="panel-card" style="margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
+                  <span>📁 รูปแบบการแจ้งเตือน (Reminder Profiles)</span>
+                  <span id="badgeProfileCount" class="badge-status active" style="font-size: 11px;">กำลังโหลด...</span>
+                </h3>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                  จัดการรูปแบบการแจ้งเตือน (รายวัน / รายเดือน / สิ้นเดือน / วันที่ระบุ) และกำหนดให้แต่ละลูกหนี้หรือสัญญาได้อิสระ
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="topbar-btn" id="btnTestTriggerReminderNow" style="font-size: 12px; padding: 7px 12px;">
+                  ⚡ ตรวจสอบและยิงเตือนทันที
+                </button>
+                <button class="topbar-btn primary" id="btnOpenCreateProfileModal" style="font-size: 12px; padding: 7px 14px;">
+                  ➕ สร้างรูปแบบใหม่
+                </button>
+              </div>
+            </div>
+
+            <!-- Profiles Grid Cards -->
+            <div id="reminderProfilesGrid" class="profiles-grid">
+              <div style="text-align: center; padding: 30px; color: var(--text-muted); grid-column: 1 / -1;">
+                กำลังโหลดรูปแบบการแจ้งเตือน...
+              </div>
             </div>
           </div>
 
@@ -946,6 +997,168 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal 1: Create / Edit Reminder Profile -->
+  <div id="modalReminderProfile" class="admin-modal">
+    <div class="modal-dialog" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 id="modalProfileTitle" style="font-size: 16px; font-weight: 700; color: #FFFFFF;">➕ สร้างรูปแบบการแจ้งเตือนใหม่</h3>
+        <button type="button" class="modal-close-btn" onclick="closeProfileModal()">&times;</button>
+      </div>
+      <form id="formReminderProfile">
+        <input type="hidden" id="profFormId">
+        <div class="modal-body" style="max-height: 72vh; overflow-y: auto; padding-right: 8px;">
+          <!-- Basic Info -->
+          <div class="form-group">
+            <label class="form-label">ชื่อรูปแบบการแจ้งเตือน <span style="color: #EF4444;">*</span></label>
+            <input type="text" id="profFormName" class="form-control" placeholder="เช่น เตือนทุกสิ้นเดือน เวลา 08:00" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">ประเภทความถี่ (Frequency) <span style="color: #EF4444;">*</span></label>
+              <select id="profFormFrequency" class="form-control" onchange="onProfileFrequencyChange(this.value)">
+                <option value="DAILY">📅 รายวัน (Daily)</option>
+                <option value="END_OF_MONTH">📆 ทุกๆ วันสิ้นเดือน (End of Month)</option>
+                <option value="SPECIFIC_DAYS">🎯 วันที่ระบุของเดือน (Specific Days)</option>
+                <option value="MONTHLY">🗓️ รายเดือน (Monthly Day)</option>
+                <option value="DUE_DATE_RELATIVE">⏳ อิงวันครบกำหนดสัญญา (Due-date Relative)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">เวลาส่งรอบเช้า (เวลาหลัก) <span style="color: #EF4444;">*</span></label>
+              <input type="time" id="profFormPrimaryTime" class="form-control" value="08:00" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">เวลาส่งรอบค่ำ (ถ้ามี)</label>
+              <input type="time" id="profFormSecondaryTime" class="form-control" value="">
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="profFormIsDefault" style="width: 18px; height: 18px;">
+                <span style="font-size: 13px; color: #38BDF8; font-weight: 600;">ตั้งเป็นรูปแบบเริ่มต้น (Default)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Frequency Specific Settings -->
+          <div id="profDailySettings" class="form-group" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px; border-radius: 8px;">
+            <label class="form-label">ช่วงห่างการส่ง (วัน)</label>
+            <select id="profDailyInterval" class="form-control">
+              <option value="1">ทุกวัน (Every 1 Day)</option>
+              <option value="2">ทุก 2 วัน</option>
+              <option value="3">ทุก 3 วัน</option>
+              <option value="7">ทุก 7 วัน (รายสัปดาห์)</option>
+            </select>
+          </div>
+
+          <div id="profSpecificDaysSettings" class="form-group" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px; border-radius: 8px;">
+            <label class="form-label">เลือกวันที่ของเดือนที่ต้องการให้แจ้งเตือน</label>
+            <div id="modalDaysChipsGrid" class="days-checkbox-grid" style="margin-bottom: 10px;"></div>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+              <input type="checkbox" id="profSpecificLastDay">
+              <span>📌 รวมวันสิ้นเดือนด้วยเสมอ</span>
+            </label>
+          </div>
+
+          <!-- Due-date Relative Rules -->
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px; border-radius: 8px; margin-bottom: 14px;">
+            <div style="font-size: 12.5px; font-weight: 600; color: #38BDF8; margin-bottom: 10px;">🎯 เงื่อนไขอิงวันครบกำหนดชำระ</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+                <input type="checkbox" id="profRemindDueToday" checked>
+                <span>เตือนตรงวันครบกำหนด</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+                <input type="checkbox" id="profRemindOverdue" checked>
+                <span>เตือนเมื่อเลยกำหนด (Overdue)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+                <input type="checkbox" id="profRemindBefore">
+                <span>เตือนล่วงหน้า (Pre-due)</span>
+              </label>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 11px; color: var(--text-muted);">ล่วงหน้า:</span>
+                <select id="profRemindBeforeDays" class="form-control" style="padding: 2px 6px; font-size: 11px; width: auto;">
+                  <option value="1">1 วัน</option>
+                  <option value="2">2 วัน</option>
+                  <option value="3">3 วัน</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Template Customization -->
+          <div class="form-group">
+            <label class="form-label">ระดับน้ำเสียง (Tone)</label>
+            <select id="profTone" class="form-control">
+              <option value="POLITE">🟢 สุภาพเป็นมิตร (Polite)</option>
+              <option value="FORMAL">🔵 กึ่งทางการ (Formal)</option>
+              <option value="URGENT">🔴 เร่งรัด (Urgent)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">หัวข้อแจ้งเตือนเฉพาะรูปแบบนี้ (Custom Header)</label>
+            <input type="text" id="profCustomHeader" class="form-control" placeholder="เช่น แจ้งยอดรอบชำระรายวัน">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">ข้อความหมายเหตุด้านล่าง (Custom Footer)</label>
+            <textarea id="profCustomFooter" class="form-control" rows="2" placeholder="เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="topbar-btn" onclick="closeProfileModal()">ยกเลิก</button>
+          <button type="submit" class="btn-primary-admin" id="btnSaveProfile">💾 บันทึกรูปแบบ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Assign Reminder to Debtor or Contract -->
+  <div id="modalAssignReminder" class="admin-modal">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="modalAssignTitle" style="font-size: 15px; font-weight: 700; color: #FFFFFF;">🔔 ตั้งค่าการแจ้งเตือน</h3>
+        <button type="button" class="modal-close-btn" onclick="closeAssignReminderModal()">&times;</button>
+      </div>
+      <form id="formAssignReminder">
+        <input type="hidden" id="assignTargetType" value="">
+        <input type="hidden" id="assignTargetId" value="">
+        <div class="modal-body">
+          <p id="assignTargetName" style="font-size: 13.5px; color: #38BDF8; font-weight: 600; margin-bottom: 14px;">-</p>
+          
+          <div class="form-group">
+            <label class="form-label">เลือกรูปแบบการแจ้งเตือน (Reminder Profile)</label>
+            <select id="assignProfileSelect" class="form-control">
+              <option value="">⚙️ ใช้รูปแบบเริ่มต้น (Default Profile)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; margin-top: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <strong style="font-size: 13px; color: #FFFFFF;">เปิดรับการแจ้งเตือน</strong>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">หากปิด ระบบจะไม่ส่งข้อความแจ้งเตือน</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="assignEnabledCheck" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="topbar-btn" onclick="closeAssignReminderModal()">ยกเลิก</button>
+          <button type="submit" class="btn-primary-admin">💾 บันทึกการตั้งค่า</button>
+        </div>
+      </form>
     </div>
   </div>
 

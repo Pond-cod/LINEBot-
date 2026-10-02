@@ -14,16 +14,18 @@ const CONFIG = {
     DEBTS: 'Debts',
     PAYMENTS: 'Payments',
     REMINDER_LOGS: 'ReminderLogs',
-    ADMINS: 'admin'
+    ADMINS: 'admin',
+    REMINDER_PROFILES: 'ReminderProfiles'
   }
 };
 
 const HEADERS = {
-  Debtors: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status'],
-  Debts: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt'],
+  Debtors: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled'],
+  Debts: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled'],
   Payments: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote'],
   ReminderLogs: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
-  admin: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status']
+  admin: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status'],
+  ReminderProfiles: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt']
 };
 
 /**
@@ -131,6 +133,14 @@ function doPost(e) {
 
       case 'deleteDebt':
         result = handleDeleteDebt(contents.debtId);
+        break;
+
+      case 'updateDebtorReminderConfig':
+        result = handleUpdateDebtorReminderConfig(contents);
+        break;
+
+      case 'updateDebtReminderConfig':
+        result = handleUpdateDebtReminderConfig(contents);
         break;
 
       default:
@@ -389,7 +399,9 @@ function handleCreateDebt(data) {
     Number(data.cycleDays || 30),
     'ACTIVE',
     nowStr,
-    nowStr
+    nowStr,
+    data.reminderProfileId || '',
+    data.reminderEnabled !== false ? 'TRUE' : 'FALSE'
   ]);
 
   return {
@@ -397,7 +409,9 @@ function handleCreateDebt(data) {
     userId: data.userId,
     totalAmount: Number(data.totalAmount),
     installmentAmount: Number(data.installmentAmount),
-    dueDate: data.dueDate
+    dueDate: data.dueDate,
+    reminderProfileId: data.reminderProfileId || '',
+    reminderEnabled: data.reminderEnabled !== false
   };
 }
 
@@ -466,6 +480,7 @@ function handleGetAllDebtors() {
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     if (row[0] && String(row[0]).startsWith('U')) {
+      const isRemindEnabled = row[8] === undefined || row[8] === '' || row[8] === 'TRUE' || row[8] === 'true' || row[8] === true;
       list.push({
         userId: row[0],
         displayName: row[1] || '',
@@ -473,7 +488,9 @@ function handleGetAllDebtors() {
         phone: row[3] || '',
         idCardNumber: row[4] || '',
         registeredAt: row[5] ? Utilities.formatDate(new Date(row[5]), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss') : '',
-        status: row[6] || 'ACTIVE'
+        status: row[6] || 'ACTIVE',
+        reminderProfileId: row[7] || '',
+        reminderEnabled: isRemindEnabled
       });
     }
   }
@@ -565,6 +582,7 @@ function handleGetAllDebts() {
   for (let i = 1; i < dValues.length; i++) {
     const r = dValues[i];
     const user = userMap[r[1]] || { name: 'ไม่ระบุชื่อ', phone: '' };
+    const isRemindEnabled = r[11] === undefined || r[11] === '' || r[11] === 'TRUE' || r[11] === 'true' || r[11] === true;
     list.push({
       debtId: r[0],
       userId: r[1],
@@ -577,7 +595,9 @@ function handleGetAllDebts() {
       cycleDays: Number(r[6]) || 30,
       debtStatus: r[7] || 'ACTIVE',
       createdAt: r[8],
-      updatedAt: r[9]
+      updatedAt: r[9],
+      reminderProfileId: r[10] || '',
+      reminderEnabled: isRemindEnabled
     });
   }
   return list;
@@ -899,4 +919,50 @@ function handleDeleteDebt(debtId) {
   }
 
   return { deleted: false, message: 'Debt not found' };
+}
+
+/**
+ * อัปเดตการตั้งค่าการแจ้งเตือนของลูกหนี้
+ */
+function handleUpdateDebtorReminderConfig(data) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.DEBTORS);
+  if (!sheet) return { success: false, message: 'Sheet Debtors not found' };
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim() === String(data.userId).trim()) {
+      const rowNum = i + 1;
+      const profileVal = data.reminderProfileId !== undefined ? (data.reminderProfileId || '') : (values[i][7] || '');
+      const enabledVal = data.reminderEnabled !== undefined ? (data.reminderEnabled ? 'TRUE' : 'FALSE') : (values[i][8] || 'TRUE');
+
+      sheet.getRange(rowNum, 8).setValue(profileVal);
+      sheet.getRange(rowNum, 9).setValue(enabledVal);
+      return { success: true, userId: data.userId, reminderProfileId: profileVal, reminderEnabled: enabledVal === 'TRUE' };
+    }
+  }
+  return { success: false, message: 'Debtor not found' };
+}
+
+/**
+ * อัปเดตการตั้งค่าการแจ้งเตือนของสัญญาหนี้
+ */
+function handleUpdateDebtReminderConfig(data) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.DEBTS);
+  if (!sheet) return { success: false, message: 'Sheet Debts not found' };
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim() === String(data.debtId).trim()) {
+      const rowNum = i + 1;
+      const profileVal = data.reminderProfileId !== undefined ? (data.reminderProfileId || '') : (values[i][10] || '');
+      const enabledVal = data.reminderEnabled !== undefined ? (data.reminderEnabled ? 'TRUE' : 'FALSE') : (values[i][11] || 'TRUE');
+
+      sheet.getRange(rowNum, 11).setValue(profileVal);
+      sheet.getRange(rowNum, 12).setValue(enabledVal);
+      return { success: true, debtId: data.debtId, reminderProfileId: profileVal, reminderEnabled: enabledVal === 'TRUE' };
+    }
+  }
+  return { success: false, message: 'Debt not found' };
 }

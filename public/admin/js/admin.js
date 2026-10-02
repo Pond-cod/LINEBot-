@@ -9,7 +9,9 @@ let allContracts = [];
 let allDebtors = [];
 let allSlips = [];
 let allAdminsList = [];
+let allReminderProfiles = [];
 let selectedMonthlyDays = [];
+let selectedModalDays = [];
 
 // ==============================================================================
 // 1. DOM Elements
@@ -373,11 +375,21 @@ function switchView(targetViewId) {
 
   // Trigger data loader for view
   if (targetViewId === 'view-admin-overview') loadStats();
-  if (targetViewId === 'view-admin-new-contract') loadWizardDebtors();
-  if (targetViewId === 'view-admin-contracts') loadContracts();
+  if (targetViewId === 'view-admin-new-contract') {
+    loadWizardDebtors();
+    loadReminderProfiles();
+  }
+  if (targetViewId === 'view-admin-contracts') {
+    loadReminderProfiles();
+    loadContracts();
+  }
   if (targetViewId === 'view-admin-slips') loadSlips();
-  if (targetViewId === 'view-admin-debtors') loadDebtors();
+  if (targetViewId === 'view-admin-debtors') {
+    loadReminderProfiles();
+    loadDebtors();
+  }
   if (targetViewId === 'view-admin-reminders') {
+    loadReminderProfiles();
     loadReminderSettings();
     loadReminderLogs();
   }
@@ -462,7 +474,7 @@ function initWizardDefaults() {
   today.setDate(today.getDate() + 30);
   const defaultDueDate = today.toISOString().split('T')[0];
   if (wizardDueDate) wizardDueDate.value = defaultDueDate;
-
+  loadReminderProfiles();
   updateWizardPreview();
 }
 
@@ -556,10 +568,21 @@ function updateWizardPreview() {
   if (prevInstallment) prevInstallment.textContent = formatMoney(installment);
   if (prevDueDate) prevDueDate.textContent = dueDate;
   if (prevCycle) prevCycle.textContent = `ทุกๆ ${cycle} วัน`;
+  
+  const profSelect = document.getElementById('wizardReminderProfile');
+  const profName = (profSelect && profSelect.selectedIndex >= 0 && profSelect.value) ? profSelect.options[profSelect.selectedIndex].text : 'รูปแบบเริ่มต้น (Default)';
+  const prevProf = document.getElementById('prevReminderProfile');
+  if (prevProf) prevProf.textContent = profName;
+
   if (prevSendPush) {
     prevSendPush.textContent = sendPush ? '✅ ส่งทันที' : 'ไม่ส่ง';
     prevSendPush.style.color = sendPush ? '#38BDF8' : '#94A3B8';
   }
+}
+
+// Attach listener to wizard reminder profile select
+if (document.getElementById('wizardReminderProfile')) {
+  document.getElementById('wizardReminderProfile').addEventListener('change', updateWizardPreview);
 }
 
 // Submit Wizard Form
@@ -578,6 +601,8 @@ if (createContractWizardForm) {
       installmentAmount: Number(wizardInstallmentAmount.value),
       dueDate: wizardDueDate.value,
       cycleDays: Number(wizardCycleDays.value) || 30,
+      reminderProfileId: document.getElementById('wizardReminderProfile')?.value || '',
+      reminderEnabled: document.getElementById('wizardReminderEnabled')?.checked !== false,
       sendLineNotification: wizardSendPushCheck.checked
     };
 
@@ -680,7 +705,7 @@ function renderContractsTable() {
   });
 
   if (filtered.length === 0) {
-    contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบสัญญาหนี้ที่ตรงกับเงื่อนไข</td></tr>';
+    contractsTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบสัญญาหนี้ที่ตรงกับเงื่อนไข</td></tr>';
     return;
   }
 
@@ -692,6 +717,8 @@ function renderContractsTable() {
     const total = Number(c.totalAmount) || 0;
     const remaining = Number(c.remainingBalance) || 0;
     const paidPercent = total > 0 ? Math.min(100, Math.round(((total - remaining) / total) * 100)) : 0;
+    const isRemindActive = c.reminderEnabled !== false;
+    const profileLabel = isRemindActive ? getProfileName(c.reminderProfileId) : 'ปิดแจ้งเตือน';
 
     return `
       <tr>
@@ -714,6 +741,17 @@ function renderContractsTable() {
           <small style="font-size: 10px; color: var(--text-muted);">รอบ ${c.cycleDays || 30} วัน</small>
         </td>
         <td>${statusBadge}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge-status ${isRemindActive ? 'active' : 'overdue'}" style="cursor: pointer; font-size: 10.5px;" onclick="openAssignReminderModal('contract', '${c.debtId}', '${c.reminderProfileId || ''}', ${isRemindActive}, '${c.debtId} (${c.debtorName || 'คุณลูกค้า'})')" title="คลิกเพื่อเปลี่ยนรูปแบบแจ้งเตือน">
+              ${profileLabel} ⚙️
+            </span>
+            <label class="switch-toggle" style="transform: scale(0.75);" title="${isRemindActive ? 'เปิดแจ้งเตือนอยู่ (คลิกเพื่อปิด)' : 'ปิดแจ้งเตือนอยู่ (คลิกเพื่อเปิด)'}">
+              <input type="checkbox" ${isRemindActive ? 'checked' : ''} onchange="toggleContractReminder('${c.debtId}', this.checked)">
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+        </td>
         <td style="text-align: center; white-space: nowrap;">
           <button class="btn-action-icon remind" onclick="sendSingleReminder('${c.debtId}')" title="ยิงแจ้งเตือนทันที">
             🔔
@@ -1123,11 +1161,14 @@ function renderDebtorsTable() {
   });
 
   if (filtered.length === 0) {
-    debtorsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบรายชื่อลูกหนี้</td></tr>';
+    debtorsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบรายชื่อลูกหนี้</td></tr>';
     return;
   }
 
   debtorsTableBody.innerHTML = filtered.map(d => {
+    const isRemindActive = d.reminderEnabled !== false;
+    const profileLabel = isRemindActive ? getProfileName(d.reminderProfileId) : 'ปิดแจ้งเตือน';
+
     return `
       <tr>
         <td>
@@ -1138,6 +1179,17 @@ function renderDebtorsTable() {
         <td>${d.phone || '-'}</td>
         <td style="font-size: 12px; color: var(--text-muted);">${d.registeredAt || '-'}</td>
         <td><span class="badge-status active">${d.status || 'ACTIVE'}</span></td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge-status ${isRemindActive ? 'active' : 'overdue'}" style="cursor: pointer; font-size: 10.5px;" onclick="openAssignReminderModal('debtor', '${d.userId}', '${d.reminderProfileId || ''}', ${isRemindActive}, '${d.fullName || d.displayName || d.userId}')" title="คลิกเพื่อตั้งค่าแจ้งเตือนลูกหนี้รายนี้">
+              ${profileLabel} ⚙️
+            </span>
+            <label class="switch-toggle" style="transform: scale(0.75);" title="${isRemindActive ? 'เปิดแจ้งเตือนอยู่ (คลิกเพื่อปิด)' : 'ปิดแจ้งเตือนอยู่ (คลิกเพื่อเปิด)'}">
+              <input type="checkbox" ${isRemindActive ? 'checked' : ''} onchange="toggleDebtorReminder('${d.userId}', this.checked)">
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+        </td>
         <td style="text-align: center;">
           <button class="topbar-btn primary" style="padding: 5px 12px; font-size: 12px;" onclick="openContractForDebtor('${d.userId}', '${d.fullName || d.displayName || ''}', '${d.phone || ''}', '${d.idCardNumber || ''}')">
             ➕ เปิดสัญญา
@@ -1492,7 +1544,435 @@ window.deleteAdmin = async function(userId) {
 };
 
 // ==============================================================================
-// 12. App Initialization
+// 12. Reminder Profiles & Granular Overrides Engine
+// ==============================================================================
+function getProfileName(profileId) {
+  if (!profileId) return 'ค่าเริ่มต้น (Default)';
+  const p = allReminderProfiles.find(x => x.profileId === profileId);
+  return p ? p.name : profileId;
+}
+
+async function loadReminderProfiles() {
+  try {
+    const res = await adminFetch('/api/admin/reminder/profiles');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.profiles)) {
+      allReminderProfiles = data.profiles;
+      renderReminderProfilesGrid();
+      updateProfileDropdowns();
+    }
+  } catch (err) {
+    console.warn('Error loading reminder profiles:', err.message);
+  }
+}
+
+function updateProfileDropdowns() {
+  const wizardProf = document.getElementById('wizardReminderProfile');
+  const assignProf = document.getElementById('assignProfileSelect');
+
+  const optionsHtml = '<option value="">⚙️ รูปแบบเริ่มต้น (Default Profile)</option>' +
+    allReminderProfiles.map(p => `<option value="${p.profileId}">${p.name}${p.isDefault ? ' [เริ่มต้น]' : ''} (${p.frequencyType})</option>`).join('');
+
+  if (wizardProf) {
+    const currentVal = wizardProf.value;
+    wizardProf.innerHTML = optionsHtml;
+    if (currentVal) wizardProf.value = currentVal;
+  }
+  if (assignProf) assignProf.innerHTML = optionsHtml;
+}
+
+function renderReminderProfilesGrid() {
+  const grid = document.getElementById('reminderProfilesGrid');
+  const countBadge = document.getElementById('badgeProfileCount');
+  if (countBadge) countBadge.textContent = `${allReminderProfiles.length} รูปแบบ`;
+  if (!grid) return;
+
+  if (allReminderProfiles.length === 0) {
+    grid.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 30px; grid-column: 1 / -1;">ไม่พบรูปแบบการแจ้งเตือน</div>';
+    return;
+  }
+
+  const freqLabels = {
+    DAILY: '📅 รายวัน',
+    END_OF_MONTH: '📆 ทุกวันสิ้นเดือน',
+    SPECIFIC_DAYS: '🎯 วันที่ระบุของเดือน',
+    MONTHLY: '🗓️ รายเดือน',
+    DUE_DATE_RELATIVE: '⏳ อิงวันครบกำหนด'
+  };
+
+  grid.innerHTML = allReminderProfiles.map(p => {
+    const isActive = p.status === 'ACTIVE';
+    const isDefault = Boolean(p.isDefault);
+    const freqLabel = freqLabels[p.frequencyType] || p.frequencyType;
+
+    let scheduleDetail = '';
+    if (p.frequencyType === 'DAILY') {
+      const interval = p.scheduleConfig?.dailyInterval || 1;
+      scheduleDetail = interval === 1 ? 'ทุกวัน' : `ทุกๆ ${interval} วัน`;
+    } else if (p.frequencyType === 'SPECIFIC_DAYS') {
+      const days = (p.scheduleConfig?.daysOfMonth || []).join(', ');
+      scheduleDetail = `วันที่ ${days}${p.scheduleConfig?.lastDayOfMonth ? ' & สิ้นเดือน' : ''}`;
+    } else if (p.frequencyType === 'END_OF_MONTH') {
+      scheduleDetail = 'วันสุดท้ายของเดือน';
+    } else if (p.frequencyType === 'MONTHLY') {
+      scheduleDetail = `ทุกวันที่ ${p.scheduleConfig?.dayOfMonth || 1}`;
+    } else {
+      scheduleDetail = 'ตามวันครบกำหนด';
+    }
+
+    const timeStr = `${p.primaryTime || '08:00'} น.${p.secondaryTime ? ` & ${p.secondaryTime} น.` : ''}`;
+
+    return `
+      <div class="profile-card ${isDefault ? 'is-default' : ''} ${!isActive ? 'paused' : ''}">
+        <div>
+          <div class="profile-card-header">
+            <div>
+              <div class="profile-card-title">${p.name} ${isDefault ? '<span style="font-size: 10px; color: #38BDF8; font-weight: normal; margin-left: 4px;">★ เริ่มต้น</span>' : ''}</div>
+              <div class="profile-card-id">${p.profileId}</div>
+            </div>
+            <span class="badge-status ${isActive ? 'active' : 'overdue'}" style="font-size: 10px;">
+              ${isActive ? 'เปิดใช้งาน' : 'ปิดชั่วคราว'}
+            </span>
+          </div>
+
+          <div class="profile-card-body">
+            <div class="profile-detail-chip">
+              <span>${freqLabel}</span> • <span>${scheduleDetail}</span>
+            </div>
+            <div class="profile-detail-chip">
+              <span>⏰ เวลาส่ง:</span> <strong>${timeStr}</strong>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+              โทน: <strong>${p.templateConfig?.tone || 'POLITE'}</strong> | ${p.rulesConfig?.remindDueTodayEnabled ? 'เตือนตรงวัน ' : ''}${p.rulesConfig?.remindBeforeEnabled ? `เตือนล่วงหน้า ${p.rulesConfig?.remindBeforeDays || 1}ว ` : ''}${p.rulesConfig?.remindOverdueEnabled ? 'เตือนเกินกำหนด' : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-card-footer">
+          <label class="switch-toggle" style="transform: scale(0.8);" title="${isActive ? 'คลิกเพื่อปิดชั่วคราว' : 'คลิกเพื่อเปิดใช้งาน'}">
+            <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleReminderProfileStatus('${p.profileId}', this.checked ? 'ACTIVE' : 'PAUSED')">
+            <span class="slider-toggle"></span>
+          </label>
+          <div class="profile-actions">
+            <button class="btn-profile-action" onclick="openEditProfileModal('${p.profileId}')" title="แก้ไขรูปแบบ">
+              ✏️ แก้ไข
+            </button>
+            ${!isDefault ? `
+              <button class="btn-profile-action delete" onclick="deleteReminderProfile('${p.profileId}')" title="ลบรูปแบบ">
+                🗑️ ลบ
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.toggleReminderProfileStatus = async function(profileId, newStatus) {
+  const prof = allReminderProfiles.find(p => p.profileId === profileId);
+  if (prof) prof.status = newStatus;
+  renderReminderProfilesGrid();
+
+  try {
+    const res = await adminFetch(`/api/admin/reminder/profiles/${profileId}/toggle`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`เปลี่ยนสถานะเป็น ${newStatus === 'ACTIVE' ? 'เปิดใช้งาน' : 'ปิดชั่วคราว'} สำเร็จ`, '✅');
+    } else {
+      showToast(data.message || 'บันทึกไม่สำเร็จ', '❌');
+      loadReminderProfiles();
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    loadReminderProfiles();
+  }
+};
+
+window.openCreateProfileModal = function() {
+  document.getElementById('formReminderProfile')?.reset();
+  document.getElementById('profFormId').value = '';
+  document.getElementById('modalProfileTitle').textContent = '➕ สร้างรูปแบบการแจ้งเตือนใหม่';
+  selectedModalDays = [];
+  initModalDaysChips();
+  onProfileFrequencyChange('DAILY');
+  document.getElementById('modalReminderProfile')?.classList.add('open');
+};
+
+window.openEditProfileModal = function(profileId) {
+  const p = allReminderProfiles.find(x => x.profileId === profileId);
+  if (!p) return;
+
+  document.getElementById('profFormId').value = p.profileId;
+  document.getElementById('modalProfileTitle').textContent = `✏️ แก้ไขรูปแบบ: ${p.name}`;
+  document.getElementById('profFormName').value = p.name;
+  document.getElementById('profFormFrequency').value = p.frequencyType;
+  document.getElementById('profFormPrimaryTime').value = p.primaryTime || '08:00';
+  document.getElementById('profFormSecondaryTime').value = p.secondaryTime || '';
+  document.getElementById('profFormIsDefault').checked = Boolean(p.isDefault);
+
+  if (p.frequencyType === 'DAILY') {
+    document.getElementById('profDailyInterval').value = p.scheduleConfig?.dailyInterval || 1;
+  }
+  selectedModalDays = (p.scheduleConfig?.daysOfMonth || []).map(Number);
+  document.getElementById('profSpecificLastDay').checked = Boolean(p.scheduleConfig?.lastDayOfMonth);
+  initModalDaysChips();
+
+  const r = p.rulesConfig || {};
+  document.getElementById('profRemindDueToday').checked = Boolean(r.remindDueTodayEnabled !== false);
+  document.getElementById('profRemindOverdue').checked = Boolean(r.remindOverdueEnabled !== false);
+  document.getElementById('profRemindBefore').checked = Boolean(r.remindBeforeEnabled);
+  document.getElementById('profRemindBeforeDays').value = r.remindBeforeDays || 1;
+
+  const t = p.templateConfig || {};
+  document.getElementById('profTone').value = t.tone || 'POLITE';
+  document.getElementById('profCustomHeader').value = t.customHeader || '';
+  document.getElementById('profCustomFooter').value = t.customFooter || '';
+
+  onProfileFrequencyChange(p.frequencyType);
+  document.getElementById('modalReminderProfile')?.classList.add('open');
+};
+
+window.closeProfileModal = function() {
+  document.getElementById('modalReminderProfile')?.classList.remove('open');
+};
+
+window.onProfileFrequencyChange = function(type) {
+  const dailyBox = document.getElementById('profDailySettings');
+  const specBox = document.getElementById('profSpecificDaysSettings');
+  if (dailyBox) dailyBox.style.display = type === 'DAILY' ? 'block' : 'none';
+  if (specBox) specBox.style.display = (type === 'SPECIFIC_DAYS' || type === 'MONTHLY') ? 'block' : 'none';
+};
+
+function initModalDaysChips() {
+  const grid = document.getElementById('modalDaysChipsGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (let i = 1; i <= 31; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'day-chip' + (selectedModalDays.includes(i) ? ' selected' : '');
+    chip.textContent = i;
+    chip.addEventListener('click', () => {
+      if (selectedModalDays.includes(i)) {
+        selectedModalDays = selectedModalDays.filter(d => d !== i);
+        chip.classList.remove('selected');
+      } else {
+        selectedModalDays.push(i);
+        selectedModalDays.sort((a, b) => a - b);
+        chip.classList.add('selected');
+      }
+    });
+    grid.appendChild(chip);
+  }
+}
+
+const formReminderProfile = document.getElementById('formReminderProfile');
+if (formReminderProfile) {
+  formReminderProfile.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('profFormId').value;
+    const isEdit = Boolean(id);
+
+    const payload = {
+      name: document.getElementById('profFormName').value.trim(),
+      frequencyType: document.getElementById('profFormFrequency').value,
+      primaryTime: document.getElementById('profFormPrimaryTime').value || '08:00',
+      secondaryTime: document.getElementById('profFormSecondaryTime').value || '',
+      isDefault: document.getElementById('profFormIsDefault').checked,
+      scheduleConfig: {
+        dailyInterval: Number(document.getElementById('profDailyInterval').value) || 1,
+        daysOfMonth: selectedModalDays,
+        lastDayOfMonth: document.getElementById('profSpecificLastDay').checked
+      },
+      rulesConfig: {
+        remindDueTodayEnabled: document.getElementById('profRemindDueToday').checked,
+        remindOverdueEnabled: document.getElementById('profRemindOverdue').checked,
+        remindBeforeEnabled: document.getElementById('profRemindBefore').checked,
+        remindBeforeDays: Number(document.getElementById('profRemindBeforeDays').value) || 1
+      },
+      templateConfig: {
+        tone: document.getElementById('profTone').value,
+        customHeader: document.getElementById('profCustomHeader').value.trim(),
+        customFooter: document.getElementById('profCustomFooter').value.trim()
+      }
+    };
+
+    showToast('กำลังบันทึกรูปแบบการแจ้งเตือน...', '⏳');
+
+    try {
+      const url = isEdit ? `/api/admin/reminder/profiles/${id}` : '/api/admin/reminder/profiles';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await adminFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(isEdit ? 'อัปเดตรูปแบบสำเร็จ!' : 'สร้างรูปแบบการแจ้งเตือนใหม่สำเร็จ!', '✅');
+        closeProfileModal();
+        await loadReminderProfiles();
+      } else {
+        showToast(data.message || 'บันทึกไม่สำเร็จ', '❌');
+      }
+    } catch (err) {
+      showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    }
+  });
+}
+
+window.deleteReminderProfile = async function(profileId) {
+  if (!confirm(`ต้องการลบรูปแบบการแจ้งเตือน ${profileId} ใช่หรือไม่?`)) return;
+  showToast('กำลังลบรูปแบบ...', '⏳');
+  try {
+    const res = await adminFetch(`/api/admin/reminder/profiles/${profileId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('ลบรูปแบบเรียบร้อยแล้ว', '✅');
+      await loadReminderProfiles();
+    } else {
+      showToast(data.message || 'ลบไม่สำเร็จ', '❌');
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+  }
+};
+
+window.openAssignReminderModal = function(targetType, targetId, currentProfileId, isEnabled, displayName) {
+  document.getElementById('assignTargetType').value = targetType;
+  document.getElementById('assignTargetId').value = targetId;
+  document.getElementById('assignTargetName').textContent = `${targetType === 'debtor' ? '👤 ลูกหนี้:' : '📑 สัญญา:'} ${displayName}`;
+  document.getElementById('modalAssignTitle').textContent = `🔔 ตั้งค่าแจ้งเตือน (${targetType === 'debtor' ? 'ระดับลูกหนี้' : 'ระดับสัญญา'})`;
+  
+  updateProfileDropdowns();
+  document.getElementById('assignProfileSelect').value = currentProfileId || '';
+  document.getElementById('assignEnabledCheck').checked = isEnabled !== false;
+
+  document.getElementById('modalAssignReminder')?.classList.add('open');
+};
+
+window.closeAssignReminderModal = function() {
+  document.getElementById('modalAssignReminder')?.classList.remove('open');
+};
+
+const formAssignReminder = document.getElementById('formAssignReminder');
+if (formAssignReminder) {
+  formAssignReminder.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const targetType = document.getElementById('assignTargetType').value;
+    const targetId = document.getElementById('assignTargetId').value;
+    const reminderProfileId = document.getElementById('assignProfileSelect').value;
+    const reminderEnabled = document.getElementById('assignEnabledCheck').checked;
+
+    showToast('กำลังบันทึกการตั้งค่า...', '⏳');
+
+    try {
+      const url = targetType === 'debtor'
+        ? `/api/admin/debtors/${targetId}/reminder`
+        : `/api/admin/contracts/${targetId}/reminder`;
+
+      const res = await adminFetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminderProfileId, reminderEnabled })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('บันทึกการตั้งค่าแจ้งเตือนเรียบร้อยแล้ว!', '✅');
+        closeAssignReminderModal();
+        if (targetType === 'debtor') {
+          await loadDebtors();
+        } else {
+          await loadContracts();
+        }
+      } else {
+        showToast(data.message || 'บันทึกไม่สำเร็จ', '❌');
+      }
+    } catch (err) {
+      showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    }
+  });
+}
+
+window.toggleContractReminder = async function(debtId, isEnabled) {
+  const contract = allContracts.find(c => c.debtId === debtId);
+  if (contract) contract.reminderEnabled = isEnabled;
+  renderContractsTable();
+
+  try {
+    const res = await adminFetch(`/api/admin/contracts/${debtId}/reminder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reminderEnabled: isEnabled })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`${isEnabled ? 'เปิด' : 'ปิด'}การแจ้งเตือนสัญญา ${debtId} แล้ว`, '🔔');
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    loadContracts();
+  }
+};
+
+window.toggleDebtorReminder = async function(userId, isEnabled) {
+  const debtor = allDebtors.find(d => d.userId === userId);
+  if (debtor) debtor.reminderEnabled = isEnabled;
+  renderDebtorsTable();
+
+  try {
+    const res = await adminFetch(`/api/admin/debtors/${userId}/reminder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reminderEnabled: isEnabled })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`${isEnabled ? 'เปิด' : 'ปิด'}การแจ้งเตือนสำหรับลูกหนี้แล้ว`, '🔔');
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    loadDebtors();
+  }
+};
+
+const btnOpenCreateProfileModal = document.getElementById('btnOpenCreateProfileModal');
+if (btnOpenCreateProfileModal) {
+  btnOpenCreateProfileModal.addEventListener('click', openCreateProfileModal);
+}
+
+const btnTestTriggerReminderNow = document.getElementById('btnTestTriggerReminderNow');
+if (btnTestTriggerReminderNow) {
+  btnTestTriggerReminderNow.addEventListener('click', async () => {
+    if (!confirm('ต้องการสั่งตรวจเช็กและยิงแจ้งเตือนลูกหนี้ตามเงื่อนไขทันทีใช่หรือไม่?')) return;
+    showToast('กำลังประมวลผลการแจ้งเตือน...', '⏳');
+    try {
+      const res = await adminFetch('/api/reminder/trigger-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forceRun: true })
+      });
+      const data = await res.json();
+      if (data.success && data.summary) {
+        const s = data.summary;
+        showToast(`สแกนเสร็จสิ้น: ส่งสำเร็จ ${s.sent} ฉบับ, ข้าม ${s.skipped}, ผิดพลาด ${s.failed}`, '🚀');
+        loadReminderLogs();
+      } else {
+        showToast(data.message || 'การตรวจสอบแจ้งเตือนไม่สำเร็จ', '❌');
+      }
+    } catch (err) {
+      showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    }
+  });
+}
+
+// ==============================================================================
+// 13. App Initialization
 // ==============================================================================
 window.addEventListener('DOMContentLoaded', () => {
   initAdminAuth();

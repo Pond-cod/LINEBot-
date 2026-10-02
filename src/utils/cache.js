@@ -50,6 +50,11 @@ class MemoryCache {
       }
       return count;
     }
+    return 0;
+  }
+
+  delByPattern(pattern) {
+    return this.invalidate(pattern);
   }
 
   clear() {

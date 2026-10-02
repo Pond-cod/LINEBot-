@@ -7,29 +7,43 @@ dayjs.extend(timezone);
 const sheetsService = require('./sheetsService');
 const lineService = require('./lineService');
 const reminderSettingsService = require('./reminderSettingsService');
+const reminderProfileService = require('./reminderProfileService');
 const { createReminderFlex, createAdminDailySummaryFlex } = require('../templates/flexMessages');
 const { getAdminUserIds } = require('../middleware/adminAuth');
 
 /**
- * สแกนและส่งข้อความแจ้งเตือนหนี้ครบกำหนดชำระตามการตั้งค่าแบบละเอียด
+ * สแกนและส่งข้อความแจ้งเตือนหนี้ครบกำหนดชำระตามระบบ Reminder Engine v5.0
+ * รองรับ 3-Tier Hierarchy:
+ * 1. Contract-level override (highest)
+ * 2. Debtor-level default
+ * 3. System Global Default Profile
  */
 async function runDailyReminderCheck(options = {}) {
-  const settings = options.customSettings || await reminderSettingsService.getSettings();
+  const globalSettings = options.customSettings || await reminderSettingsService.getSettings();
   const triggerType = options.triggerType || 'อัตโนมัติ (Schedule)';
-  const tz = settings.timezone || 'Asia/Bangkok';
+  const tz = globalSettings.timezone || 'Asia/Bangkok';
 
-  console.log(`⏰ [Reminder Check] Starting scan (${triggerType})...`);
+  console.log(`⏰ [Reminder Engine v5.0] Starting scan (${triggerType})...`);
 
-  // ตรวจสอบสวิตช์หลัก
-  if (!settings.enabled && !options.forceRun) {
-    console.log('⏸️ [Reminder Check] Automated reminders are currently disabled in settings.');
+  // ตรวจสอบสวิตช์หลักของระบบ
+  if (!globalSettings.enabled && !options.forceRun) {
+    console.log('⏸️ [Reminder Check] Automated reminders are currently disabled in global settings.');
     return {
       disabled: true,
-      message: 'ระบบแจ้งเตือนถูกปิดการใช้งานอยู่ในการตั้งค่า'
+      message: 'ระบบแจ้งเตือนหลักถูกปิดการใช้งานอยู่ในการตั้งค่า'
     };
   }
 
-  // 1. ดึงข้อมูลสัญญาและลูกหนี้ทั้งหมด
+  // 1. โหลดโปรไฟล์แจ้งเตือนทั้งหมด
+  const allProfiles = await reminderProfileService.getAllProfiles();
+  const profileMap = new Map();
+  allProfiles.forEach(p => profileMap.set(p.profileId, p));
+
+  const defaultProfile = allProfiles.find(p => p.isDefault && p.status === 'ACTIVE') ||
+                         allProfiles.find(p => p.status === 'ACTIVE') ||
+                         allProfiles[0];
+
+  // 2. ดึงข้อมูลสัญญาและลูกหนี้ทั้งหมด
   const debts = await sheetsService.getAllDebts();
   const debtors = await sheetsService.getAllDebtors();
   const debtorsMap = new Map();
@@ -40,15 +54,6 @@ async function runDailyReminderCheck(options = {}) {
   const todayDay = todayDateObj.date();
   const isLastDayOfMonth = todayDateObj.endOf('month').format('YYYY-MM-DD') === todayStr;
 
-  const monthlyEnabled = Boolean(settings.monthlySchedule?.enabled);
-  const matchMonthlyDay = monthlyEnabled && (
-    (settings.monthlySchedule?.daysOfMonth || []).map(Number).includes(todayDay) ||
-    (settings.monthlySchedule?.lastDayOfMonth && isLastDayOfMonth)
-  );
-
-  const beforeDays = settings.rules?.remindBeforeDays || 1;
-  const beforeTargetDate = todayDateObj.add(beforeDays, 'day').format('YYYY-MM-DD');
-
   const candidates = [];
 
   for (const d of debts) {
@@ -56,107 +61,194 @@ async function runDailyReminderCheck(options = {}) {
     if (!d.dueDate || debtStatus === 'PAID' || debtStatus === 'SETTLED') continue;
     if ((d.remainingBalance || 0) <= 0) continue;
 
-    let reminderType = null;
+    const debtor = debtorsMap.get(d.userId) || { fullName: d.debtorName || 'คุณลูกค้า', reminderEnabled: true, reminderProfileId: '' };
 
-    // เงื่อนไข 1: เตือนในวันครบกำหนด (Due Today)
-    if (settings.rules?.remindDueTodayEnabled && d.dueDate === todayStr) {
+    // 3-Tier Hierarchy Check:
+    // Tier 1: Contract-level toggle
+    if (d.reminderEnabled === false) {
+      continue; // ปิดเตือนระดับสัญญา
+    }
+
+    // Tier 2: Debtor-level toggle
+    if (debtor.reminderEnabled === false) {
+      continue; // ปิดเตือนระดับลูกหนี้
+    }
+
+    // Resolve Effective Profile
+    let effectiveProfile = null;
+    let resolvedProfileSource = 'DEFAULT';
+
+    if (d.reminderProfileId && profileMap.has(d.reminderProfileId)) {
+      const p = profileMap.get(d.reminderProfileId);
+      if (p && p.status === 'ACTIVE') {
+        effectiveProfile = p;
+        resolvedProfileSource = 'CONTRACT';
+      }
+    }
+
+    if (!effectiveProfile && debtor.reminderProfileId && profileMap.has(debtor.reminderProfileId)) {
+      const p = profileMap.get(debtor.reminderProfileId);
+      if (p && p.status === 'ACTIVE') {
+        effectiveProfile = p;
+        resolvedProfileSource = 'DEBTOR';
+      }
+    }
+
+    if (!effectiveProfile) {
+      if (defaultProfile && defaultProfile.status === 'ACTIVE') {
+        effectiveProfile = defaultProfile;
+        resolvedProfileSource = 'GLOBAL_DEFAULT';
+      }
+    }
+
+    // หากไม่มีโปรไฟล์ที่เปิดใช้งาน ให้ข้าม
+    if (!effectiveProfile) continue;
+
+    // ประเมินเงื่อนไขการส่งแจ้งเตือนตาม Profile Frequency & Rules
+    let reminderType = null;
+    const rules = effectiveProfile.rulesConfig || {};
+    const sched = effectiveProfile.scheduleConfig || {};
+    const freq = effectiveProfile.frequencyType || 'DAILY';
+
+    const beforeDays = Number(rules.remindBeforeDays) || 1;
+    const beforeTargetDate = todayDateObj.add(beforeDays, 'day').format('YYYY-MM-DD');
+
+    // Rule A: เตือนตรงวันครบกำหนด (Due Today)
+    if (rules.remindDueTodayEnabled && d.dueDate === todayStr) {
       reminderType = 'DUE_TODAY';
     }
-    // เงื่อนไข 2: เตือนล่วงหน้า (Pre-due)
-    else if (settings.rules?.remindBeforeEnabled && d.dueDate === beforeTargetDate) {
+    // Rule B: เตือนล่วงหน้า (Pre-due)
+    else if (rules.remindBeforeEnabled && d.dueDate === beforeTargetDate) {
       reminderType = `DUE_BEFORE_${beforeDays}_DAYS`;
     }
-    // เงื่อนไข 3: เตือนค้างชำระ / เกินกำหนด (Overdue)
-    else if (settings.rules?.remindOverdueEnabled && dayjs(d.dueDate).isBefore(todayDateObj, 'day')) {
+    // Rule C: เตือนเกินกำหนด (Overdue)
+    else if (rules.remindOverdueEnabled && dayjs(d.dueDate).isBefore(todayDateObj, 'day')) {
       const daysOverdue = todayDateObj.diff(dayjs(d.dueDate), 'day');
-      const freq = settings.rules?.overdueFrequency || 'DAILY';
+      const overdueFreq = rules.overdueFrequency || 'DAILY';
 
       let shouldRemind = false;
-      if (freq === 'DAILY') shouldRemind = true;
-      else if (freq === 'EVERY_2_DAYS' && daysOverdue % 2 === 1) shouldRemind = true;
-      else if (freq === 'EVERY_3_DAYS' && daysOverdue % 3 === 1) shouldRemind = true;
-      else if (freq === 'WEEKLY' && daysOverdue % 7 === 1) shouldRemind = true;
+      if (overdueFreq === 'DAILY') shouldRemind = true;
+      else if (overdueFreq === 'EVERY_2_DAYS' && daysOverdue % 2 === 1) shouldRemind = true;
+      else if (overdueFreq === 'EVERY_3_DAYS' && daysOverdue % 3 === 1) shouldRemind = true;
+      else if (overdueFreq === 'WEEKLY' && daysOverdue % 7 === 1) shouldRemind = true;
 
       if (shouldRemind) {
         reminderType = 'OVERDUE';
       }
     }
-    // เงื่อนไข 4: แจ้งเตือนรอบประจำเดือน / วันที่ระบุของเดือน (Monthly Scheduled Day)
-    else if (matchMonthlyDay) {
-      reminderType = 'MONTHLY_SCHEDULE';
+    // Rule D: ความถี่ตามโปรไฟล์ (Schedule Frequency Patterns)
+    if (!reminderType) {
+      if (freq === 'DAILY') {
+        const interval = Number(sched.dailyInterval) || 1;
+        if (interval === 1) {
+          reminderType = 'DAILY_SCHEDULE';
+        } else {
+          const createdDay = d.createdAt ? dayjs(d.createdAt).diff(todayDateObj, 'day') : 0;
+          if (Math.abs(createdDay) % interval === 0) {
+            reminderType = `DAILY_INTERVAL_${interval}`;
+          }
+        }
+      } else if (freq === 'END_OF_MONTH') {
+        if (isLastDayOfMonth) {
+          reminderType = 'END_OF_MONTH';
+        }
+      } else if (freq === 'SPECIFIC_DAYS') {
+        const targetDays = (sched.daysOfMonth || []).map(Number);
+        const matchLastDay = sched.lastDayOfMonth && isLastDayOfMonth;
+        if (targetDays.includes(todayDay) || matchLastDay) {
+          reminderType = 'SPECIFIC_DAYS';
+        }
+      } else if (freq === 'MONTHLY') {
+        const targetDay = Number(sched.dayOfMonth) || 1;
+        const matchLastDay = sched.lastDayOfMonth && isLastDayOfMonth;
+        if (todayDay === targetDay || matchLastDay) {
+          reminderType = 'MONTHLY_SCHEDULE';
+        }
+      }
     }
 
     if (reminderType) {
-      const debtorInfo = debtorsMap.get(d.userId) || { fullName: d.debtorName || 'คุณลูกค้า' };
       candidates.push({
         debtId: d.debtId,
         userId: d.userId,
-        debtorName: debtorInfo.fullName || debtorInfo.displayName || 'คุณลูกค้า',
+        debtorName: debtor.fullName || debtor.displayName || 'คุณลูกค้า',
         installmentAmount: d.installmentAmount,
         remainingBalance: d.remainingBalance,
         dueDate: d.dueDate,
         debtStatus: d.debtStatus,
-        reminderType
+        reminderType,
+        profile: effectiveProfile,
+        profileSource: resolvedProfileSource
       });
     }
   }
 
-  console.log(`📋 Found ${candidates.length} candidate debt records matching reminder rules.`);
+  console.log(`📋 Found ${candidates.length} candidate debt records matching reminder profiles.`);
 
   let sentCount = 0;
   let skippedCount = 0;
   let failedCount = 0;
 
-  const tpl = settings.template || {};
-  const bankAccountStr = tpl.bankName && tpl.accountNumber
-    ? `${tpl.bankName} ${tpl.accountNumber}`
-    : 'กสิกรไทย (KBANK) 123-4-56789-0';
-
-  for (const debt of candidates) {
+  for (const candidate of candidates) {
     try {
-      // ตรวจสอบว่าเคยส่งแจ้งเตือนประเภทนี้ในวันนี้แล้วหรือไม่
-      const alreadySent = await sheetsService.hasBeenRemindedToday(debt.debtId, debt.reminderType);
+      // ตรวจสอบการส่งซ้ำในวันเดียวกัน
+      const alreadySent = await sheetsService.hasBeenRemindedToday(candidate.debtId, candidate.reminderType);
       if (alreadySent && !options.ignoreDuplicate) {
-        console.log(`⏭️ Skipped debt ${debt.debtId} for ${debt.userId} (already sent today)`);
+        console.log(`⏭️ Skipped debt ${candidate.debtId} for ${candidate.userId} (already sent today)`);
         skippedCount++;
         continue;
       }
 
-      // สร้าง Flex Message สำหรับแจ้งเตือนตามเทมเพลตที่กำหนด
+      const prof = candidate.profile;
+      const tpl = prof.templateConfig || {};
+      const globalTpl = globalSettings.template || {};
+
+      const bankAccountStr = (tpl.bankName && tpl.accountNumber)
+        ? `${tpl.bankName} ${tpl.accountNumber}`
+        : (globalTpl.bankName && globalTpl.accountNumber)
+          ? `${globalTpl.bankName} ${globalTpl.accountNumber}`
+          : 'กสิกรไทย (KBANK) 123-4-56789-0';
+
+      const accountNameStr = tpl.accountName || globalTpl.accountName || 'ชื่อบัญชีผู้รับโอน';
+      const promptPayStr = tpl.promptPayNumber || globalTpl.promptPayNumber || '';
+      const customHeaderStr = tpl.customHeader || prof.name || globalTpl.customHeader || '';
+      const customFooterStr = tpl.customFooter || globalTpl.customFooter || '';
+      const toneStr = tpl.tone || globalTpl.tone || 'POLITE';
+
       const flexMsg = createReminderFlex({
-        debtorName: debt.debtorName,
-        debtId: debt.debtId,
-        installmentAmount: debt.installmentAmount,
-        remainingBalance: debt.remainingBalance,
-        dueDate: debt.dueDate,
-        reminderType: debt.reminderType,
-        tone: tpl.tone || 'POLITE',
+        debtorName: candidate.debtorName,
+        debtId: candidate.debtId,
+        installmentAmount: candidate.installmentAmount,
+        remainingBalance: candidate.remainingBalance,
+        dueDate: candidate.dueDate,
+        reminderType: candidate.reminderType,
+        tone: toneStr,
         bankAccount: bankAccountStr,
-        accountName: tpl.accountName || 'ชื่อบัญชีผู้รับโอน',
-        promptPayNumber: tpl.promptPayNumber || '',
-        customHeader: tpl.customHeader || '',
-        customFooter: tpl.customFooter || ''
+        accountName: accountNameStr,
+        promptPayNumber: promptPayStr,
+        customHeader: customHeaderStr,
+        customFooter: customFooterStr
       });
 
-      // ยิง Push Message ไปยัง LINE ของลูกหนี้
-      await lineService.pushMessage(debt.userId, flexMsg);
+      // ส่งข้อความผ่าน LINE Messaging API
+      await lineService.pushMessage(candidate.userId, flexMsg);
 
-      // บันทึก Log ลง Google Sheets
+      // บันทึก Log ลงชีต ReminderLogs
       await sheetsService.logReminder({
-        debtId: debt.debtId,
-        userId: debt.userId,
-        reminderType: debt.reminderType,
+        debtId: candidate.debtId,
+        userId: candidate.userId,
+        reminderType: `${candidate.reminderType} [${prof.profileId}]`,
         status: 'SUCCESS'
       });
 
-      console.log(`✅ Sent ${debt.reminderType} reminder to user ${debt.userId} (Debt: ${debt.debtId})`);
+      console.log(`✅ Sent [${prof.profileId}] reminder to user ${candidate.userId} (Debt: ${candidate.debtId})`);
       sentCount++;
     } catch (err) {
-      console.error(`❌ Failed to send reminder for debt ${debt.debtId}:`, err.message);
+      console.error(`❌ Failed to send reminder for debt ${candidate.debtId}:`, err.message);
       await sheetsService.logReminder({
-        debtId: debt.debtId,
-        userId: debt.userId,
-        reminderType: debt.reminderType,
+        debtId: candidate.debtId,
+        userId: candidate.userId,
+        reminderType: candidate.reminderType,
         status: `FAILED: ${err.message}`
       });
       failedCount++;
@@ -171,8 +263,8 @@ async function runDailyReminderCheck(options = {}) {
     time: dayjs().tz(tz).format('YYYY-MM-DD HH:mm:ss')
   };
 
-  // แจ้งเตือนสรุปผลไปยังแอดมิน (ถ้าเปิดไว้)
-  if (settings.notifyAdminOnRun && (sentCount > 0 || failedCount > 0 || options.forceRun)) {
+  // แจ้งเตือนสรุปผลไปยังแอดมิน
+  if (globalSettings.notifyAdminOnRun && (sentCount > 0 || failedCount > 0 || options.forceRun)) {
     try {
       const adminIds = await getAdminUserIds();
       if (adminIds && adminIds.length > 0) {
@@ -194,7 +286,7 @@ async function runDailyReminderCheck(options = {}) {
     }
   }
 
-  console.log(`🏁 [Reminder Check] Finished: ${JSON.stringify(summary)}`);
+  console.log(`🏁 [Reminder Engine v5.0] Finished: ${JSON.stringify(summary)}`);
   return summary;
 }
 

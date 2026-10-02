@@ -1,0 +1,107 @@
+[
+  {
+    "profileId": "PRF-DAILY",
+    "name": "เตือนรายวัน (Daily 08:00)",
+    "frequencyType": "DAILY",
+    "scheduleConfig": {
+      "dailyInterval": 1
+    },
+    "primaryTime": "08:00",
+    "secondaryTime": "",
+    "rulesConfig": {
+      "remindBeforeEnabled": false,
+      "remindBeforeDays": 1,
+      "remindDueTodayEnabled": true,
+      "remindOverdueEnabled": true,
+      "overdueFrequency": "DAILY"
+    },
+    "templateConfig": {
+      "tone": "POLITE",
+      "customHeader": "แจ้งยอดรอบชำระรายวัน",
+      "customFooter": "เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"
+    },
+    "isDefault": true,
+    "status": "ACTIVE",
+    "createdAt": "2026-10-01 00:00:00",
+    "updatedAt": "2026-10-01 00:00:00"
+  },
+  {
+    "profileId": "PRF-ENDMONTH",
+    "name": "เตือนวันสิ้นเดือน (End of Month)",
+    "frequencyType": "END_OF_MONTH",
+    "scheduleConfig": {
+      "lastDayOfMonth": true
+    },
+    "primaryTime": "08:00",
+    "secondaryTime": "",
+    "rulesConfig": {
+      "remindBeforeEnabled": true,
+      "remindBeforeDays": 1,
+      "remindDueTodayEnabled": true,
+      "remindOverdueEnabled": true,
+      "overdueFrequency": "DAILY"
+    },
+    "templateConfig": {
+      "tone": "POLITE",
+      "customHeader": "แจ้งยอดรอบชำระประจำสิ้นเดือน",
+      "customFooter": "เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"
+    },
+    "isDefault": false,
+    "status": "ACTIVE",
+    "createdAt": "2026-10-01 00:00:00",
+    "updatedAt": "2026-10-01 00:00:00"
+  },
+  {
+    "profileId": "PRF-PAYDAY-25",
+    "name": "เตือนวันเงินออก (วันที่ 25 และ สิ้นเดือน)",
+    "frequencyType": "SPECIFIC_DAYS",
+    "scheduleConfig": {
+      "daysOfMonth": [
+        25
+      ],
+      "lastDayOfMonth": true
+    },
+    "primaryTime": "08:00",
+    "secondaryTime": "18:00",
+    "rulesConfig": {
+      "remindBeforeEnabled": true,
+      "remindBeforeDays": 1,
+      "remindDueTodayEnabled": true,
+      "remindOverdueEnabled": true,
+      "overdueFrequency": "EVERY_2_DAYS"
+    },
+    "templateConfig": {
+      "tone": "POLITE",
+      "customHeader": "แจ้งยอดรอบชำระเงินเดือนออก",
+      "customFooter": "เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"
+    },
+    "isDefault": false,
+    "status": "ACTIVE",
+    "createdAt": "2026-10-01 00:00:00",
+    "updatedAt": "2026-10-02 09:53:39"
+  },
+  {
+    "profileId": "PRF-DUE-RELATIVE",
+    "name": "เตือนอิงวันครบกำหนดสัญญา (Due Date Relative)",
+    "frequencyType": "DUE_DATE_RELATIVE",
+    "scheduleConfig": {},
+    "primaryTime": "08:00",
+    "secondaryTime": "",
+    "rulesConfig": {
+      "remindBeforeEnabled": true,
+      "remindBeforeDays": 2,
+      "remindDueTodayEnabled": true,
+      "remindOverdueEnabled": true,
+      "overdueFrequency": "DAILY"
+    },
+    "templateConfig": {
+      "tone": "POLITE",
+      "customHeader": "แจ้งเตือนรอบครบกำหนดสัญญาเงินกู้",
+      "customFooter": "เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"
+    },
+    "isDefault": false,
+    "status": "ACTIVE",
+    "createdAt": "2026-10-01 00:00:00",
+    "updatedAt": "2026-10-01 00:00:00"
+  }
+]
