@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ระบบเจ้าหนี้ / ผู้ดูแลระบบ - Admin Portal</title>
+  <title>ระบบจัดการหนี้ & แจ้งเตือน LINE - Admin Portal (PC)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,604 +13,863 @@
 </head>
 <body>
   <div class="admin-app-shell">
-    
-    <!-- Top Admin Header -->
-    <header class="app-header">
-      <div class="header-brand">
+
+    <!-- ==============================================================================
+         1. Left Sidebar Navigation (Desktop First)
+         ============================================================================== -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <!-- Brand & Status -->
+      <div class="sidebar-brand">
         <div class="brand-icon">🛡️</div>
         <div>
-          <div class="brand-title">Admin Hub</div>
-          <div class="brand-subtitle" id="adminSubtitle">ระบบจัดการหนี้ & ตรวจสลิป</div>
+          <div class="brand-title">LINE Debt Admin</div>
+          <div class="brand-status">
+            <span class="status-dot"></span> ระบบออนไลน์ (พร้อมใช้งาน)
+          </div>
         </div>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <div class="header-badge" id="adminRoleBadge">ผู้ดูแลระบบ</div>
-        <button id="btnAdminLogout" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #EF4444; border-radius: 12px; font-size: 11px; font-weight: 600; padding: 4px 8px; cursor: pointer; font-family: inherit;">ออก</button>
+
+      <!-- Navigation Menu Items -->
+      <div class="sidebar-nav-container">
+        <div class="nav-section-title">เมนูหลัก</div>
+
+        <button class="sidebar-nav-item active" data-target="view-admin-overview">
+          <div class="nav-left">
+            <span class="nav-icon">📊</span>
+            <span>ภาพรวม & สถิติ</span>
+          </div>
+        </button>
+
+        <button class="sidebar-nav-item" data-target="view-admin-new-contract">
+          <div class="nav-left">
+            <span class="nav-icon">➕</span>
+            <span>สร้างสัญญาใหม่</span>
+          </div>
+          <span class="nav-pill highlight">สร้างด่วน</span>
+        </button>
+
+        <button class="sidebar-nav-item" data-target="view-admin-contracts">
+          <div class="nav-left">
+            <span class="nav-icon">📑</span>
+            <span>จัดการสัญญาหนี้</span>
+          </div>
+          <span class="nav-pill" id="sidebarContractsBadge">0</span>
+        </button>
+
+        <button class="sidebar-nav-item" data-target="view-admin-slips">
+          <div class="nav-left">
+            <span class="nav-icon">📥</span>
+            <span>ตรวจสลิปโอนเงิน</span>
+          </div>
+          <span class="nav-pill warning" id="sidebarSlipsBadge">0 ใบ</span>
+        </button>
+
+        <button class="sidebar-nav-item" data-target="view-admin-debtors">
+          <div class="nav-left">
+            <span class="nav-icon">👥</span>
+            <span>สมุดรายชื่อลูกหนี้</span>
+          </div>
+        </button>
+
+        <div class="nav-section-title" style="margin-top: 14px;">การตั้งค่า & ระบบ</div>
+
+        <button class="sidebar-nav-item" data-target="view-admin-reminders">
+          <div class="nav-left">
+            <span class="nav-icon">⏰</span>
+            <span>แจ้งเตือนอัตโนมัติ</span>
+          </div>
+        </button>
+
+        <button class="sidebar-nav-item" data-target="view-admin-managers">
+          <div class="nav-left">
+            <span class="nav-icon">🛡️</span>
+            <span>จัดการทีมแอดมิน</span>
+          </div>
+        </button>
       </div>
-    </header>
 
-    <!-- Scrollable Viewport -->
-    <main class="views-viewport">
+      <!-- Sidebar Footer (Profile & Logout) -->
+      <div class="sidebar-footer">
+        <div class="admin-profile-card">
+          <div class="admin-avatar" id="sidebarAvatar">👤</div>
+          <div class="admin-profile-info">
+            <div class="admin-profile-name" id="sidebarAdminName">ผู้ดูแลระบบ</div>
+            <div class="admin-profile-role" id="sidebarAdminId">Uxxxxxxxx...</div>
+          </div>
+          <button id="btnAdminLogout" class="btn-sidebar-logout" title="ออกจากระบบ">🚪</button>
+        </div>
+      </div>
+    </aside>
 
-      <!-- ========================================== -->
-      <!-- SUB-VIEW 1: OVERVIEW & STATS               -->
-      <!-- ========================================== -->
-      <section id="view-admin-overview" class="sub-view active">
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon">💰</div>
-            <div class="stat-label">ยอดหนี้คงค้างรวม</div>
-            <div class="stat-val primary" id="statRemaining">฿0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">📥</div>
-            <div class="stat-label">สลิปรอตรวจสอบ</div>
-            <div class="stat-val warning" id="statPendingSlips">0 ใบ</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">📅</div>
-            <div class="stat-label">ครบกำหนดวันนี้</div>
-            <div class="stat-val danger" id="statDueToday">0 ราย</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">📑</div>
-            <div class="stat-label">สัญญาทั้งหมด</div>
-            <div class="stat-val success" id="statTotalContracts">0</div>
-          </div>
-          <div class="stat-card" style="cursor: pointer;" onclick="switchView('view-admin-debtors')">
-            <div class="stat-icon">👥</div>
-            <div class="stat-label">ลูกหนี้ / ผู้ใช้</div>
-            <div class="stat-val highlight" id="statTotalDebtors" style="color: #60A5FA;">0 คน</div>
+    <!-- ==============================================================================
+         2. Main Content Canvas (Desktop Layout)
+         ============================================================================== -->
+    <div class="admin-main-wrapper">
+
+      <!-- Desktop Topbar -->
+      <header class="admin-desktop-topbar">
+        <div class="topbar-left">
+          <button class="mobile-toggle-btn" id="btnToggleSidebar">☰</button>
+          <div class="topbar-breadcrumb">
+            <span class="breadcrumb-root">Admin Hub</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current" id="topbarCurrentViewTitle">ภาพรวม & สถิติ</span>
           </div>
         </div>
-
-        <!-- Quick Remind Trigger & Settings Link -->
-        <div class="panel-card">
-          <div class="panel-header" style="margin-bottom: 8px;">
-            <div class="panel-title">⏰ ระบบแจ้งเตือนอัตโนมัติ</div>
-            <span id="overviewReminderStatusBadge" style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10B981; padding: 2px 8px; border-radius: 10px;">เปิดใช้งาน (08:00 น.)</span>
-          </div>
-          <p id="overviewReminderDesc" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-            ระบบทำงานอัตโนมัติทุกเช้า 08:00 น. (เตือนล่วงหน้า 1 วัน, วันครบกำหนด, และค้างชำระ)
-          </p>
-          <div style="display: flex; gap: 8px; flex-direction: column;">
-            <button class="btn-primary-admin" id="btnTriggerCronNow" style="background: #0284C7;">
-              🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)
-            </button>
-            <button class="btn-primary-admin" onclick="switchView('view-admin-reminders')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #FFFFFF; margin-top: 0;">
-              ⚙️ ตั้งค่าระบบแจ้งเตือนแบบละเอียด
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ========================================== -->
-      <!-- SUB-VIEW 2: DEBTORS (รายชื่อลูกหนี้ / ผู้ใช้) -->
-      <!-- ========================================== -->
-      <section id="view-admin-debtors" class="sub-view">
-        <div class="panel-card">
-          <div class="panel-header" style="margin-bottom: 12px;">
-            <div class="panel-title">👥 รายชื่อลูกหนี้ & ผู้ใช้งาน LINE</div>
-            <span id="debtorsCountBadge" style="font-size: 11px; background: rgba(59, 130, 246, 0.2); color: #60A5FA; padding: 2px 8px; border-radius: 10px;">0 คน</span>
-          </div>
-
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-            รายชื่อผู้ที่ล็อกอินผ่าน LINE หรือมีข้อมูลในระบบ คุณสามารถคลิก <strong>"➕ เปิดสัญญา"</strong> เพื่อนำ LINE User ID ไปสร้างสัญญาได้ทันที
-          </p>
-
-          <div style="margin-bottom: 14px;">
-            <input type="text" id="debtorSearchInput" class="form-control" placeholder="🔍 ค้นหาชื่อ, LINE ID, หรือเบอร์โทร...">
-          </div>
-
-          <div id="debtorsListContainer">
-            <div style="text-align: center; padding: 30px; color: var(--text-muted);">
-              กำลังโหลดรายชื่อลูกหนี้...
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ========================================== -->
-      <!-- SUB-VIEW 3: CONTRACTS MANAGEMENT          -->
-      <!-- ========================================== -->
-      <section id="view-admin-contracts" class="sub-view">
-        <!-- Create Contract Form -->
-        <div class="panel-card">
-          <div class="panel-title" style="margin-bottom: 12px;">➕ สร้างสัญญาหนี้ใหม่</div>
-          <form id="createContractForm">
-            <div class="form-group">
-              <label>LINE User ID ผู้กู้ (เช่น U1234...)</label>
-              <input type="text" id="newUserId" class="form-control" placeholder="Uxxxxxxxx..." required>
-            </div>
-            <div class="form-group">
-              <label>ชื่อ - นามสกุล ผู้กู้</label>
-              <input type="text" id="newDebtorName" class="form-control" placeholder="นายสมชาย ใจดี" required>
-            </div>
-            <div class="form-group">
-              <label>เบอร์โทรศัพท์</label>
-              <input type="tel" id="newPhone" class="form-control" placeholder="08xxxxxxxx">
-            </div>
-            <div style="display: flex; gap: 10px;">
-              <div class="form-group" style="flex: 1;">
-                <label>ยอดหนี้รวม (บาท)</label>
-                <input type="number" id="newTotalAmount" class="form-control" placeholder="20000" required>
-              </div>
-              <div class="form-group" style="flex: 1;">
-                <label>ค่างวดต่องวด (บาท)</label>
-                <input type="number" id="newInstallmentAmount" class="form-control" placeholder="2000" required>
-              </div>
-            </div>
-            <div style="display: flex; gap: 10px;">
-              <div class="form-group" style="flex: 1;">
-                <label>วันครบกำหนดชำระ</label>
-                <input type="date" id="newDueDate" class="form-control" required>
-              </div>
-              <div class="form-group" style="flex: 1;">
-                <label>รอบชำระ (วัน)</label>
-                <input type="number" id="newCycleDays" class="form-control" value="30">
-              </div>
-            </div>
-            <button type="submit" class="btn-primary-admin" id="btnSaveContract">บันทึกสัญญาใหม่</button>
-          </form>
-        </div>
-
-        <!-- Contracts List -->
-        <div class="panel-card">
-          <div class="panel-header">
-            <div class="panel-title">📑 รายการสัญญาทั้งหมด</div>
-            <span id="contractsCount" style="font-size: 11px; color: var(--text-muted);">0 รายการ</span>
-          </div>
-          <div id="contractsListContainer">
-            <div style="text-align: center; padding: 20px; color: var(--text-muted);">กำลังโหลดข้อมูลสัญญา...</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ========================================== -->
-      <!-- SUB-VIEW 3: SLIP APPROVAL HUB             -->
-      <!-- ========================================== -->
-      <section id="view-admin-slips" class="sub-view">
-        <div class="panel-header" style="margin-bottom: 12px;">
-          <div class="panel-title">🔍 ตรวจสอบและอนุมัติสลิป</div>
-          <span id="pendingSlipsBadge" style="font-size: 11px; background: rgba(245, 158, 11, 0.2); color: #F59E0B; padding: 2px 8px; border-radius: 10px;">รอตรวจ 0 ใบ</span>
-        </div>
-
-        <div id="slipsContainer">
-          <div style="text-align: center; padding: 40px; color: var(--text-muted);">กำลังโหลดรายการสลิป...</div>
-        </div>
-      </section>
-
-      <!-- ========================================== -->
-      <!-- SUB-VIEW 4: REMINDERS & DETAILED SETTINGS  -->
-      <!-- ========================================== -->
-      <section id="view-admin-reminders" class="sub-view">
-        
-        <!-- Header & Master Toggle Card -->
-        <div class="panel-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <div>
-              <div class="panel-title" style="font-size: 15px;">⚙️ ตั้งค่าระบบแจ้งเตือนอัตโนมัติ</div>
-              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
-                กำหนดเวลา เงื่อนไข 3 ระยะ และรูปแบบข้อความทวงถามหนี้
-              </div>
-            </div>
-            <label class="switch-toggle" title="เปิด/ปิดระบบแจ้งเตือนทั้งหมด">
-              <input type="checkbox" id="cfgEnabled" checked>
-              <span class="slider-toggle"></span>
-            </label>
-          </div>
-          <div id="masterStatusBadge" style="font-size: 11.5px; padding: 4px 10px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); color: #10B981; display: inline-block;">
-            🟢 สถานะ: กำลังเปิดทำงานอัตโนมัติ
-          </div>
-        </div>
-
-        <!-- 1. Schedule Settings -->
-        <div class="panel-card">
-          <div class="panel-title" style="margin-bottom: 12px; font-size: 14px;">⏰ รอบเวลาในการทำงาน (Schedule)</div>
-          
-          <div class="form-group">
-            <label class="form-label">รอบเวลาหลัก (ทุกเช้า) <span style="color: #EF4444;">*</span></label>
-            <input type="time" id="cfgPrimaryTime" class="form-control" value="08:00">
-            <span style="font-size: 11px; color: var(--text-muted);">เวลาที่ระบบเริ่มสแกนและส่งข้อความเตือน (เวลาไทย GMT+7)</span>
-          </div>
-
-          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 12px; margin-top: 12px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <div>
-                <label class="form-label" style="margin-bottom: 0;">รอบเวลาเสริม (รอบเย็น / ค่ำ)</label>
-                <div style="font-size: 11px; color: var(--text-muted);">เปิดรอบย้ำเตือนหรือส่งสรุปเพิ่มเติมในแต่ละวัน</div>
-              </div>
-              <label class="switch-toggle">
-                <input type="checkbox" id="cfgSecondaryTimeEnabled">
-                <span class="slider-toggle"></span>
-              </label>
-            </div>
-            <div id="secondaryTimeWrapper" style="display: none; margin-top: 8px;">
-              <input type="time" id="cfgSecondaryTime" class="form-control" value="18:00">
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. Rules 3 Stages -->
-        <div class="panel-card">
-          <div class="panel-title" style="margin-bottom: 12px; font-size: 14px;">🎯 เงื่อนไขการแจ้งเตือน 3 ระยะ (3-Stage Rules)</div>
-
-          <!-- Stage 1: Pre-due -->
-          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-              <strong style="font-size: 13px; color: #60A5FA;">1. แจ้งเตือนก่อนถึงกำหนด (Pre-due)</strong>
-              <label class="switch-toggle">
-                <input type="checkbox" id="cfgRemindBeforeEnabled" checked>
-                <span class="slider-toggle"></span>
-              </label>
-            </div>
-            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">
-              แจ้งเตือนล่วงหน้าเพื่อให้ลูกหนี้เตรียมพร้อมยอดเงินชำระ
-            </div>
-            <div id="remindBeforeDaysWrapper" style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 12px; color: #CBD5E1;">แจ้งเตือนล่วงหน้า:</span>
-              <select id="cfgRemindBeforeDays" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;">
-                <option value="1">1 วัน</option>
-                <option value="2">2 วัน</option>
-                <option value="3">3 วัน</option>
-                <option value="5">5 วัน</option>
-                <option value="7">7 วัน (1 สัปดาห์)</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Stage 2: Due Today -->
-          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-              <strong style="font-size: 13px; color: #34D399;">2. แจ้งเตือนในวันครบกำหนด (Due Today)</strong>
-              <label class="switch-toggle">
-                <input type="checkbox" id="cfgRemindDueTodayEnabled" checked>
-                <span class="slider-toggle"></span>
-              </label>
-            </div>
-            <div style="font-size: 11.5px; color: var(--text-muted);">
-              แจ้งเตือนเช้าวันครบกำหนดชำระตรงวัน พร้อมยอดชำระและข้อมูลบัญชีโอน
-            </div>
-          </div>
-
-          <!-- Stage 3: Overdue -->
-          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-              <strong style="font-size: 13px; color: #F87171;">3. แจ้งเตือนยอดค้างชำระ (Overdue)</strong>
-              <label class="switch-toggle">
-                <input type="checkbox" id="cfgRemindOverdueEnabled" checked>
-                <span class="slider-toggle"></span>
-              </label>
-            </div>
-            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">
-              ติดตามยอดกรณีเกินกำหนดชำระ เพื่อไม่ให้ตกหล่น
-            </div>
-            <div id="overdueFrequencyWrapper" style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 12px; color: #CBD5E1;">ความถี่ในการติดตาม:</span>
-              <select id="cfgOverdueFrequency" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;">
-                <option value="DAILY">ทุกวัน (Daily)</option>
-                <option value="EVERY_2_DAYS">ทุก 2 วัน</option>
-                <option value="EVERY_3_DAYS">ทุก 3 วัน</option>
-                <option value="WEEKLY">สัปดาห์ละ 1 ครั้ง</option>
-              </select>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- 3. Message Tone & Payment Details -->
-        <div class="panel-card">
-          <div class="panel-title" style="margin-bottom: 12px; font-size: 14px;">💬 รูปแบบข้อความ & ข้อมูลการชำระเงิน</div>
-
-          <div class="form-group">
-            <label class="form-label">ระดับน้ำเสียงข้อความ (Message Tone)</label>
-            <select id="cfgTone" class="form-control">
-              <option value="POLITE">🟢 สุภาพเป็นมิตร (Polite & Friendly) - แนะนำ</option>
-              <option value="FORMAL">🔵 กึ่งทางการ (Formal & Business)</option>
-              <option value="URGENT">🔴 เร่งรัดเคร่งครัด (Urgent / Strict)</option>
-            </select>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">ชื่อธนาคาร</label>
-              <input type="text" id="cfgBankName" class="form-control" placeholder="เช่น ธนาคารกสิกรไทย (KBANK)">
-            </div>
-            <div class="form-group">
-              <label class="form-label">เลขที่บัญชี</label>
-              <input type="text" id="cfgAccountNumber" class="form-control" placeholder="เช่น 123-4-56789-0">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">ชื่อบัญชีผู้รับโอน</label>
-              <input type="text" id="cfgAccountName" class="form-control" placeholder="เช่น นาย สมชาย ใจดี">
-            </div>
-            <div class="form-group">
-              <label class="form-label">เบอร์พร้อมเพย์ (ถ้ามี)</label>
-              <input type="text" id="cfgPromptPay" class="form-control" placeholder="เช่น 0812345678">
-            </div>
-          </div>
-
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label">ข้อความหมายเหตุด้านล่าง (Custom Footer Note)</label>
-            <textarea id="cfgCustomFooter" class="form-control" rows="2" placeholder="เช่น เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"></textarea>
-          </div>
-        </div>
-
-        <!-- 4. Admin Summary & Actions -->
-        <div class="panel-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-            <div>
-              <div style="font-size: 13px; font-weight: 600; color: #FFFFFF;">🔔 ส่งสรุปผลให้แอดมินทาง LINE</div>
-              <div style="font-size: 11px; color: var(--text-muted);">ส่งการ์ดสรุปยอดแจ้งเตือนประจำวันเข้า LINE แอดมินเมื่อระบบทำงานเสร็จ</div>
-            </div>
-            <label class="switch-toggle">
-              <input type="checkbox" id="cfgNotifyAdmin" checked>
-              <span class="slider-toggle"></span>
-            </label>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <button class="btn-primary-admin" id="btnSaveReminderSettings" style="background: #10B981; font-weight: 600;">
-              💾 บันทึกการตั้งค่าระบบแจ้งเตือน
-            </button>
-            <button class="btn-primary-admin" id="btnTestPushToAdmin" style="background: #6366F1; margin-top: 0;">
-              📲 ส่งตัวอย่างเข้า LINE ฉัน (Test Preview)
-            </button>
-            <button class="btn-primary-admin" id="btnTriggerCronFromSettings" style="background: #0284C7; margin-top: 0;">
-              🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)
-            </button>
-          </div>
-        </div>
-
-        <!-- 5. Recent Logs -->
-        <div class="panel-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <div class="panel-title" style="font-size: 14px;">📋 ประวัติการส่งแจ้งเตือนล่าสุด</div>
-            <button id="btnRefreshLogs" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #CBD5E1; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;">
-              🔄 รีเฟรช
-            </button>
-          </div>
-          <div id="reminderLogsContainer" style="max-height: 250px; overflow-y: auto;">
-            <div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 12px;">
-              กำลังโหลดประวัติการแจ้งเตือน...
-            </div>
-          </div>
-        </div>
-
-        <!-- 6. Manual Push Single Debt -->
-        <div class="panel-card">
-          <div class="panel-title" style="margin-bottom: 8px; font-size: 14px;">📨 ยิงแจ้งเตือนรายบุคคล (Manual Push)</div>
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
-            ใส่รหัสสัญญาเพื่อยิงแจ้งเตือนลูกหนี้เฉพาะคนทันที:
-          </p>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="manualDebtIdInput" class="form-control" placeholder="รหัสสัญญา เช่น DB-202610-001">
-            <button class="btn-primary-admin" id="btnManualPushSingle" style="width: auto; margin-top: 0; white-space: nowrap; background: #0EA5E9;">
-              ส่งข้อความ
-            </button>
-          </div>
-        </div>
-
-      </section>
-
-      <!-- ========================================== -->
-      <!-- SUB-VIEW 5: ADMIN MANAGERS (สิทธิ์แอดมิน) -->
-      <!-- ========================================== -->
-      <section id="view-admin-managers" class="sub-view">
-        <div class="panel-header" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="panel-title">🛡️ จัดการผู้ดูแลระบบ</div>
-            <span id="adminsCountBadge" style="font-size: 11px; background: rgba(56, 189, 248, 0.15); color: var(--primary); padding: 2px 8px; border-radius: 10px;">0 คน</span>
-          </div>
-          <button class="btn-primary-admin" id="btnOpenAddAdminModal" style="width: auto; margin-top: 0; padding: 6px 14px; font-size: 12px; background: #0EA5E9;">
-            ➕ เพิ่มแอดมิน
+        <div class="topbar-right">
+          <button class="topbar-btn primary" onclick="switchView('view-admin-new-contract')">
+            <span>➕ สร้างสัญญาใหม่</span>
           </button>
-        </div>
-
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-          รายชื่อผู้ดูแลระบบจะถูกบันทึกลงใน Google Sheet แท็บ <code>admin</code> อัตโนมัติ เพื่อใช้ตรวจสอบสิทธิ์การเข้าใช้งาน Admin Hub ทันที
-        </p>
-
-        <!-- Search Bar -->
-        <div style="margin-bottom: 12px;">
-          <input type="text" id="adminSearchInput" class="form-control" placeholder="🔍 ค้นหาชื่อ, LINE ID, เบอร์โทร..." style="font-size: 13px;">
-        </div>
-
-        <!-- Admins List Container -->
-        <div id="adminsListContainer">
-          <div style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายชื่อผู้ดูแลระบบ...</div>
-        </div>
-      </section>
-
-    </main>
-
-    <!-- Floating Bottom Navigation Bar -->
-    <nav class="bottom-nav">
-      <button class="nav-item active" data-target="view-admin-overview">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
-        <span>ภาพรวม</span>
-      </button>
-
-      <button class="nav-item" data-target="view-admin-debtors">
-        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        <span>ลูกหนี้</span>
-      </button>
-
-      <button class="nav-item" data-target="view-admin-contracts">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-        <span>สัญญา</span>
-      </button>
-
-      <button class="nav-item" data-target="view-admin-slips">
-        <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-        <span>ตรวจสลิป</span>
-      </button>
-
-      <button class="nav-item" data-target="view-admin-reminders">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-        <span>แจ้งเตือน</span>
-      </button>
-
-      <button class="nav-item" data-target="view-admin-managers">
-        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        <span>แอดมิน</span>
-      </button>
-    </nav>
-
-    <!-- Modal: เพิ่ม / แก้ไข ผู้ดูแลระบบ -->
-    <div id="modalAdminForm" class="modal-overlay hidden" style="display: none;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3 id="modalAdminTitle">➕ เพิ่มผู้ดูแลระบบใหม่</h3>
-          <button class="modal-close" id="btnCloseAdminModal">&times;</button>
-        </div>
-        <form id="adminManagerForm">
-          <input type="hidden" id="adminFormMode" value="create">
-          
-          <div class="form-group">
-            <label>LINE User ID <span style="color: #EF4444;">*</span></label>
-            <div style="display: flex; gap: 6px;">
-              <input type="text" id="adminInputUserId" class="form-control" placeholder="Uxxxxxxxx..." required style="font-family: monospace; font-size: 13px;">
-              <button type="button" id="btnSelectFromDebtors" style="background: rgba(255,255,255,0.08); border: 1px solid var(--surface-border); color: #94A3B8; padding: 0 10px; border-radius: 8px; font-size: 11px; white-space: nowrap; cursor: pointer;">เลือกลูกหนี้</button>
-            </div>
-            <small style="font-size: 11px; color: var(--text-muted);">รหัสบัญชี LINE 33 หลัก (ขึ้นต้นด้วย U)</small>
-          </div>
-
-          <div class="form-group">
-            <label>ชื่อผู้ดูแลระบบ (Display Name)</label>
-            <input type="text" id="adminInputDisplayName" class="form-control" placeholder="เช่น พี่ปอนด์, แอดมินหลัก">
-          </div>
-
-          <div class="form-group">
-            <label>บทบาท (Role)</label>
-            <select id="adminInputRole" class="form-control">
-              <option value="ADMIN">ADMIN (ผู้ดูแลระบบทั่วไป)</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN (ผู้ดูแลระบบสูงสุด)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>เบอร์โทรศัพท์ (ถ้ามี)</label>
-            <input type="tel" id="adminInputPhone" class="form-control" placeholder="08xxxxxxxx">
-          </div>
-
-          <div class="form-group">
-            <label>หมายเหตุ</label>
-            <input type="text" id="adminInputNote" class="form-control" placeholder="เช่น แอดมินฝ่ายบัญชี, ผู้ช่วยดูแล">
-          </div>
-
-          <div class="form-group">
-            <label>สถานะสิทธิ์การใช้งาน</label>
-            <select id="adminInputStatus" class="form-control">
-              <option value="ACTIVE">ACTIVE (เปิดใช้งาน)</option>
-              <option value="INACTIVE">INACTIVE (ระงับสิทธิ์ชั่วคราว)</option>
-            </select>
-          </div>
-
-          <div style="display: flex; gap: 10px; margin-top: 18px;">
-            <button type="button" class="btn-cancel" id="btnCancelAdminModal" style="flex: 1; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid var(--surface-border); color: #FFFFFF; border-radius: 8px; font-size: 13px; cursor: pointer;">ยกเลิก</button>
-            <button type="submit" class="btn-primary-admin" id="btnSaveAdminSubmit" style="flex: 2; margin-top: 0; padding: 12px; font-size: 13px; background: #0EA5E9; cursor: pointer;">บันทึกข้อมูล</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="toast">
-      <span id="toastIcon">ℹ️</span>
-      <span id="toastMessage">แจ้งเตือน</span>
-    </div>
-
-    <!-- Admin Access Control Overlay -->
-    <div id="adminAuthOverlay" class="auth-overlay">
-      <div class="auth-modal">
-        <!-- State 1: Checking -->
-        <div id="authCheckingState" style="text-align: center;">
-          <div class="auth-spinner"></div>
-          <h3 style="font-size: 16px; font-weight: 600; margin-top: 14px; color: #FFFFFF;">ระบบความปลอดภัย Admin</h3>
-          <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">กำลังตรวจสอบสิทธิ์การเข้าใช้งานด้วยบัญชี LINE...</p>
-        </div>
-
-        <!-- State 2: Not Logged In -->
-        <div id="authLoginState" style="display: none; text-align: center;">
-          <div class="auth-icon-circle" style="background: rgba(6, 199, 85, 0.15); border: 1px solid rgba(6, 199, 85, 0.3); color: #06C755;">🛡️</div>
-          <h3 style="font-size: 17px; font-weight: 700; color: #FFFFFF; margin-top: 12px;">เข้าสู่ระบบผู้ดูแลระบบ</h3>
-          <p style="font-size: 12px; color: var(--text-muted); margin: 8px 0 20px 0; line-height: 1.5;">
-            สงวนสิทธิ์เฉพาะบัญชี LINE ของผู้ดูแลระบบที่ได้รับอนุญาตเท่านั้น กรุณาเข้าสู่ระบบเพื่อยืนยันตัวตน
-          </p>
-          <button class="btn-primary-admin" id="btnAdminLoginLine" style="background: #06C755; border: none; font-size: 14px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            <span>💬 เข้าสู่ระบบด้วยบัญชี LINE</span>
+          <button class="topbar-btn" id="btnTopTriggerCron">
+            <span>🚀 สั่งยิงเตือนวันนี้</span>
           </button>
+          <a href="/client/" target="_blank" class="topbar-btn" title="เปิดหน้าเว็บลูกหนี้">
+            <span>👤 ดูหน้าลูกหนี้</span>
+          </a>
+        </div>
+      </header>
 
-          <!-- Localhost / Dev Mode Login Section -->
-          <div id="localLoginSection" style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: left;">
-            <div style="font-size: 12px; font-weight: 600; color: #F59E0B; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <span>🔑 เข้าสู่ระบบในเครื่อง (Localhost Mode)</span>
+      <!-- Scrollable Views Viewport -->
+      <main class="views-viewport">
+
+        <!-- ========================================== -->
+        <!-- SUB-VIEW 1: OVERVIEW & STATS               -->
+        <!-- ========================================== -->
+        <section id="view-admin-overview" class="sub-view active">
+          <!-- Stats Grid (5 Column Desktop Grid) -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">💰</div>
+              <div class="stat-label">ยอดหนี้คงค้างรวม</div>
+              <div class="stat-val primary" id="statRemaining">฿0.00</div>
             </div>
-            <p style="font-size: 11px; color: #94A3B8; margin-bottom: 10px; line-height: 1.4;">
-              กรณีทดสอบบนเครื่อง (http://localhost) ซึ่ง LINE Login ไม่อนุญาต ให้ระบุ LINE User ID ของแอดมิน:
+            <div class="stat-card">
+              <div class="stat-icon">📥</div>
+              <div class="stat-label">สลิปรอตรวจสอบ</div>
+              <div class="stat-val warning" id="statPendingSlips">0 ใบ</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📅</div>
+              <div class="stat-label">ครบกำหนดวันนี้</div>
+              <div class="stat-val danger" id="statDueToday">0 ราย</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📑</div>
+              <div class="stat-label">สัญญาทั้งหมด</div>
+              <div class="stat-val success" id="statTotalContracts">0</div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="switchView('view-admin-debtors')">
+              <div class="stat-icon">👥</div>
+              <div class="stat-label">ลูกหนี้ / ผู้ใช้</div>
+              <div class="stat-val highlight" id="statTotalDebtors">0 คน</div>
+            </div>
+          </div>
+
+          <!-- Quick Reminder Banner -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">⏰ ระบบแจ้งเตือนอัตโนมัติประจำวัน</div>
+              <span id="overviewReminderStatusBadge" class="badge-status active">เปิดใช้งาน</span>
+            </div>
+            <p id="overviewReminderDesc" style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.6;">
+              ระบบจะทำงานอัตโนมัติตามรอบเวลาที่ตั้งค่าไว้ (ตรวจวันครบกำหนด, วันที่ระบุของเดือน, และค้างชำระ)
             </p>
-            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-              <input type="text" id="inputLocalAdminUserId" placeholder="เช่น U16565ee5abb9acecbbaf08d123f06cd2" 
-                style="flex: 1; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 8px 10px; color: #FFF; font-size: 12px; font-family: monospace;" />
-              <button id="btnLocalAdminLogin" type="button" 
-                style="background: #3B82F6; color: #FFF; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                เข้าสู่ระบบ
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="topbar-btn primary" id="btnTriggerCronNow" style="padding: 10px 18px; font-size: 13px;">
+                🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)
+              </button>
+              <button class="topbar-btn" onclick="switchView('view-admin-reminders')" style="padding: 10px 18px; font-size: 13px;">
+                ⚙️ จัดการกฎและเวลาแจ้งเตือน
               </button>
             </div>
-            <button id="btnQuickAdminLogin" type="button" 
-              style="width: 100%; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #60A5FA; border-radius: 8px; padding: 8px; font-size: 11.5px; font-weight: 500; cursor: pointer; transition: all 0.2s;">
-              ⚡ ล็อกอินทันทีด้วยบัญชีแอดมินหลัก (😾POND-IT😸)
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SUB-VIEW 2: NEW CONTRACT CREATOR (DEDICATED) -->
+        <!-- ========================================== -->
+        <section id="view-admin-new-contract" class="sub-view">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">➕ สร้างสัญญาหนี้ใหม่ (New Contract Creator)</h2>
+              <p class="view-desc">เปิดสัญญาเงินกู้ใหม่ พร้อมระบบช่วยคำนวณค่างวด และตัวเลือกส่งแจ้งเตือนเข้า LINE ลูกหนี้ทันที</p>
+            </div>
+            <button class="topbar-btn" onclick="switchView('view-admin-contracts')">
+              ← ไปที่รายการสัญญาทั้งหมด
             </button>
           </div>
 
-          <div style="margin-top: 15px;">
-            <a href="/client/" style="font-size: 12px; color: #64748B; text-decoration: none;">← ไปยังหน้าลูกหนี้ (Client Portal)</a>
+          <div class="new-contract-layout">
+            <!-- Left: Form -->
+            <div class="panel-card">
+              <form id="createContractWizardForm">
+                <div style="font-size: 14px; font-weight: 600; color: #38BDF8; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                  <span>1. ข้อมูลผู้กู้ (Borrower Details)</span>
+                </div>
+
+                <!-- Debtor Fast Selector -->
+                <div class="form-group">
+                  <label class="form-label">เลือกลูกหนี้จากฐานข้อมูล หรือกรอกใหม่</label>
+                  <select id="wizardDebtorSelect" class="form-control">
+                    <option value="">-- เลือกลูกหนี้จากรายชื่อ (หรือกรอกเองด้านล่าง) --</option>
+                  </select>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">LINE User ID ผู้กู้ <span style="color: #EF4444;">*</span></label>
+                    <input type="text" id="wizardUserId" class="form-control" placeholder="เช่น U16565ee5abb..." required style="font-family: monospace;">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">ชื่อ - นามสกุล ผู้กู้ <span style="color: #EF4444;">*</span></label>
+                    <input type="text" id="wizardDebtorName" class="form-control" placeholder="เช่น นายสมชาย ใจดี" required>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">เบอร์โทรศัพท์ผู้กู้</label>
+                    <input type="tel" id="wizardPhone" class="form-control" placeholder="08xxxxxxxx">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">เลขบัตรประชาชน (ถ้ามี)</label>
+                    <input type="text" id="wizardIdCard" class="form-control" placeholder="13 หลัก">
+                  </div>
+                </div>
+
+                <div style="font-size: 14px; font-weight: 600; color: #38BDF8; margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
+                  <span>2. เงื่อนไขทางการเงิน & ค่างวด (Financials & Calculator)</span>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">ยอดหนี้เงินกู้รวม (บาท) <span style="color: #EF4444;">*</span></label>
+                    <input type="number" id="wizardTotalAmount" class="form-control" placeholder="เช่น 20000" required min="1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">จำนวนงวดที่ต้องการผ่อน (งวด)</label>
+                    <input type="number" id="wizardInstallmentCount" class="form-control" placeholder="เช่น 10" min="1" value="10">
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">ค่างวดต่องวด (บาท) <span style="color: #EF4444;">*</span></label>
+                    <input type="number" id="wizardInstallmentAmount" class="form-control" placeholder="เช่น 2000" required min="1">
+                    <small style="color: var(--text-muted); font-size: 11px;">ระบบคำนวณจาก ยอดรวม / จำนวนงวด ให้อัตโนมัติ (สามารถแก้ไขเองได้)</small>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">รอบการชำระ (วัน)</label>
+                    <select id="wizardCycleDays" class="form-control">
+                      <option value="30">ทุกๆ 30 วัน (รายเดือน)</option>
+                      <option value="15">ทุกๆ 15 วัน (ปักษ์)</option>
+                      <option value="7">ทุกๆ 7 วัน (รายสัปดาห์)</option>
+                      <option value="1">รายวัน (ทุกวัน)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">วันครบกำหนดชำระงวดแรก <span style="color: #EF4444;">*</span></label>
+                  <input type="date" id="wizardDueDate" class="form-control" required>
+                </div>
+
+                <div style="font-size: 14px; font-weight: 600; color: #38BDF8; margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
+                  <span>3. ตัวเลือกการแจ้งเตือน (LINE Push Notification)</span>
+                </div>
+
+                <!-- Checkbox Send LINE Push -->
+                <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 20px;">
+                  <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="wizardSendPushCheck" checked style="width: 18px; height: 18px; margin-top: 2px;">
+                    <div>
+                      <strong style="color: #FFFFFF; font-size: 13.5px;">ส่งข้อความเปิดสัญญาไปยัง LINE ลูกหนี้ทันที</strong>
+                      <div style="font-size: 11.5px; color: #94A3B8; margin-top: 2px;">
+                        เมื่อบันทึกสัญญา ระบบจะยิง Flex Message แจ้งรายละเอียดสัญญาเงินกู้ พร้อมปุ่มดูสัญญาและแนบสลิปไปยัง LINE ของผู้กู้ทันที
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                <div style="display: flex; gap: 12px;">
+                  <button type="button" id="btnResetWizardForm" class="topbar-btn" style="padding: 12px 20px; font-size: 13px;">
+                    🔄 ล้างข้อมูล
+                  </button>
+                  <button type="submit" id="btnSubmitWizardContract" class="btn-primary-admin" style="flex: 1; padding: 12px 20px;">
+                    💾 บันทึกและเปิดสัญญาเงินกู้ใหม่
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Right: Real-time Contract Preview -->
+            <div class="contract-preview-card">
+              <div class="preview-badge-row">
+                <span class="badge-status active">ตัวอย่างการ์ดสัญญา</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Real-time Preview</span>
+              </div>
+
+              <div class="preview-amount-box">
+                <div style="font-size: 11.5px; color: var(--text-muted);">ยอดหนี้เงินกู้รวมทั้งสิ้น</div>
+                <div class="preview-amount-val" id="prevTotalAmount">฿0.00</div>
+              </div>
+
+              <div class="preview-details-list">
+                <div class="preview-detail-item">
+                  <span class="preview-detail-label">👤 ผู้กู้:</span>
+                  <span class="preview-detail-value" id="prevDebtorName">-</span>
+                </div>
+                <div class="preview-detail-item">
+                  <span class="preview-detail-label">💵 ค่างวดต่องวด:</span>
+                  <span class="preview-detail-value" id="prevInstallment" style="color: #10B981;">฿0.00</span>
+                </div>
+                <div class="preview-detail-item">
+                  <span class="preview-detail-label">📅 กำหนดงวดแรก:</span>
+                  <span class="preview-detail-value" id="prevDueDate" style="color: #F59E0B;">-</span>
+                </div>
+                <div class="preview-detail-item">
+                  <span class="preview-detail-label">🔄 รอบการชำระ:</span>
+                  <span class="preview-detail-value" id="prevCycle">ทุกๆ 30 วัน</span>
+                </div>
+                <div class="preview-detail-item">
+                  <span class="preview-detail-label">🔔 ส่งแจ้งเตือน LINE:</span>
+                  <span class="preview-detail-value" id="prevSendPush" style="color: #38BDF8;">ส่งทันที</span>
+                </div>
+              </div>
+
+              <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; font-size: 11.5px; color: var(--text-muted); line-height: 1.5;">
+                💡 สัญญานี้จะถูกบันทึกลงใน Google Sheet แท็บ <code>Debts</code> และคำนวณเข้าสู่ระบบแจ้งเตือนอัตโนมัติทันที
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <!-- State 3: Logged in but Unauthorized (Strict Access Denied) -->
-        <div id="authDeniedState" style="display: none; text-align: center;">
-          <div class="auth-icon-circle" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444;">⛔</div>
-          <h3 style="font-size: 17px; font-weight: 700; color: #EF4444; margin-top: 12px;">ปฏิเสธการเข้าถึง (Access Denied)</h3>
-          <p id="deniedReasonText" style="font-size: 12px; color: var(--text-muted); margin: 6px 0 16px 0; line-height: 1.5;">
-            ไม่พบบัญชี LINE ของคุณใน Google Sheet แท็บ <code>admin</code>
-          </p>
+        <!-- ========================================== -->
+        <!-- SUB-VIEW 3: CONTRACTS MANAGEMENT (TABLE)   -->
+        <!-- ========================================== -->
+        <section id="view-admin-contracts" class="sub-view">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">📑 สัญญาหนี้ทั้งหมด (Contracts Directory)</h2>
+              <p class="view-desc">รายการสัญญาเงินกู้ทั้งหมด ตรวจสอบสถานะการผ่อน และสั่งยิงแจ้งเตือนรายบุคคล</p>
+            </div>
+            <button class="topbar-btn primary" onclick="switchView('view-admin-new-contract')">
+              ➕ เปิดสัญญาใหม่
+            </button>
+          </div>
 
-          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 12px;">
-            <div style="color: #94A3B8; margin-bottom: 4px;">ชื่อบัญชี LINE: <strong id="deniedDisplayName" style="color: #FFFFFF;">-</strong></div>
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-              <div style="color: #94A3B8; font-size: 11px;">LINE ID: <span id="deniedUserId" style="font-family: monospace; color: #38BDF8;">-</span></div>
-              <button id="btnCopyDeniedId" style="background: rgba(59, 130, 246, 0.2); border: none; color: #60A5FA; padding: 2px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;">คัดลอก</button>
+          <!-- Contracts Table Panel -->
+          <div class="panel-card">
+            <!-- Filter & Search Bar -->
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+              <input type="text" id="contractSearchInput" class="form-control" placeholder="🔍 ค้นหาเลขที่สัญญา, ชื่อลูกหนี้, หรือ LINE ID..." style="flex: 2; min-width: 250px;">
+              <select id="contractFilterStatus" class="form-control" style="flex: 1; min-width: 150px;">
+                <option value="ALL">สถานะทั้งหมด</option>
+                <option value="ACTIVE">กำลังผ่อน (ACTIVE)</option>
+                <option value="OVERDUE">เกินกำหนด (OVERDUE)</option>
+                <option value="PAID">ชำระครบแล้ว (PAID)</option>
+              </select>
+              <button id="btnRefreshContracts" class="topbar-btn">
+                🔄 รีเฟรช
+              </button>
+            </div>
+
+            <!-- Full Width Data Table -->
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>เลขที่สัญญา</th>
+                    <th>ผู้กู้ (ลูกหนี้)</th>
+                    <th>ยอดรวม</th>
+                    <th>ยอดคงเหลือ</th>
+                    <th>ค่างวด</th>
+                    <th>กำหนดชำระ</th>
+                    <th>สถานะ</th>
+                    <th style="text-align: center;">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="contractsTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                      กำลังโหลดข้อมูลสัญญาหนี้...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SUB-VIEW 4: SLIP VERIFICATION HUB          -->
+        <!-- ========================================== -->
+        <section id="view-admin-slips" class="sub-view">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">📥 ตรวจสอบสลิปโอนเงิน (Slip Verification Hub)</h2>
+              <p class="view-desc">ตรวจสลิปที่ลูกหนี้ส่งเข้ามาในแชท LINE หรือแนบผ่านเว็บ พร้อมตัดยอดยอดหนี้คงเหลืออัตโนมัติ</p>
+            </div>
+            <button id="btnRefreshSlips" class="topbar-btn">
+              🔄 รีเฟรชรายการสลิป
+            </button>
+          </div>
+
+          <div id="slipsContainer" class="slips-grid">
+            <div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">
+              กำลังโหลดรายการสลิป...
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SUB-VIEW 5: DEBTORS (รายชื่อลูกหนี้)       -->
+        <!-- ========================================== -->
+        <section id="view-admin-debtors" class="sub-view">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">👥 สมุดรายชื่อลูกหนี้ (Debtors Directory)</h2>
+              <p class="view-desc">รายชื่อผู้ใช้ที่ลงทะเบียนผ่านระบบ LINE หรือมีประวัติการกู้ยืมเงิน</p>
+            </div>
+            <button class="topbar-btn primary" onclick="switchView('view-admin-new-contract')">
+              ➕ เปิดสัญญาใหม่
+            </button>
+          </div>
+
+          <div class="panel-card">
+            <div style="margin-bottom: 14px;">
+              <input type="text" id="debtorSearchInput" class="form-control" placeholder="🔍 ค้นหาชื่อ, LINE User ID, หรือเบอร์โทรศัพท์...">
+            </div>
+
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>ผู้ใช้งาน</th>
+                    <th>LINE User ID</th>
+                    <th>เบอร์โทร</th>
+                    <th>วันที่ลงทะเบียน</th>
+                    <th>สถานะ</th>
+                    <th style="text-align: center;">ดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody id="debtorsTableBody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                      กำลังโหลดรายชื่อลูกหนี้...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SUB-VIEW 6: REMINDER SETTINGS & ENGINE     -->
+        <!-- ========================================== -->
+        <section id="view-admin-reminders" class="sub-view">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">⏰ ระบบแจ้งเตือนอัตโนมัติ (Automated Reminder Engine)</h2>
+              <p class="view-desc">กำหนดรอบเวลา ความถี่ วันที่ของเดือน และปรับแต่งข้อความแจ้งเตือนเข้า LINE</p>
+            </div>
+            <button class="topbar-btn primary" id="btnSaveReminderSettingsTop">
+              💾 บันทึกการตั้งค่า
+            </button>
+          </div>
+
+          <!-- Master Switch Card -->
+          <div class="panel-card" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%); border-color: rgba(14, 165, 233, 0.3);">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <h3 style="font-size: 16px; font-weight: 700; color: #FFFFFF;">🔔 เปิดใช้งานระบบแจ้งเตือนอัตโนมัติ (Master Switch)</h3>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
+                  เมื่อเปิดใช้งาน ระบบจะตรวจเช็กและส่ง Push Message หาผู้กู้ตามเงื่อนไขที่กำหนดด้านล่าง
+                </p>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="cfgEnabled" checked>
+                <span class="slider-toggle"></span>
+              </label>
             </div>
           </div>
 
-          <p style="font-size: 11.5px; color: #94A3B8; margin-bottom: 18px; line-height: 1.5; text-align: left; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
-            💡 <strong>วิธีเปิดสิทธิ์ใช้งาน:</strong><br>
-            นำ LINE ID ข้างต้นไปวางใน Google Sheet แท็บ <code>admin</code> แถวที่ 2 (คอลัมน์ A) และกำหนดคอลัมน์ status เป็น <code>ACTIVE</code> จากนั้นกดปุ่ม "ตรวจสอบสิทธิ์อีกครั้ง" ด้านล่างนี้
-          </p>
+          <div class="form-row" style="align-items: start;">
+            <!-- Left: Schedule & Timing Rules -->
+            <div>
+              <!-- 1. Frequency & Schedule Mode -->
+              <div class="panel-card">
+                <div class="panel-title" style="margin-bottom: 14px;">📅 รูปแบบความถี่ & วันที่แจ้งเตือน (Schedule Mode)</div>
 
-          <button class="btn-primary-admin" id="btnRecheckAuth" style="background: #0EA5E9; border: none; margin-bottom: 10px; padding: 12px; font-size: 13px;">
-            🔄 ตรวจสอบสิทธิ์อีกครั้ง
-          </button>
+                <div class="form-group">
+                  <label class="form-label">โหมดการแจ้งเตือน</label>
+                  <select id="cfgScheduleMode" class="form-control">
+                    <option value="COMBINED">ผสมผสาน (ตรวจตามวันครบกำหนด + แจ้งตามวันที่ระบุของเดือน)</option>
+                    <option value="DAILY">ตรวจเช็กทุกวัน (อิงวันครบกำหนด)</option>
+                    <option value="MONTHLY">เน้นวันที่ระบุในแต่ละเดือน (เช่น ทุกวันที่ 1, 25)</option>
+                  </select>
+                </div>
 
-          <button class="btn-primary-admin" id="btnSwitchAccount" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #FFFFFF; margin-bottom: 12px; font-size: 13px;">
-            สลับบัญชี LINE อื่น
-          </button>
-          <div>
-            <a href="/client/" style="font-size: 12px; color: #38BDF8; text-decoration: none;">← ไปยังหน้าลูกหนี้ (Client Portal)</a>
+                <!-- Monthly Days Selector -->
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px; margin-bottom: 14px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <strong style="font-size: 13px; color: #38BDF8;">📆 กำหนดวันที่แจ้งเตือนในแต่ละเดือน (Monthly Days)</strong>
+                    <label class="switch-toggle">
+                      <input type="checkbox" id="cfgMonthlyEnabled">
+                      <span class="slider-toggle"></span>
+                    </label>
+                  </div>
+                  <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px;">
+                    คลิกเลือกวันที่ของเดือนที่ต้องการให้ระบบยิงข้อความแจ้งยอด:
+                  </p>
+                  
+                  <div class="days-checkbox-grid" id="monthlyDaysGrid">
+                    <!-- 1 - 31 Chips generated via JS -->
+                  </div>
+
+                  <div style="margin-top: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+                      <input type="checkbox" id="cfgMonthlyLastDay">
+                      <span>📌 แจ้งเตือนใน <strong>วันสิ้นเดือน</strong> เสมอ (28, 29, 30 หรือ 31)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Scheduled Times -->
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">เวลาส่งรอบเช้า (เวลาหลัก)</label>
+                    <input type="time" id="cfgPrimaryTime" class="form-control" value="08:00">
+                  </div>
+                  <div class="form-group">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                      <label class="form-label" style="margin-bottom: 0;">รอบส่งช่วงค่ำ</label>
+                      <label class="switch-toggle" style="transform: scale(0.85);">
+                        <input type="checkbox" id="cfgSecondaryEnabled">
+                        <span class="slider-toggle"></span>
+                      </label>
+                    </div>
+                    <input type="time" id="cfgSecondaryTime" class="form-control" value="18:00">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Due Date Relative Rules -->
+              <div class="panel-card">
+                <div class="panel-title" style="margin-bottom: 14px;">🎯 เงื่อนไขอิงตามวันครบกำหนด (Due Date Rules)</div>
+
+                <!-- Pre-due -->
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <strong style="font-size: 13px; color: #FBBF24;">1. แจ้งเตือนล่วงหน้า (Pre-due)</strong>
+                    <label class="switch-toggle">
+                      <input type="checkbox" id="cfgRemindBeforeEnabled" checked>
+                      <span class="slider-toggle"></span>
+                    </label>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px; color: var(--text-muted);">เตือนล่วงหน้า:</span>
+                    <select id="cfgRemindBeforeDays" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;">
+                      <option value="1">1 วัน</option>
+                      <option value="2">2 วัน</option>
+                      <option value="3">3 วัน</option>
+                      <option value="5">5 วัน</option>
+                      <option value="7">7 วัน (1 สัปดาห์)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Due Today -->
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <strong style="font-size: 13px; color: #34D399;">2. แจ้งเตือนในวันครบกำหนด (Due Today)</strong>
+                    <label class="switch-toggle">
+                      <input type="checkbox" id="cfgRemindDueTodayEnabled" checked>
+                      <span class="slider-toggle"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Overdue -->
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <strong style="font-size: 13px; color: #F87171;">3. แจ้งเตือนยอดค้างชำระ (Overdue)</strong>
+                    <label class="switch-toggle">
+                      <input type="checkbox" id="cfgRemindOverdueEnabled" checked>
+                      <span class="slider-toggle"></span>
+                    </label>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px; color: var(--text-muted);">ความถี่ติดตาม:</span>
+                    <select id="cfgOverdueFrequency" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;">
+                      <option value="DAILY">ทุกวัน</option>
+                      <option value="EVERY_2_DAYS">ทุก 2 วัน</option>
+                      <option value="EVERY_3_DAYS">ทุก 3 วัน</option>
+                      <option value="WEEKLY">สัปดาห์ละ 1 ครั้ง</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Template Customizer & Bank Info -->
+            <div>
+              <div class="panel-card">
+                <div class="panel-title" style="margin-bottom: 14px;">💬 รูปแบบข้อความ & ข้อมูลการรับเงิน</div>
+
+                <div class="form-group">
+                  <label class="form-label">ระดับน้ำเสียงข้อความ (Message Tone)</label>
+                  <select id="cfgTone" class="form-control">
+                    <option value="POLITE">🟢 สุภาพเป็นมิตร (Polite & Friendly) - แนะนำ</option>
+                    <option value="FORMAL">🔵 กึ่งทางการ (Formal & Business)</option>
+                    <option value="URGENT">🔴 เร่งรัดเคร่งครัด (Urgent / Strict)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">หัวข้อแจ้งเตือน (Custom Header)</label>
+                  <input type="text" id="cfgCustomHeader" class="form-control" placeholder="เช่น แจ้งยอดรอบชำระเงินกู้">
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">ชื่อธนาคาร</label>
+                    <input type="text" id="cfgBankName" class="form-control" placeholder="เช่น ธนาคารกสิกรไทย (KBANK)">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">เลขที่บัญชี</label>
+                    <input type="text" id="cfgAccountNumber" class="form-control" placeholder="เช่น 123-4-56789-0">
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">ชื่อบัญชีผู้รับโอน</label>
+                    <input type="text" id="cfgAccountName" class="form-control" placeholder="เช่น นายสมชาย ใจดี">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">เบอร์พร้อมเพย์ (ถ้ามี)</label>
+                    <input type="text" id="cfgPromptPay" class="form-control" placeholder="เช่น 0812345678">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">ข้อความหมายเหตุด้านล่าง (Custom Footer)</label>
+                  <textarea id="cfgCustomFooter" class="form-control" rows="2" placeholder="เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"></textarea>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; margin: 14px 0;">
+                  <span style="font-size: 12.5px; color: #CBD5E1;">🔔 ส่งสรุปผลเข้า LINE แอดมินทุกครั้งที่ระบบทำงาน</span>
+                  <label class="switch-toggle">
+                    <input type="checkbox" id="cfgNotifyAdmin" checked>
+                    <span class="slider-toggle"></span>
+                  </label>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 18px;">
+                  <button class="topbar-btn" id="btnTestPushToAdmin" style="flex: 1; justify-content: center; padding: 11px;">
+                    📲 ส่งตัวอย่างเข้า LINE ฉัน
+                  </button>
+                  <button class="btn-primary-admin" id="btnSaveReminderSettings" style="flex: 1; margin-top: 0; background: #10B981;">
+                    💾 บันทึกการตั้งค่า
+                  </button>
+                </div>
+              </div>
+
+              <!-- Recent Logs -->
+              <div class="panel-card">
+                <div class="panel-header">
+                  <div class="panel-title" style="font-size: 14px;">📋 ประวัติการส่งแจ้งเตือนล่าสุด</div>
+                  <button id="btnRefreshLogs" class="topbar-btn" style="padding: 4px 10px; font-size: 11px;">
+                    🔄 รีเฟรช
+                  </button>
+                </div>
+                <div id="reminderLogsContainer" style="max-height: 220px; overflow-y: auto;">
+                  <div style="text-align: center; color: var(--text-muted); padding: 14px; font-size: 12px;">
+                    กำลังโหลดประวัติการแจ้งเตือน...
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SUB-VIEW 7: ADMIN MANAGEMENT              -->
+        <!-- ========================================== -->
+        <section id="view-admin-managers" class="sub-view">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">🛡️ จัดการทีมผู้ดูแลระบบ (Admins Management)</h2>
+              <p class="view-desc">รายชื่อบัญชี LINE ที่ได้รับสิทธิ์เข้าใช้งานระบบหลังบ้าน ข้อมูลซิงค์กับ Google Sheet แท็บ <code>admin</code></p>
+            </div>
+            <button class="topbar-btn primary" id="btnOpenAddAdminModal">
+              ➕ เพิ่มแอดมินใหม่
+            </button>
+          </div>
+
+          <div class="panel-card">
+            <div style="margin-bottom: 14px;">
+              <input type="text" id="adminSearchInput" class="form-control" placeholder="🔍 ค้นหาชื่อแอดมิน, LINE User ID, เบอร์โทร...">
+            </div>
+
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>ชื่อผู้ดูแลระบบ</th>
+                    <th>LINE User ID</th>
+                    <th>บทบาท (Role)</th>
+                    <th>เบอร์โทร</th>
+                    <th>สถานะ</th>
+                    <th style="text-align: center;">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="adminsTableBody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                      กำลังโหลดรายชื่อผู้ดูแลระบบ...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ==============================================================================
+       Modals & Overlays
+       ============================================================================== -->
+
+  <!-- Modal: Add / Edit Admin -->
+  <div id="modalAdminForm" class="modal-overlay hidden" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalAdminTitle">➕ เพิ่มผู้ดูแลระบบใหม่</h3>
+        <button class="modal-close" id="btnCloseAdminModal">&times;</button>
+      </div>
+      <form id="adminManagerForm">
+        <input type="hidden" id="adminFormMode" value="create">
+        
+        <div class="form-group">
+          <label class="form-label">LINE User ID <span style="color: #EF4444;">*</span></label>
+          <input type="text" id="adminInputUserId" class="form-control" placeholder="Uxxxxxxxx..." required style="font-family: monospace;">
+          <small style="font-size: 11px; color: var(--text-muted);">รหัสบัญชี LINE 33 หลัก (ขึ้นต้นด้วย U)</small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ชื่อผู้ดูแลระบบ</label>
+          <input type="text" id="adminInputDisplayName" class="form-control" placeholder="เช่น แอดมินหลัก, ฝ่ายการเงิน">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">บทบาท (Role)</label>
+            <select id="adminInputRole" class="form-control">
+              <option value="ADMIN">ADMIN (ผู้ดูแลระบบ)</option>
+              <option value="SUPER_ADMIN">SUPER_ADMIN (สูงสุด)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">สถานะ</label>
+            <select id="adminInputStatus" class="form-control">
+              <option value="ACTIVE">ACTIVE (เปิดใช้งาน)</option>
+              <option value="INACTIVE">INACTIVE (ระงับสิทธิ์)</option>
+            </select>
           </div>
         </div>
 
-      </div>
-    </div>
+        <div class="form-group">
+          <label class="form-label">เบอร์โทรศัพท์ (ถ้ามี)</label>
+          <input type="tel" id="adminInputPhone" class="form-control" placeholder="08xxxxxxxx">
+        </div>
 
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="button" class="topbar-btn" id="btnCancelAdminModal" style="flex: 1; justify-content: center; padding: 12px;">ยกเลิก</button>
+          <button type="submit" class="btn-primary-admin" id="btnSaveAdminSubmit" style="flex: 2; margin-top: 0; padding: 12px;">บันทึกข้อมูล</button>
+        </div>
+      </form>
+    </div>
   </div>
 
-  <script src="js/admin.js?v=4.6"></script>
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">
+    <span id="toastIcon">ℹ️</span>
+    <span id="toastMessage">แจ้งเตือน</span>
+  </div>
+
+  <!-- Admin Access Control Overlay -->
+  <div id="adminAuthOverlay" class="auth-overlay">
+    <div class="auth-modal">
+      <!-- State 1: Checking -->
+      <div id="authCheckingState" style="text-align: center;">
+        <div class="auth-spinner"></div>
+        <h3 style="font-size: 16px; font-weight: 600; margin-top: 14px; color: #FFFFFF;">ระบบความปลอดภัย Admin</h3>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">กำลังตรวจสอบสิทธิ์การเข้าใช้งาน...</p>
+      </div>
+
+      <!-- State 2: Not Logged In -->
+      <div id="authLoginState" style="display: none; text-align: center;">
+        <div class="auth-icon-circle" style="font-size: 36px; margin-bottom: 8px;">🛡️</div>
+        <h3 style="font-size: 17px; font-weight: 700; color: #FFFFFF;">เข้าสู่ระบบผู้ดูแลระบบ</h3>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 16px 0; line-height: 1.5;">
+          สงวนสิทธิ์เฉพาะบัญชี LINE ของผู้ดูแลระบบที่ได้รับอนุญาตเท่านั้น
+        </p>
+
+        <button class="btn-primary-admin" id="btnAdminLoginLine" style="background: #06C755; border: none; font-size: 14px; padding: 12px;">
+          <span>💬 เข้าสู่ระบบด้วยบัญชี LINE</span>
+        </button>
+
+        <!-- Localhost / Dev Mode Login Section -->
+        <div id="localLoginSection" style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: left;">
+          <div style="font-size: 12px; font-weight: 600; color: #F59E0B; margin-bottom: 6px;">
+            <span>🔑 เข้าสู่ระบบในเครื่อง (Localhost Mode)</span>
+          </div>
+          <p style="font-size: 11px; color: #94A3B8; margin-bottom: 10px; line-height: 1.4;">
+            กรณีทดสอบบนเครื่อง (http://localhost) ซึ่ง LINE Login ไม่อนุญาต ให้ระบุ LINE User ID ของแอดมิน:
+          </p>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="text" id="inputLocalAdminUserId" placeholder="เช่น U16565ee5abb..." 
+              style="flex: 1; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 8px 10px; color: #FFF; font-size: 12px; font-family: monospace;" />
+            <button id="btnLocalAdminLogin" type="button" 
+              style="background: #3B82F6; color: #FFF; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+              เข้าสู่ระบบ
+            </button>
+          </div>
+          <button id="btnQuickAdminLogin" type="button" 
+            style="width: 100%; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #60A5FA; border-radius: 8px; padding: 8px; font-size: 11.5px; font-weight: 500; cursor: pointer;">
+            ⚡ ล็อกอินทันทีด้วยบัญชีแอดมินหลัก (😾POND-IT😸)
+          </button>
+        </div>
+
+        <div style="margin-top: 15px;">
+          <a href="/client/" style="font-size: 12px; color: #64748B; text-decoration: none;">← ไปยังหน้าลูกหนี้ (Client Portal)</a>
+        </div>
+      </div>
+
+      <!-- State 3: Logged in but Unauthorized -->
+      <div id="authDeniedState" style="display: none; text-align: center;">
+        <div style="font-size: 36px; margin-bottom: 8px;">⛔</div>
+        <h3 style="font-size: 17px; font-weight: 700; color: #EF4444;">ปฏิเสธการเข้าถึง (Access Denied)</h3>
+        <p id="deniedReasonText" style="font-size: 12px; color: var(--text-muted); margin: 6px 0 16px 0; line-height: 1.5;">
+          ไม่พบบัญชี LINE ของคุณในรายการผู้ดูแลระบบ
+        </p>
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 12px;">
+          <div style="color: #94A3B8;">ชื่อบัญชี LINE: <strong id="deniedDisplayName" style="color: #FFFFFF;">-</strong></div>
+          <div style="color: #94A3B8; margin-top: 4px;">LINE ID: <span id="deniedUserId" style="font-family: monospace; color: #38BDF8;">-</span></div>
+        </div>
+        <button id="btnSwitchAccount" class="topbar-btn" style="width: 100%; justify-content: center; padding: 10px;">
+          🔄 สลับบัญชีผู้ใช้งาน
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/admin.js"></script>
 </body>
 </html>

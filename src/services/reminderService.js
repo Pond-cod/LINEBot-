@@ -35,9 +35,19 @@ async function runDailyReminderCheck(options = {}) {
   const debtorsMap = new Map();
   debtors.forEach(d => debtorsMap.set(d.userId, d));
 
-  const todayStr = dayjs().tz(tz).format('YYYY-MM-DD');
+  const todayDateObj = dayjs().tz(tz);
+  const todayStr = todayDateObj.format('YYYY-MM-DD');
+  const todayDay = todayDateObj.date();
+  const isLastDayOfMonth = todayDateObj.endOf('month').format('YYYY-MM-DD') === todayStr;
+
+  const monthlyEnabled = Boolean(settings.monthlySchedule?.enabled);
+  const matchMonthlyDay = monthlyEnabled && (
+    (settings.monthlySchedule?.daysOfMonth || []).map(Number).includes(todayDay) ||
+    (settings.monthlySchedule?.lastDayOfMonth && isLastDayOfMonth)
+  );
+
   const beforeDays = settings.rules?.remindBeforeDays || 1;
-  const beforeTargetDate = dayjs().tz(tz).add(beforeDays, 'day').format('YYYY-MM-DD');
+  const beforeTargetDate = todayDateObj.add(beforeDays, 'day').format('YYYY-MM-DD');
 
   const candidates = [];
 
@@ -57,8 +67,8 @@ async function runDailyReminderCheck(options = {}) {
       reminderType = `DUE_BEFORE_${beforeDays}_DAYS`;
     }
     // เงื่อนไข 3: เตือนค้างชำระ / เกินกำหนด (Overdue)
-    else if (settings.rules?.remindOverdueEnabled && dayjs(d.dueDate).isBefore(dayjs().tz(tz), 'day')) {
-      const daysOverdue = dayjs().tz(tz).diff(dayjs(d.dueDate), 'day');
+    else if (settings.rules?.remindOverdueEnabled && dayjs(d.dueDate).isBefore(todayDateObj, 'day')) {
+      const daysOverdue = todayDateObj.diff(dayjs(d.dueDate), 'day');
       const freq = settings.rules?.overdueFrequency || 'DAILY';
 
       let shouldRemind = false;
@@ -70,6 +80,10 @@ async function runDailyReminderCheck(options = {}) {
       if (shouldRemind) {
         reminderType = 'OVERDUE';
       }
+    }
+    // เงื่อนไข 4: แจ้งเตือนรอบประจำเดือน / วันที่ระบุของเดือน (Monthly Scheduled Day)
+    else if (matchMonthlyDay) {
+      reminderType = 'MONTHLY_SCHEDULE';
     }
 
     if (reminderType) {
@@ -120,6 +134,7 @@ async function runDailyReminderCheck(options = {}) {
         bankAccount: bankAccountStr,
         accountName: tpl.accountName || 'ชื่อบัญชีผู้รับโอน',
         promptPayNumber: tpl.promptPayNumber || '',
+        customHeader: tpl.customHeader || '',
         customFooter: tpl.customFooter || ''
       });
 

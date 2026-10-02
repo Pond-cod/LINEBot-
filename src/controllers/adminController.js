@@ -1,7 +1,7 @@
 const dayjs = require('dayjs');
 const sheetsService = require('../services/sheetsService');
 const lineService = require('../services/lineService');
-const { createPaymentStatusFlex, createReminderFlex } = require('../templates/flexMessages');
+const { createPaymentStatusFlex, createReminderFlex, createNewContractFlex } = require('../templates/flexMessages');
 
 /**
  * 1. ดึงข้อมูลสถิติภาพรวม (Admin Dashboard Overview)
@@ -121,10 +121,31 @@ async function createContract(req, res) {
       debt: newDebt
     });
 
+    // ส่ง LINE Push แจ้งเตือนเปิดสัญญาใหม่หาลูกหนี้ทันที (ถ้าแอดมินเลือก)
+    let notificationSent = false;
+    if (req.body.sendLineNotification) {
+      try {
+        const contractFlex = createNewContractFlex({
+          debtorName: debtorName || 'คุณลูกค้า',
+          debtId: newDebt.debtId,
+          totalAmount: Number(totalAmount),
+          installmentAmount: Number(installmentAmount),
+          dueDate,
+          cycleDays: cycleDays || 30
+        });
+        await lineService.pushMessage(userId, contractFlex);
+        notificationSent = true;
+        console.log(`✅ Welcome contract flex sent to debtor ${userId} for debt ${newDebt.debtId}`);
+      } catch (pushErr) {
+        console.warn(`Could not push welcome contract message to ${userId}:`, pushErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      message: 'สร้างสัญญาใหม่สำเร็จ',
-      debt: newDebt
+      message: notificationSent ? 'สร้างสัญญาใหม่และส่งแจ้งเตือนเข้า LINE ลูกหนี้สำเร็จ!' : 'สร้างสัญญาใหม่สำเร็จ',
+      debt: newDebt,
+      notificationSent
     });
   } catch (error) {
     console.error('Error creating contract:', error);

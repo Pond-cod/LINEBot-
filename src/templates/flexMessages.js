@@ -21,27 +21,33 @@ function createReminderFlex({
   accountName = 'ชื่อบัญชีผู้รับโอน',
   promptPayNumber = '',
   tone = 'POLITE',
+  customHeader = '',
   customFooter = ''
 }) {
   let badgeText = 'แจ้งเตือนครบกำหนดชำระ';
   let badgeColor = '#06C755';
-  let headerTitle = 'แจ้งเตือนรอบชำระหนี้';
+  let headerTitle = customHeader || 'แจ้งเตือนรอบชำระหนี้';
   let subText = `ถึงกำหนดชำระวันที่ ${dueDate}`;
 
   if (reminderType && reminderType.startsWith('DUE_BEFORE')) {
     badgeText = 'เตือนล่วงหน้า';
     badgeColor = '#F59E0B';
-    headerTitle = 'แจ้งเตือนชำระล่วงหน้า';
+    headerTitle = customHeader || 'แจ้งเตือนชำระล่วงหน้า';
     subText = `ครบกำหนดชำระวันที่ ${dueDate}`;
   } else if (reminderType === 'OVERDUE') {
     badgeText = 'เกินกำหนดชำระ!';
     badgeColor = '#EF4444';
-    headerTitle = 'แจ้งเตือนเกินกำหนดชำระ';
+    headerTitle = customHeader || 'แจ้งเตือนเกินกำหนดชำระ';
     subText = `เกินกำหนดชำระตั้งแต่วันที่ ${dueDate} กรุณาดำเนินการ`;
+  } else if (reminderType === 'MONTHLY_SCHEDULE') {
+    badgeText = 'รอบชำระประจำเดือน';
+    badgeColor = '#38BDF8';
+    headerTitle = customHeader || 'แจ้งรอบชำระเงินกู้ประจำเดือน';
+    subText = `ถึงรอบชำระประจำเดือน ครบกำหนดวันที่ ${dueDate}`;
   } else {
     badgeText = 'ครบกำหนดวันนี้!';
     badgeColor = '#06C755';
-    headerTitle = 'ครบกำหนดชำระวันนี้';
+    headerTitle = customHeader || 'ครบกำหนดชำระวันนี้';
     subText = `ครบกำหนดชำระภายในวันนี้ (${dueDate})`;
   }
 
@@ -49,12 +55,12 @@ function createReminderFlex({
   if (tone === 'URGENT') {
     badgeColor = '#DC2626';
     badgeText = '⚠️ เตือนเร่งด่วน!';
-    headerTitle = 'แจ้งเตือนยอดชำระเร่งด่วน';
+    headerTitle = customHeader || 'แจ้งเตือนยอดชำระเร่งด่วน';
     subText = `กรุณาชำระเงินและส่งหลักฐานทันทีเพื่อรักษาสิทธิ์ของท่าน`;
   } else if (tone === 'FORMAL') {
     badgeColor = '#2563EB';
     badgeText = 'แจ้งยอดชำระ';
-    headerTitle = 'แจ้งยอดครบกำหนดตามสัญญา';
+    headerTitle = customHeader || 'แจ้งยอดครบกำหนดตามสัญญา';
     subText = `สัญญาเงินกู้เลขที่ ${debtId || '-'} ครบกำหนดชำระวันที่ ${dueDate}`;
   }
 
@@ -726,11 +732,187 @@ function createAdminDailySummaryFlex({
   };
 }
 
+/**
+ * 7. Flex Message: แจ้งยืนยันการเปิดสัญญาหนี้ใหม่ (New Contract Created)
+ */
+function createNewContractFlex({
+  debtorName = 'คุณลูกค้า',
+  debtId,
+  totalAmount,
+  installmentAmount,
+  dueDate,
+  cycleDays = 30,
+  liffUrl = ''
+}) {
+  const targetLiffUrl = liffUrl || `https://liff.line.me/${process.env.LIFF_ID || ''}`;
+
+  return {
+    type: 'flex',
+    altText: `📑 [สัญญาใหม่] สัญญาเลขที่ ${debtId} ยอดรวม ฿${formatMoney(totalAmount)}`,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#0F172A',
+        paddingAll: '20px',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: '📑 บันทึกสัญญาใหม่สำเร็จ',
+                color: '#38BDF8',
+                size: 'xs',
+                weight: 'bold',
+                flex: 1
+              },
+              {
+                type: 'text',
+                text: 'กำลังผ่อนชำระ',
+                color: '#10B981',
+                size: 'xs',
+                align: 'end',
+                weight: 'bold'
+              }
+            ]
+          },
+          {
+            type: 'text',
+            text: 'สัญญาเงินกู้ / ยอดหนี้',
+            weight: 'bold',
+            size: 'xl',
+            color: '#FFFFFF',
+            margin: 'md'
+          },
+          {
+            type: 'text',
+            text: `เลขที่สัญญา: ${debtId}`,
+            size: 'xs',
+            color: '#94A3B8',
+            margin: 'xs'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#1E293B',
+        paddingAll: '20px',
+        contents: [
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: 'rgba(255, 255, 255, 0.04)',
+            cornerRadius: '12px',
+            paddingAll: '16px',
+            contents: [
+              {
+                type: 'text',
+                text: 'ยอดหนี้เงินกู้รวมทั้งสิ้น',
+                size: 'xs',
+                color: '#94A3B8'
+              },
+              {
+                type: 'text',
+                text: `฿${formatMoney(totalAmount)}`,
+                size: 'xxl',
+                weight: 'bold',
+                color: '#38BDF8',
+                margin: 'xs'
+              }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'lg',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: '👤 ชื่อผู้กู้:', color: '#94A3B8', size: 'sm', flex: 2 },
+                  { type: 'text', text: debtorName, color: '#FFFFFF', size: 'sm', weight: 'bold', align: 'end', flex: 3 }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: '💵 ค่างวดต่องวด:', color: '#94A3B8', size: 'sm', flex: 2 },
+                  { type: 'text', text: `฿${formatMoney(installmentAmount)}`, color: '#10B981', size: 'sm', weight: 'bold', align: 'end', flex: 3 }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: '📅 กำหนดงวดแรก:', color: '#94A3B8', size: 'sm', flex: 2 },
+                  { type: 'text', text: dueDate, color: '#F59E0B', size: 'sm', weight: 'bold', align: 'end', flex: 3 }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: '🔄 รอบการชำระ:', color: '#94A3B8', size: 'sm', flex: 2 },
+                  { type: 'text', text: `ทุกๆ ${cycleDays} วัน`, color: '#FFFFFF', size: 'sm', align: 'end', flex: 3 }
+                ]
+              }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'lg',
+            paddingAll: '12px',
+            backgroundColor: 'rgba(56, 189, 248, 0.08)',
+            cornerRadius: '8px',
+            contents: [
+              {
+                type: 'text',
+                text: '💡 ข้อมูลสัญญานี้ถูกบันทึกในระบบเรียบร้อยแล้ว ท่านสามารถตรวจสอบยอดคงเหลือและแนบสลิปโอนเงินได้ตลอด 24 ชั่วโมง',
+                size: 'xs',
+                color: '#BAE6FD',
+                wrap: true
+              }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#0F172A',
+        paddingAll: '16px',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#0284C7',
+            action: {
+              type: 'uri',
+              label: '📱 เปิดดูสัญญา & ส่งสลิป',
+              uri: targetLiffUrl
+            }
+          }
+        ]
+      }
+    }
+  };
+}
+
 module.exports = {
   createReminderFlex,
   createSlipReceivedFlex,
   createDebtSummaryFlex,
   createWelcomeFlex,
   createPaymentStatusFlex,
-  createAdminDailySummaryFlex
+  createAdminDailySummaryFlex,
+  createNewContractFlex
 };

@@ -11,10 +11,17 @@ const LOCAL_CONFIG_PATH = path.join(__dirname, '../config/reminderSettings.json'
 
 const DEFAULT_SETTINGS = {
   enabled: true,
+  scheduleMode: 'COMBINED', // 'DAILY' | 'MONTHLY' | 'COMBINED'
   primaryTime: '08:00',
   secondaryTimeEnabled: false,
   secondaryTime: '18:00',
   timezone: 'Asia/Bangkok',
+  // กฎการแจ้งเตือนตามรอบเดือน / วันที่ระบุ
+  monthlySchedule: {
+    enabled: false,
+    daysOfMonth: [1, 25], // วันที่ต้องการเตือนในแต่ละเดือน เช่น [1, 5, 25]
+    lastDayOfMonth: true   // เตือนวันสิ้นเดือน
+  },
   rules: {
     remindBeforeEnabled: true,
     remindBeforeDays: 1, // เตือนล่วงหน้า 1 วัน
@@ -28,6 +35,7 @@ const DEFAULT_SETTINGS = {
     accountNumber: '123-4-56789-0',
     accountName: 'ชื่อบัญชีผู้รับโอน',
     promptPayNumber: '',
+    customHeader: 'แจ้งยอดรอบชำระเงินกู้',
     customFooter: 'เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ'
   },
   notifyAdminOnRun: true
@@ -54,6 +62,7 @@ async function getSettings() {
         cachedSettings = {
           ...DEFAULT_SETTINGS,
           ...gasData.reminderSettings,
+          monthlySchedule: { ...DEFAULT_SETTINGS.monthlySchedule, ...(gasData.reminderSettings.monthlySchedule || {}) },
           rules: { ...DEFAULT_SETTINGS.rules, ...(gasData.reminderSettings.rules || {}) },
           template: { ...DEFAULT_SETTINGS.template, ...(gasData.reminderSettings.template || {}) }
         };
@@ -73,6 +82,7 @@ async function getSettings() {
       cachedSettings = {
         ...DEFAULT_SETTINGS,
         ...parsed,
+        monthlySchedule: { ...DEFAULT_SETTINGS.monthlySchedule, ...(parsed.monthlySchedule || {}) },
         rules: { ...DEFAULT_SETTINGS.rules, ...(parsed.rules || {}) },
         template: { ...DEFAULT_SETTINGS.template, ...(parsed.template || {}) }
       };
@@ -95,6 +105,7 @@ async function saveSettings(newSettings) {
   const merged = {
     ...DEFAULT_SETTINGS,
     ...newSettings,
+    monthlySchedule: { ...DEFAULT_SETTINGS.monthlySchedule, ...(newSettings.monthlySchedule || {}) },
     rules: { ...DEFAULT_SETTINGS.rules, ...(newSettings.rules || {}) },
     template: { ...DEFAULT_SETTINGS.template, ...(newSettings.template || {}) }
   };

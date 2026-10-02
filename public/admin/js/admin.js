@@ -1,28 +1,49 @@
-// Admin Portal JavaScript Controller (v4.0 - LINE User ID Access Control)
+/**
+ * Admin Portal Controller (PC Dashboard & Automation Engine)
+ * Fully supports Desktop PC layout, New Contract Wizard, and Flexible Reminder Engine
+ */
+
 const LIFF_ID = '2011816015-RfpKwHVZ';
 let currentAdminUser = null;
+let allContracts = [];
+let allDebtors = [];
+let allSlips = [];
+let allAdminsList = [];
+let selectedMonthlyDays = [];
 
-// Auth Overlay Elements
+// ==============================================================================
+// 1. DOM Elements
+// ==============================================================================
+// Auth Overlay
 const adminAuthOverlay = document.getElementById('adminAuthOverlay');
 const authCheckingState = document.getElementById('authCheckingState');
 const authLoginState = document.getElementById('authLoginState');
 const authDeniedState = document.getElementById('authDeniedState');
-const authSetupState = document.getElementById('authSetupState');
 const btnAdminLoginLine = document.getElementById('btnAdminLoginLine');
+const btnLocalAdminLogin = document.getElementById('btnLocalAdminLogin');
+const inputLocalAdminUserId = document.getElementById('inputLocalAdminUserId');
+const btnQuickAdminLogin = document.getElementById('btnQuickAdminLogin');
 const btnSwitchAccount = document.getElementById('btnSwitchAccount');
-const btnProceedSetup = document.getElementById('btnProceedSetup');
 const deniedDisplayName = document.getElementById('deniedDisplayName');
 const deniedUserId = document.getElementById('deniedUserId');
-const btnCopyDeniedId = document.getElementById('btnCopyDeniedId');
-const setupDisplayName = document.getElementById('setupDisplayName');
-const setupUserId = document.getElementById('setupUserId');
-const btnCopySetupId = document.getElementById('btnCopySetupId');
-const adminSubtitle = document.getElementById('adminSubtitle');
-const btnAdminLogout = document.getElementById('btnAdminLogout');
 
-// Nav & Views Elements
-const navItems = document.querySelectorAll('.nav-item');
+// Sidebar & Topbar
+const adminSidebar = document.getElementById('adminSidebar');
+const btnToggleSidebar = document.getElementById('btnToggleSidebar');
+const topbarCurrentViewTitle = document.getElementById('topbarCurrentViewTitle');
+const sidebarAdminName = document.getElementById('sidebarAdminName');
+const sidebarAdminId = document.getElementById('sidebarAdminId');
+const sidebarAvatar = document.getElementById('sidebarAvatar');
+const btnAdminLogout = document.getElementById('btnAdminLogout');
+const sidebarNavItems = document.querySelectorAll('.sidebar-nav-item');
 const subViews = document.querySelectorAll('.sub-view');
+const sidebarContractsBadge = document.getElementById('sidebarContractsBadge');
+const sidebarSlipsBadge = document.getElementById('sidebarSlipsBadge');
+
+// Toast
+const toast = document.getElementById('toast');
+const toastMessage = document.getElementById('toastMessage');
+const toastIcon = document.getElementById('toastIcon');
 
 // Stats Elements
 const statRemaining = document.getElementById('statRemaining');
@@ -31,35 +52,62 @@ const statDueToday = document.getElementById('statDueToday');
 const statTotalContracts = document.getElementById('statTotalContracts');
 const statTotalDebtors = document.getElementById('statTotalDebtors');
 const btnTriggerCronNow = document.getElementById('btnTriggerCronNow');
+const btnTopTriggerCron = document.getElementById('btnTopTriggerCron');
+
+// New Contract Wizard Elements
+const createContractWizardForm = document.getElementById('createContractWizardForm');
+const wizardDebtorSelect = document.getElementById('wizardDebtorSelect');
+const wizardUserId = document.getElementById('wizardUserId');
+const wizardDebtorName = document.getElementById('wizardDebtorName');
+const wizardPhone = document.getElementById('wizardPhone');
+const wizardIdCard = document.getElementById('wizardIdCard');
+const wizardTotalAmount = document.getElementById('wizardTotalAmount');
+const wizardInstallmentCount = document.getElementById('wizardInstallmentCount');
+const wizardInstallmentAmount = document.getElementById('wizardInstallmentAmount');
+const wizardCycleDays = document.getElementById('wizardCycleDays');
+const wizardDueDate = document.getElementById('wizardDueDate');
+const wizardSendPushCheck = document.getElementById('wizardSendPushCheck');
+const btnSubmitWizardContract = document.getElementById('btnSubmitWizardContract');
+const btnResetWizardForm = document.getElementById('btnResetWizardForm');
+
+// Preview Elements
+const prevTotalAmount = document.getElementById('prevTotalAmount');
+const prevDebtorName = document.getElementById('prevDebtorName');
+const prevInstallment = document.getElementById('prevInstallment');
+const prevDueDate = document.getElementById('prevDueDate');
+const prevCycle = document.getElementById('prevCycle');
+const prevSendPush = document.getElementById('prevSendPush');
 
 // Contracts Elements
-const createContractForm = document.getElementById('createContractForm');
-const contractsListContainer = document.getElementById('contractsListContainer');
-const contractsCount = document.getElementById('contractsCount');
+const contractsTableBody = document.getElementById('contractsTableBody');
+const contractSearchInput = document.getElementById('contractSearchInput');
+const contractFilterStatus = document.getElementById('contractFilterStatus');
+const btnRefreshContracts = document.getElementById('btnRefreshContracts');
 
 // Slips Elements
 const slipsContainer = document.getElementById('slipsContainer');
-const pendingSlipsBadge = document.getElementById('pendingSlipsBadge');
+const btnRefreshSlips = document.getElementById('btnRefreshSlips');
+
+// Debtors Elements
+const debtorsTableBody = document.getElementById('debtorsTableBody');
+const debtorSearchInput = document.getElementById('debtorSearchInput');
 
 // Reminders Elements
-const manualDebtIdInput = document.getElementById('manualDebtIdInput');
-const btnManualPushSingle = document.getElementById('btnManualPushSingle');
-const overviewReminderStatusBadge = document.getElementById('overviewReminderStatusBadge');
-const overviewReminderDesc = document.getElementById('overviewReminderDesc');
 const cfgEnabled = document.getElementById('cfgEnabled');
-const masterStatusBadge = document.getElementById('masterStatusBadge');
+const cfgScheduleMode = document.getElementById('cfgScheduleMode');
+const cfgMonthlyEnabled = document.getElementById('cfgMonthlyEnabled');
+const monthlyDaysGrid = document.getElementById('monthlyDaysGrid');
+const cfgMonthlyLastDay = document.getElementById('cfgMonthlyLastDay');
 const cfgPrimaryTime = document.getElementById('cfgPrimaryTime');
-const cfgSecondaryTimeEnabled = document.getElementById('cfgSecondaryTimeEnabled');
+const cfgSecondaryEnabled = document.getElementById('cfgSecondaryEnabled');
 const cfgSecondaryTime = document.getElementById('cfgSecondaryTime');
-const secondaryTimeWrapper = document.getElementById('secondaryTimeWrapper');
 const cfgRemindBeforeEnabled = document.getElementById('cfgRemindBeforeEnabled');
 const cfgRemindBeforeDays = document.getElementById('cfgRemindBeforeDays');
-const remindBeforeDaysWrapper = document.getElementById('remindBeforeDaysWrapper');
 const cfgRemindDueTodayEnabled = document.getElementById('cfgRemindDueTodayEnabled');
 const cfgRemindOverdueEnabled = document.getElementById('cfgRemindOverdueEnabled');
 const cfgOverdueFrequency = document.getElementById('cfgOverdueFrequency');
-const overdueFrequencyWrapper = document.getElementById('overdueFrequencyWrapper');
 const cfgTone = document.getElementById('cfgTone');
+const cfgCustomHeader = document.getElementById('cfgCustomHeader');
 const cfgBankName = document.getElementById('cfgBankName');
 const cfgAccountNumber = document.getElementById('cfgAccountNumber');
 const cfgAccountName = document.getElementById('cfgAccountName');
@@ -67,21 +115,14 @@ const cfgPromptPay = document.getElementById('cfgPromptPay');
 const cfgCustomFooter = document.getElementById('cfgCustomFooter');
 const cfgNotifyAdmin = document.getElementById('cfgNotifyAdmin');
 const btnSaveReminderSettings = document.getElementById('btnSaveReminderSettings');
+const btnSaveReminderSettingsTop = document.getElementById('btnSaveReminderSettingsTop');
 const btnTestPushToAdmin = document.getElementById('btnTestPushToAdmin');
-const btnTriggerCronFromSettings = document.getElementById('btnTriggerCronFromSettings');
 const btnRefreshLogs = document.getElementById('btnRefreshLogs');
 const reminderLogsContainer = document.getElementById('reminderLogsContainer');
 
-// Debtors Elements
-const debtorsCountBadge = document.getElementById('debtorsCountBadge');
-const debtorSearchInput = document.getElementById('debtorSearchInput');
-const debtorsListContainer = document.getElementById('debtorsListContainer');
-let allDebtors = [];
-
-// Admin Managers Elements
-const adminsCountBadge = document.getElementById('adminsCountBadge');
+// Admins Management Elements
+const adminsTableBody = document.getElementById('adminsTableBody');
 const adminSearchInput = document.getElementById('adminSearchInput');
-const adminsListContainer = document.getElementById('adminsListContainer');
 const btnOpenAddAdminModal = document.getElementById('btnOpenAddAdminModal');
 const modalAdminForm = document.getElementById('modalAdminForm');
 const btnCloseAdminModal = document.getElementById('btnCloseAdminModal');
@@ -92,20 +133,22 @@ const adminInputUserId = document.getElementById('adminInputUserId');
 const adminInputDisplayName = document.getElementById('adminInputDisplayName');
 const adminInputRole = document.getElementById('adminInputRole');
 const adminInputPhone = document.getElementById('adminInputPhone');
-const adminInputNote = document.getElementById('adminInputNote');
 const adminInputStatus = document.getElementById('adminInputStatus');
 const modalAdminTitle = document.getElementById('modalAdminTitle');
-const btnSelectFromDebtors = document.getElementById('btnSelectFromDebtors');
-let allAdminsList = [];
 
-// Toast
-const toast = document.getElementById('toast');
-const toastMessage = document.getElementById('toastMessage');
-const toastIcon = document.getElementById('toastIcon');
+// ==============================================================================
+// 2. Helpers & API Fetcher
+// ==============================================================================
+function showToast(msg, icon = 'ℹ️') {
+  if (!toast) return;
+  toastMessage.textContent = msg;
+  toastIcon.textContent = icon;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2800);
+}
 
-/**
- * ฟังก์ชันเรียก API สำหรับ Admin โดยส่ง x-line-userid ไปตรวจสอบสิทธิ์อัตโนมัติ
- */
 async function adminFetch(url, options = {}) {
   const headers = options.headers || {};
   if (currentAdminUser && currentAdminUser.userId) {
@@ -122,11 +165,16 @@ async function adminFetch(url, options = {}) {
   return res;
 }
 
-/**
- * 1. ตรวจสอบสิทธิ์การเข้าใช้งาน Admin ผ่าน LIFF, LINE User ID หรือ Local Session
- */
+function formatMoney(num) {
+  if (isNaN(num)) return '฿0.00';
+  return '฿' + Number(num).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ==============================================================================
+// 3. Authentication & Access Control
+// ==============================================================================
 async function initAdminAuth() {
-  // 1.1 ตรวจสอบว่ามี Local Admin Session ที่บันทึกไว้ใน Browser หรือไม่ (สำหรับโหมดทดสอบ / Localhost)
+  // 1. ตรวจสอบ Local Session
   const savedSession = localStorage.getItem('debt_admin_session');
   if (savedSession) {
     try {
@@ -147,7 +195,7 @@ async function initAdminAuth() {
     }
   }
 
-  // 1.2 ตรวจสอบผ่าน LINE LIFF SDK
+  // 2. ตรวจสอบผ่าน LINE LIFF SDK
   try {
     await liff.init({ liffId: LIFF_ID });
 
@@ -155,7 +203,6 @@ async function initAdminAuth() {
       const profile = await liff.getProfile();
       currentAdminUser = profile;
 
-      // ตรวจสอบสิทธิ์กับ Backend API
       const res = await fetch(`/api/admin/verify-access?userId=${encodeURIComponent(profile.userId)}`);
       const authData = await res.json();
 
@@ -163,7 +210,7 @@ async function initAdminAuth() {
         unlockAdminView(profile);
       } else {
         const reason = authData.adminCount === 0
-          ? 'ยังไม่มีรายชื่อผู้ดูแลระบบใน Google Sheet (แท็บ <code>admin</code> ยังว่างเปล่า)'
+          ? 'ยังไม่มีรายชื่อผู้ดูแลระบบใน Google Sheet (แท็บ admin ยังว่างเปล่า)'
           : 'บัญชี LINE ของคุณไม่มีสิทธิ์เข้าใช้งานในส่วนผู้ดูแลระบบ';
         showDeniedState(profile, reason);
       }
@@ -182,10 +229,15 @@ async function initAdminAuth() {
 
 function unlockAdminView(profile) {
   if (adminAuthOverlay) adminAuthOverlay.classList.add('hidden');
-  if (adminSubtitle) adminSubtitle.textContent = `แอดมิน: ${profile.displayName}`;
-  if (btnAdminLogout) btnAdminLogout.style.display = 'block';
+  if (sidebarAdminName) sidebarAdminName.textContent = profile.displayName || 'ผู้ดูแลระบบ';
+  if (sidebarAdminId) sidebarAdminId.textContent = profile.userId || '-';
+  if (sidebarAvatar && profile.pictureUrl) {
+    sidebarAvatar.innerHTML = `<img src="${profile.pictureUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+  }
+
   loadStats();
   loadReminderSettings();
+  initWizardDefaults();
 }
 
 function showLoginState() {
@@ -204,7 +256,6 @@ function showDeniedState(profile, reason) {
   if (authDeniedState) authDeniedState.style.display = 'block';
 }
 
-// ฟังก์ชันยืนยันสิทธิ์สำหรับ Local Admin Login
 async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลระบบ (Local Mode)') {
   if (!userId || !userId.trim()) {
     showToast('กรุณาระบุ LINE User ID ของแอดมิน', '⚠️');
@@ -220,7 +271,7 @@ async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลร
       currentAdminUser = userObj;
       localStorage.setItem('debt_admin_session', JSON.stringify(userObj));
       unlockAdminView(userObj);
-      showToast(`เข้าสู่ระบบสำเร็จในชื่อ: ${displayName}`, '✅');
+      showToast(`เข้าสู่ระบบสำเร็จ: ${displayName}`, '✅');
     } else {
       showToast('LINE User ID นี้ไม่มีสิทธิ์แอดมินในระบบ', '⛔');
       alert(`⛔ ปฏิเสธการเข้าถึง:\nLINE User ID: ${cleanId}\nไม่พบในรายการแอดมินที่ได้รับอนุญาตใน .env หรือ Google Sheet`);
@@ -230,7 +281,7 @@ async function loginAsLocalAdmin(userId, displayName = 'ผู้ดูแลร
   }
 }
 
-// ผูก Event Listeners สำหรับระบบความปลอดภัย
+// Event Listeners for Login & Logout
 if (btnAdminLoginLine) {
   btnAdminLoginLine.addEventListener('click', () => {
     if (window.location.protocol === 'http:') {
@@ -240,11 +291,6 @@ if (btnAdminLoginLine) {
     liff.login({ redirectUri: window.location.href });
   });
 }
-
-// ผูก Event ปุ่ม Local Login
-const btnLocalAdminLogin = document.getElementById('btnLocalAdminLogin');
-const inputLocalAdminUserId = document.getElementById('inputLocalAdminUserId');
-const btnQuickAdminLogin = document.getElementById('btnQuickAdminLogin');
 
 if (btnLocalAdminLogin && inputLocalAdminUserId) {
   btnLocalAdminLogin.addEventListener('click', () => {
@@ -284,34 +330,19 @@ if (btnSwitchAccount) {
   });
 }
 
-const btnRecheckAuth = document.getElementById('btnRecheckAuth');
-if (btnRecheckAuth) {
-  btnRecheckAuth.addEventListener('click', async () => {
-    btnRecheckAuth.textContent = 'กำลังตรวจสอบชีต...';
-    btnRecheckAuth.disabled = true;
-    if (authCheckingState) authCheckingState.style.display = 'block';
-    if (authDeniedState) authDeniedState.style.display = 'none';
-    await initAdminAuth();
-    btnRecheckAuth.textContent = '🔄 ตรวจสอบสิทธิ์อีกครั้ง';
-    btnRecheckAuth.disabled = false;
-  });
-}
+// ==============================================================================
+// 4. View Switching & Navigation (PC Layout)
+// ==============================================================================
+const viewTitleMap = {
+  'view-admin-overview': 'ภาพรวม & สถิติ',
+  'view-admin-new-contract': 'สร้างสัญญาหนี้ใหม่',
+  'view-admin-contracts': 'จัดการสัญญาหนี้',
+  'view-admin-slips': 'ตรวจสอบสลิปโอนเงิน',
+  'view-admin-debtors': 'สมุดรายชื่อลูกหนี้',
+  'view-admin-reminders': 'ระบบแจ้งเตือนอัตโนมัติ',
+  'view-admin-managers': 'จัดการทีมแอดมิน'
+};
 
-if (btnCopyDeniedId) {
-  btnCopyDeniedId.addEventListener('click', () => {
-    copyText(currentAdminUser?.userId, 'คัดลอก LINE User ID เรียบร้อยแล้ว');
-  });
-}
-
-if (btnCopySetupId) {
-  btnCopySetupId.addEventListener('click', () => {
-    copyText(currentAdminUser?.userId, 'คัดลอก LINE User ID เรียบร้อยแล้ว');
-  });
-}
-
-/**
- * 2. ควบคุมการสลับ Sub-views
- */
 function switchView(targetViewId) {
   subViews.forEach(view => {
     if (view.id === targetViewId) {
@@ -321,7 +352,7 @@ function switchView(targetViewId) {
     }
   });
 
-  navItems.forEach(item => {
+  sidebarNavItems.forEach(item => {
     if (item.getAttribute('data-target') === targetViewId) {
       item.classList.add('active');
     } else {
@@ -329,14 +360,23 @@ function switchView(targetViewId) {
     }
   });
 
+  if (topbarCurrentViewTitle) {
+    topbarCurrentViewTitle.textContent = viewTitleMap[targetViewId] || 'Admin Hub';
+  }
+
+  // Scroll viewport to top
   const viewport = document.querySelector('.views-viewport');
   if (viewport) viewport.scrollTop = 0;
 
-  // โหลดข้อมูลตามหน้า
+  // Close mobile sidebar if open
+  if (adminSidebar) adminSidebar.classList.remove('open');
+
+  // Trigger data loader for view
   if (targetViewId === 'view-admin-overview') loadStats();
-  if (targetViewId === 'view-admin-debtors') loadDebtors();
+  if (targetViewId === 'view-admin-new-contract') loadWizardDebtors();
   if (targetViewId === 'view-admin-contracts') loadContracts();
   if (targetViewId === 'view-admin-slips') loadSlips();
+  if (targetViewId === 'view-admin-debtors') loadDebtors();
   if (targetViewId === 'view-admin-reminders') {
     loadReminderSettings();
     loadReminderLogs();
@@ -346,1076 +386,918 @@ function switchView(targetViewId) {
 
 window.switchView = switchView;
 
-navItems.forEach(item => {
+sidebarNavItems.forEach(item => {
   item.addEventListener('click', () => {
     const target = item.getAttribute('data-target');
-    switchView(target);
+    if (target) switchView(target);
   });
 });
 
-function showToast(msg, icon = 'ℹ️') {
-  toastMessage.textContent = msg;
-  toastIcon.textContent = icon;
-  toast.classList.add('show');
-  setTimeout(() => {
-    toast.classList.remove('show');
-  }, 2500);
+if (btnToggleSidebar && adminSidebar) {
+  btnToggleSidebar.addEventListener('click', () => {
+    adminSidebar.classList.toggle('open');
+  });
 }
 
-/**
- * 3. โหลดสถิติภาพรวม (Overview)
- */
+// ==============================================================================
+// 5. Overview & Stats
+// ==============================================================================
 async function loadStats() {
   try {
     const res = await adminFetch('/api/admin/stats');
-    const json = await res.json();
+    const data = await res.json();
 
-    if (json.success && json.stats) {
-      const s = json.stats;
-      statRemaining.textContent = `฿${Number(s.totalRemaining).toLocaleString()}`;
-      statPendingSlips.textContent = `${s.pendingSlipsCount} ใบ`;
-      statDueToday.textContent = `${s.dueTodayCount} ราย`;
-      statTotalContracts.textContent = `${s.totalContracts}`;
-      if (statTotalDebtors) statTotalDebtors.textContent = `${s.totalDebtors || 0} คน`;
+    if (data.success && data.stats) {
+      const s = data.stats;
+      if (statRemaining) statRemaining.textContent = formatMoney(s.totalRemaining);
+      if (statPendingSlips) statPendingSlips.textContent = `${s.pendingSlipsCount} ใบ`;
+      if (statDueToday) statDueToday.textContent = `${s.dueTodayCount} ราย`;
+      if (statTotalContracts) statTotalContracts.textContent = `${s.activeDebtsCount} สัญญา`;
+      if (statTotalDebtors) statTotalDebtors.textContent = `${s.debtorsCount} คน`;
+
+      if (sidebarContractsBadge) sidebarContractsBadge.textContent = s.activeDebtsCount;
+      if (sidebarSlipsBadge) {
+        sidebarSlipsBadge.textContent = `${s.pendingSlipsCount} ใบ`;
+        sidebarSlipsBadge.style.display = s.pendingSlipsCount > 0 ? 'inline-block' : 'none';
+      }
     }
   } catch (err) {
     console.error('Error loading stats:', err);
   }
 }
 
-/**
- * 4. โหลดและแสดงรายการสัญญา (Contracts)
- */
-async function loadContracts() {
+// Topbar Trigger Cron & Overview Trigger
+if (btnTriggerCronNow) btnTriggerCronNow.addEventListener('click', triggerCronExecution);
+if (btnTopTriggerCron) btnTopTriggerCron.addEventListener('click', triggerCronExecution);
+
+async function triggerCronExecution() {
+  if (!confirm('ต้องการสั่งรันการตรวจสอบและยิงแจ้งเตือนวันนี้ทันทีใช่หรือไม่?')) return;
+  showToast('กำลังสั่งรันระบบแจ้งเตือน...', '⏳');
+
   try {
-    contractsListContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">กำลังโหลด...</div>';
-    const res = await adminFetch('/api/admin/contracts');
-    const json = await res.json();
+    const res = await adminFetch('/api/reminder/trigger-now', { method: 'POST' });
+    const data = await res.json();
 
-    if (json.success && json.contracts) {
-      const contracts = json.contracts;
-      contractsCount.textContent = `${contracts.length} รายการ`;
-
-      if (contracts.length === 0) {
-        contractsListContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">ยังไม่มีสัญญาในระบบ</div>';
-        return;
-      }
-
-      contractsListContainer.innerHTML = contracts.map(c => {
-        let statusClass = 'active';
-        if (c.debtStatus === 'OVERDUE') statusClass = 'overdue';
-        if (c.debtStatus === 'PAID') statusClass = 'paid';
-
-        return `
-          <div class="contract-card">
-            <div class="contract-top">
-              <span class="contract-id">${c.debtId}</span>
-              <span class="contract-status ${statusClass}">${c.debtStatus}</span>
-            </div>
-            <div class="contract-body">
-              <div>ผู้กู้: <strong>${c.debtorName}</strong> (${c.debtorPhone || '-'})</div>
-              <div>ยอดคงเหลือ: <strong style="color: var(--primary);">฿${Number(c.remainingBalance).toLocaleString()}</strong> / ยอดรวม ฿${Number(c.totalAmount).toLocaleString()}</div>
-              <div>ค่างวด: ฿${Number(c.installmentAmount).toLocaleString()} | กำหนดชำระ: <strong style="color: #EF4444;">${c.dueDate || '-'}</strong></div>
-            </div>
-            <div style="margin-top: 8px; display: flex; justify-content: flex-end; gap: 8px;">
-              <button onclick="sendSingleReminder('${c.debtId}')" style="background: none; border: 1px solid rgba(56, 189, 248, 0.4); color: #38BDF8; font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
-                🔔 ส่งแจ้งเตือน
-              </button>
-              <button onclick="deleteContract('${c.debtId}')" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
-                🗑️ ลบสัญญา
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
+    if (data.success) {
+      const sum = data.summary || {};
+      alert(`✅ สั่งยิงแจ้งเตือนเสร็จสมบูรณ์!\n\n📋 พบหนี้ที่เข้าเกณฑ์: ${sum.totalCandidates || 0} ราย\n✅ ส่งสำเร็จ: ${sum.sent || 0} ราย\n⏭️ ข้าม (ส่งไปแล้ววันนี้): ${sum.skipped || 0} ราย\n❌ ส่งไม่สำเร็จ: ${sum.failed || 0} ราย`);
+      loadStats();
+      loadReminderLogs();
+    } else {
+      showToast(data.message || 'เกิดข้อผิดพลาดในการยิงแจ้งเตือน', '❌');
     }
   } catch (err) {
-    console.error('Error loading contracts:', err);
-    contractsListContainer.innerHTML = '<div style="text-align: center; color: #EF4444; padding: 20px;">เกิดข้อผิดพลาดในการโหลดสัญญา</div>';
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
   }
 }
 
-/**
- * 5. สร้างสัญญาใหม่ (พร้อมระบบป้องกันการกดส่งซ้ำ)
- */
-let isSubmittingContract = false;
+// ==============================================================================
+// 6. Dedicated New Contract Creator (Wizard & Live Preview)
+// ==============================================================================
+function initWizardDefaults() {
+  const today = new Date();
+  today.setDate(today.getDate() + 30);
+  const defaultDueDate = today.toISOString().split('T')[0];
+  if (wizardDueDate) wizardDueDate.value = defaultDueDate;
 
-createContractForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
+  updateWizardPreview();
+}
 
-  if (isSubmittingContract) return;
-
-  const btnSaveContract = document.getElementById('btnSaveContract');
-  const originalBtnText = btnSaveContract ? btnSaveContract.textContent : 'บันทึกสัญญาใหม่';
-
-  const payload = {
-    userId: document.getElementById('newUserId').value.trim(),
-    debtorName: document.getElementById('newDebtorName').value.trim(),
-    phone: document.getElementById('newPhone').value.trim(),
-    totalAmount: document.getElementById('newTotalAmount').value,
-    installmentAmount: document.getElementById('newInstallmentAmount').value,
-    dueDate: document.getElementById('newDueDate').value,
-    cycleDays: document.getElementById('newCycleDays').value
-  };
-
-  isSubmittingContract = true;
-  if (btnSaveContract) {
-    btnSaveContract.disabled = true;
-    btnSaveContract.textContent = '⏳ กำลังบันทึกสัญญาใหม่...';
-  }
-
+async function loadWizardDebtors() {
   try {
-    const res = await adminFetch('/api/admin/contracts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const json = await res.json();
-    if (json.success) {
-      showToast(json.message || 'สร้างสัญญาใหม่สำเร็จ!', '✅');
-      createContractForm.reset();
-      loadContracts();
-      loadStats();
-    } else {
-      showToast(json.message || 'สร้างสัญญาไม่สำเร็จ', '❌');
+    const res = await adminFetch('/api/admin/debtors');
+    const data = await res.json();
+    if (data.success && data.debtors) {
+      allDebtors = data.debtors;
+      if (wizardDebtorSelect) {
+        wizardDebtorSelect.innerHTML = '<option value="">-- เลือกลูกหนี้จากรายชื่อ (หรือกรอกเองด้านล่าง) --</option>' +
+          allDebtors.map(d => `<option value="${d.userId}">${d.fullName || d.displayName} (${d.phone || d.userId.slice(0, 10)}...)</option>`).join('');
+      }
     }
   } catch (err) {
-    console.error('Error creating contract:', err);
-    showToast('เกิดข้อผิดพลาดในการสร้างสัญญา', '❌');
-  } finally {
-    isSubmittingContract = false;
-    if (btnSaveContract) {
-      btnSaveContract.disabled = false;
-      btnSaveContract.textContent = originalBtnText;
-    }
+    console.warn('Could not load debtors for wizard:', err.message);
   }
-});
+}
 
-/**
- * 5.1 ฟังก์ชันลบสัญญาหนี้
- */
-window.deleteContract = async function(debtId) {
-  if (!confirm(`ต้องการลบสัญญา ${debtId} ใช่หรือไม่?`)) return;
+if (wizardDebtorSelect) {
+  wizardDebtorSelect.addEventListener('change', () => {
+    const selectedId = wizardDebtorSelect.value;
+    if (!selectedId) return;
+
+    const found = allDebtors.find(d => d.userId === selectedId);
+    if (found) {
+      if (wizardUserId) wizardUserId.value = found.userId;
+      if (wizardDebtorName) wizardDebtorName.value = found.fullName || found.displayName || '';
+      if (wizardPhone) wizardPhone.value = found.phone || '';
+      if (wizardIdCard) wizardIdCard.value = found.idCardNumber || '';
+      updateWizardPreview();
+    }
+  });
+}
+
+// Smart Payment Calculator
+function handleCalculatorFromCount() {
+  const total = Number(wizardTotalAmount.value) || 0;
+  const count = Number(wizardInstallmentCount.value) || 0;
+
+  if (total > 0 && count > 0) {
+    const installment = Math.ceil(total / count);
+    wizardInstallmentAmount.value = installment;
+  }
+  updateWizardPreview();
+}
+
+function handleCalculatorFromInstallment() {
+  const total = Number(wizardTotalAmount.value) || 0;
+  const installment = Number(wizardInstallmentAmount.value) || 0;
+
+  if (total > 0 && installment > 0) {
+    const count = Math.ceil(total / installment);
+    wizardInstallmentCount.value = count;
+  }
+  updateWizardPreview();
+}
+
+if (wizardTotalAmount) {
+  wizardTotalAmount.addEventListener('input', handleCalculatorFromCount);
+}
+if (wizardInstallmentCount) {
+  wizardInstallmentCount.addEventListener('input', handleCalculatorFromCount);
+}
+if (wizardInstallmentAmount) {
+  wizardInstallmentAmount.addEventListener('input', handleCalculatorFromInstallment);
+}
+if (wizardDebtorName) {
+  wizardDebtorName.addEventListener('input', updateWizardPreview);
+}
+if (wizardDueDate) {
+  wizardDueDate.addEventListener('change', updateWizardPreview);
+}
+if (wizardCycleDays) {
+  wizardCycleDays.addEventListener('change', updateWizardPreview);
+}
+if (wizardSendPushCheck) {
+  wizardSendPushCheck.addEventListener('change', updateWizardPreview);
+}
+
+function updateWizardPreview() {
+  const total = Number(wizardTotalAmount?.value) || 0;
+  const installment = Number(wizardInstallmentAmount?.value) || 0;
+  const name = wizardDebtorName?.value || 'คุณลูกค้า';
+  const dueDate = wizardDueDate?.value || '-';
+  const cycle = wizardCycleDays?.value || '30';
+  const sendPush = wizardSendPushCheck?.checked;
+
+  if (prevTotalAmount) prevTotalAmount.textContent = formatMoney(total);
+  if (prevDebtorName) prevDebtorName.textContent = name;
+  if (prevInstallment) prevInstallment.textContent = formatMoney(installment);
+  if (prevDueDate) prevDueDate.textContent = dueDate;
+  if (prevCycle) prevCycle.textContent = `ทุกๆ ${cycle} วัน`;
+  if (prevSendPush) {
+    prevSendPush.textContent = sendPush ? '✅ ส่งทันที' : 'ไม่ส่ง';
+    prevSendPush.style.color = sendPush ? '#38BDF8' : '#94A3B8';
+  }
+}
+
+// Submit Wizard Form
+let isSubmittingWizard = false;
+if (createContractWizardForm) {
+  createContractWizardForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isSubmittingWizard) return;
+
+    const payload = {
+      userId: wizardUserId.value.trim(),
+      debtorName: wizardDebtorName.value.trim(),
+      phone: wizardPhone.value.trim(),
+      idCardNumber: wizardIdCard.value.trim(),
+      totalAmount: Number(wizardTotalAmount.value),
+      installmentAmount: Number(wizardInstallmentAmount.value),
+      dueDate: wizardDueDate.value,
+      cycleDays: Number(wizardCycleDays.value) || 30,
+      sendLineNotification: wizardSendPushCheck.checked
+    };
+
+    if (!payload.userId || !payload.debtorName || !payload.totalAmount || !payload.installmentAmount || !payload.dueDate) {
+      showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', '⚠️');
+      return;
+    }
+
+    isSubmittingWizard = true;
+    if (btnSubmitWizardContract) {
+      btnSubmitWizardContract.disabled = true;
+      btnSubmitWizardContract.textContent = '⏳ กำลังบันทึกสัญญาและส่งแจ้งเตือน...';
+    }
+
+    try {
+      const res = await adminFetch('/api/admin/contracts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message || 'สร้างสัญญาใหม่สำเร็จ!', '✅');
+        createContractWizardForm.reset();
+        initWizardDefaults();
+        loadContracts();
+        loadStats();
+        setTimeout(() => switchView('view-admin-contracts'), 800);
+      } else {
+        showToast(json.message || 'สร้างสัญญาไม่สำเร็จ', '❌');
+      }
+    } catch (err) {
+      console.error('Error creating contract:', err);
+      showToast('เกิดข้อผิดพลาดในการสร้างสัญญา: ' + err.message, '❌');
+    } finally {
+      isSubmittingWizard = false;
+      if (btnSubmitWizardContract) {
+        btnSubmitWizardContract.disabled = false;
+        btnSubmitWizardContract.textContent = '💾 บันทึกและเปิดสัญญาเงินกู้ใหม่';
+      }
+    }
+  });
+}
+
+if (btnResetWizardForm) {
+  btnResetWizardForm.addEventListener('click', () => {
+    createContractWizardForm.reset();
+    initWizardDefaults();
+    showToast('ล้างข้อมูลฟอร์มแล้ว', '🔄');
+  });
+}
+
+// Quick action to open contract wizard for specific debtor
+window.openContractForDebtor = function(userId, name, phone, idCard) {
+  switchView('view-admin-new-contract');
+  if (wizardUserId) wizardUserId.value = userId || '';
+  if (wizardDebtorName) wizardDebtorName.value = name || '';
+  if (wizardPhone) wizardPhone.value = phone || '';
+  if (wizardIdCard) wizardIdCard.value = idCard || '';
+  updateWizardPreview();
+  showToast(`เลือกข้อมูลคุณ ${name} เรียบร้อยแล้ว`, '👤');
+};
+
+// ==============================================================================
+// 7. Contracts Directory (Data Table)
+// ==============================================================================
+async function loadContracts() {
+  if (!contractsTableBody) return;
+  contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดข้อมูลสัญญา...</td></tr>';
 
   try {
-    const res = await adminFetch(`/api/admin/contracts/${encodeURIComponent(debtId)}`, {
-      method: 'DELETE'
-    });
-    const json = await res.json();
-    if (json.success) {
-      showToast(json.message || 'ลบสัญญาเรียบร้อยแล้ว', '🗑️');
+    const res = await adminFetch('/api/admin/contracts');
+    const data = await res.json();
+
+    if (data.success && data.contracts) {
+      allContracts = data.contracts;
+      renderContractsTable();
+    }
+  } catch (err) {
+    console.error('Error loading contracts:', err);
+    contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #EF4444; padding: 20px;">เกิดข้อผิดพลาดในการโหลดสัญญา</td></tr>';
+  }
+}
+
+function renderContractsTable() {
+  if (!contractsTableBody) return;
+
+  const query = (contractSearchInput?.value || '').toLowerCase().trim();
+  const filterStatus = contractFilterStatus?.value || 'ALL';
+
+  const filtered = allContracts.filter(c => {
+    const matchQuery = !query || 
+      (c.debtId || '').toLowerCase().includes(query) ||
+      (c.debtorName || '').toLowerCase().includes(query) ||
+      (c.userId || '').toLowerCase().includes(query);
+
+    const matchStatus = filterStatus === 'ALL' || c.debtStatus === filterStatus;
+    return matchQuery && matchStatus;
+  });
+
+  if (filtered.length === 0) {
+    contractsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบสัญญาหนี้ที่ตรงกับเงื่อนไข</td></tr>';
+    return;
+  }
+
+  contractsTableBody.innerHTML = filtered.map(c => {
+    let statusBadge = `<span class="badge-status active">กำลังผ่อน</span>`;
+    if (c.debtStatus === 'OVERDUE') statusBadge = `<span class="badge-status overdue">เกินกำหนด</span>`;
+    if (c.debtStatus === 'PAID') statusBadge = `<span class="badge-status paid">ชำระครบ</span>`;
+
+    const total = Number(c.totalAmount) || 0;
+    const remaining = Number(c.remainingBalance) || 0;
+    const paidPercent = total > 0 ? Math.min(100, Math.round(((total - remaining) / total) * 100)) : 0;
+
+    return `
+      <tr>
+        <td><strong style="color: #38BDF8; font-family: monospace;">${c.debtId}</strong></td>
+        <td>
+          <div style="font-weight: 600; color: #FFFFFF;">${c.debtorName || 'คุณลูกค้า'}</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: monospace;">${c.userId}</div>
+        </td>
+        <td><strong>${formatMoney(total)}</strong></td>
+        <td>
+          <div style="color: #38BDF8; font-weight: 600;">${formatMoney(remaining)}</div>
+          <div style="width: 100px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 4px; overflow: hidden;">
+            <div style="width: ${paidPercent}%; height: 100%; background: #10B981;"></div>
+          </div>
+          <span style="font-size: 10px; color: var(--text-muted);">${paidPercent}% ชำระแล้ว</span>
+        </td>
+        <td><span style="color: #10B981; font-weight: 600;">${formatMoney(c.installmentAmount)}</span></td>
+        <td>
+          <div style="font-weight: 600; color: #F59E0B;">${c.dueDate || '-'}</div>
+          <small style="font-size: 10px; color: var(--text-muted);">รอบ ${c.cycleDays || 30} วัน</small>
+        </td>
+        <td>${statusBadge}</td>
+        <td style="text-align: center; white-space: nowrap;">
+          <button class="btn-action-icon remind" onclick="sendSingleReminder('${c.debtId}')" title="ยิงแจ้งเตือนทันที">
+            🔔
+          </button>
+          <button class="btn-action-icon delete" onclick="deleteContract('${c.debtId}')" title="ลบสัญญา">
+            🗑️
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+if (contractSearchInput) contractSearchInput.addEventListener('input', renderContractsTable);
+if (contractFilterStatus) contractFilterStatus.addEventListener('change', renderContractsTable);
+if (btnRefreshContracts) btnRefreshContracts.addEventListener('click', loadContracts);
+
+window.deleteContract = async function(debtId) {
+  if (!confirm(`ต้องการลบสัญญา ${debtId} ใช่หรือไม่? ข้อมูลในระบบจะถูกนำออก`)) return;
+
+  try {
+    const res = await adminFetch(`/api/admin/contracts/${debtId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('ลบสัญญาสำเร็จ', '✅');
       loadContracts();
       loadStats();
     } else {
-      showToast(json.message || 'ลบสัญญาไม่สำเร็จ', '❌');
+      showToast(data.message || 'ลบสัญญาไม่สำเร็จ', '❌');
     }
   } catch (err) {
     showToast('เกิดข้อผิดพลาดในการลบสัญญา', '❌');
   }
 };
 
-/**
- * 6. โหลดและจัดการสลิป (Slips Approval Hub)
- */
-async function loadSlips() {
+window.sendSingleReminder = async function(debtId) {
+  if (!confirm(`ต้องการส่งข้อความแจ้งเตือนสัญญา ${debtId} ไปยัง LINE ลูกหนี้ทันทีใช่หรือไม่?`)) return;
+  showToast('กำลังส่งข้อความแจ้งเตือน...', '⏳');
+
   try {
-    slipsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">กำลังโหลดรายการสลิป...</div>';
+    const res = await adminFetch(`/api/admin/remind/${debtId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('ส่งแจ้งเตือนเข้า LINE เรียบร้อยแล้ว!', '✅');
+      loadReminderLogs();
+    } else {
+      showToast(data.message || 'ส่งแจ้งเตือนไม่สำเร็จ', '❌');
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+  }
+};
+
+// ==============================================================================
+// 8. Slip Verification Hub
+// ==============================================================================
+async function loadSlips() {
+  if (!slipsContainer) return;
+  slipsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">กำลังโหลดรายการสลิป...</div>';
+
+  try {
     const res = await adminFetch('/api/admin/slips');
-    const json = await res.json();
+    const data = await res.json();
 
-    if (json.success && json.slips) {
-      const slips = json.slips;
-      const pendingSlips = slips.filter(s => s.verificationStatus === 'PENDING');
-      pendingSlipsBadge.textContent = `รอตรวจ ${pendingSlips.length} ใบ`;
-
-      if (slips.length === 0) {
-        slipsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">ยังไม่มีสลิปส่งเข้ามาในระบบ</div>';
-        return;
-      }
-
-      slipsContainer.innerHTML = slips.map(s => {
-        const isPending = s.verificationStatus === 'PENDING';
-        return `
-          <div class="slip-card">
-            <div class="slip-header">
-              <div>
-                <div class="slip-debtor-name">${s.debtorName}</div>
-                <div class="slip-meta">รหัส: ${s.paymentId} | 📅 ${s.uploadedAt}</div>
-              </div>
-              <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: ${isPending ? 'rgba(245, 158, 11, 0.2)' : s.verificationStatus === 'VERIFIED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${isPending ? '#F59E0B' : s.verificationStatus === 'VERIFIED' ? '#10B981' : '#EF4444'};">
-                ${s.verificationStatus === 'VERIFIED' ? 'อนุมัติแล้ว' : s.verificationStatus === 'REJECTED' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}
-              </span>
-            </div>
-
-            ${s.slipViewUrl ? `
-              <div class="slip-preview-box" onclick="window.open('${s.slipViewUrl}', '_blank')">
-                <img src="${s.slipViewUrl}" alt="Slip" class="slip-preview-img" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'150\' viewBox=\'0 0 300 150\' fill=\'%231E293B\'><text x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%2394A3B8\' font-family=\'sans-serif\' font-size=\'14\'>คลิกเพื่อเปิดดูสลิปใน Google Drive</text></svg>';">
-              </div>
-            ` : ''}
-
-            <div style="font-size: 13px; margin: 8px 0; color: #FFFFFF;">
-              ยอดระบุ: <strong>฿${Number(s.amount || 0).toLocaleString()}</strong>
-            </div>
-
-            ${isPending ? `
-              <div class="slip-actions">
-                <button class="btn-approve" onclick="approveSlip('${s.paymentId}', ${s.amount || 0})">
-                  ✅ อนุมัติ & หักยอดหนี้
-                </button>
-                <button class="btn-reject" onclick="rejectSlip('${s.paymentId}')">
-                  ❌ ไม่อนุมัติ
-                </button>
-              </div>
-            ` : `
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-                บันทึก: ${s.adminNote || '-'}
-              </div>
-            `}
-          </div>
-        `;
-      }).join('');
+    if (data.success && data.slips) {
+      allSlips = data.slips;
+      renderSlips();
     }
   } catch (err) {
     console.error('Error loading slips:', err);
-    slipsContainer.innerHTML = '<div style="text-align: center; color: #EF4444; padding: 40px;">เกิดข้อผิดพลาดในการโหลดสลิป</div>';
+    slipsContainer.innerHTML = '<div style="text-align: center; color: #EF4444; padding: 20px; grid-column: 1 / -1;">เกิดข้อผิดพลาดในการโหลดสลิป</div>';
   }
 }
 
-/**
- * 7. อนุมัติสลิป
- */
-window.approveSlip = async function(paymentId, currentAmount) {
-  const confirmed = prompt(`ยืนยันยอดเงินที่จะตัดออกจากยอดหนี้ (บาท):`, currentAmount || '');
-  if (confirmed === null) return;
+function renderSlips() {
+  if (!slipsContainer) return;
 
-  const amount = Number(confirmed);
-  if (isNaN(amount) || amount <= 0) {
-    alert('กรุณากรอกยอดเงินที่ถูกต้องครับ');
+  if (allSlips.length === 0) {
+    slipsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">ไม่มีสลิปรอตรวจสอบในขณะนี้</div>';
     return;
   }
 
+  slipsContainer.innerHTML = allSlips.map(s => {
+    const isPending = !s.verificationStatus || s.verificationStatus === 'PENDING';
+    const statusPill = isPending
+      ? `<span class="badge-status due-today">รอตรวจสอบ</span>`
+      : (s.verificationStatus === 'APPROVED' ? `<span class="badge-status active">อนุมัติแล้ว</span>` : `<span class="badge-status overdue">ปฏิเสธ</span>`);
+
+    return `
+      <div class="slip-card">
+        <div class="slip-header">
+          <div>
+            <div class="slip-debtor-name">${s.debtorName || 'คุณลูกค้า'}</div>
+            <div class="slip-meta">สัญญา: <strong>${s.debtId || '-'}</strong> | รหัส: ${s.paymentId}</div>
+            <div class="slip-meta">ส่งเมื่อ: ${s.uploadedAt || '-'}</div>
+          </div>
+          <div>${statusPill}</div>
+        </div>
+
+        <div class="slip-preview-box" onclick="window.open('${s.slipViewUrl}', '_blank')">
+          <img src="${s.slipViewUrl}" class="slip-preview-img" alt="สลิปโอนเงิน" onerror="this.src='https://via.placeholder.com/300x200?text=Slip+Image'">
+        </div>
+
+        <div style="font-size: 13px; margin-bottom: 12px; display: flex; justify-content: space-between;">
+          <span style="color: var(--text-muted);">ยอดเงินที่ระบุ:</span>
+          <strong style="color: #10B981; font-size: 15px;">${formatMoney(s.amount)}</strong>
+        </div>
+
+        ${isPending ? `
+          <div class="slip-actions">
+            <button class="btn-slip-approve" onclick="approveSlip('${s.paymentId}', ${s.amount})">
+              ✅ อนุมัติ & หักลดยอด
+            </button>
+            <button class="btn-slip-reject" onclick="rejectSlip('${s.paymentId}')">
+              ❌ ปฏิเสธสลิป
+            </button>
+          </div>
+        ` : `
+          <div style="font-size: 12px; color: var(--text-muted); text-align: center; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+            บันทึกผลแล้ว: ${s.adminNote || s.verificationStatus}
+          </div>
+        `}
+      </div>
+    `;
+  }).join('');
+}
+
+if (btnRefreshSlips) btnRefreshSlips.addEventListener('click', loadSlips);
+
+window.approveSlip = async function(paymentId, amount) {
+  const confirmed = prompt(`กรุณายืนยันยอดเงินที่อนุมัติ (บาท):`, amount || '');
+  if (confirmed === null) return;
+
+  const numAmount = parseFloat(confirmed);
+  if (isNaN(numAmount) || numAmount <= 0) {
+    alert('กรุณาระบุจำนวนเงินที่ถูกต้อง');
+    return;
+  }
+
+  showToast('กำลังอนุมัติสลิปและปรับยอดหนี้...', '⏳');
   try {
     const res = await adminFetch('/api/admin/slips/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentId, confirmedAmount: amount })
+      body: JSON.stringify({ paymentId, confirmedAmount: numAmount })
     });
-    const json = await res.json();
-    if (json.success) {
-      showToast('อนุมัติสลิปและปรับลดยอดหนี้แล้ว!', '✅');
+    const data = await res.json();
+    if (data.success) {
+      showToast('อนุมัติสลิปและส่งข้อความแจ้งลูกหนี้สำเร็จ!', '✅');
       loadSlips();
       loadStats();
     } else {
-      showToast(json.message || 'อนุมัติไม่สำเร็จ', '❌');
+      showToast(data.message || 'อนุมัติไม่สำเร็จ', '❌');
     }
   } catch (err) {
-    console.error('Error approving slip:', err);
-    showToast('เกิดข้อผิดพลาด', '❌');
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
   }
 };
 
-/**
- * 8. ปฏิเสธสลิป
- */
 window.rejectSlip = async function(paymentId) {
-  const reason = prompt('ระบุเหตุผลที่ปฏิเสธสลิป:', 'สลิปไม่ถูกต้องหรือยอดเงินไม่ตรง');
+  const reason = prompt('กรุณาระบุเหตุผลในการปฏิเสธสลิป (จะส่งแจ้งลูกหนี้ทาง LINE):', 'สลิปไม่ถูกต้อง หรือยอดเงินไม่ตรง');
   if (reason === null) return;
 
+  showToast('กำลังปฏิเสธสลิป...', '⏳');
   try {
     const res = await adminFetch('/api/admin/slips/reject', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId, reason })
     });
-    const json = await res.json();
-    if (json.success) {
-      showToast('ปฏิเสธสลิปเรียบร้อยแล้ว', 'ℹ️');
+    const data = await res.json();
+    if (data.success) {
+      showToast('ปฏิเสธสลิปและส่งข้อความแจ้งเตือนแล้ว', '✅');
       loadSlips();
-      loadStats();
     } else {
-      showToast(json.message || 'ปฏิเสธไม่สำเร็จ', '❌');
+      showToast(data.message || 'ปฏิเสธไม่สำเร็จ', '❌');
     }
   } catch (err) {
-    console.error('Error rejecting slip:', err);
-    showToast('เกิดข้อผิดพลาด', '❌');
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
   }
 };
 
-/**
- * 9. ระบบจัดการการตั้งค่าแจ้งเตือนอัตโนมัติแบบละเอียด (Detailed Reminder Settings)
- */
+// ==============================================================================
+// 9. Debtors Directory (Data Table)
+// ==============================================================================
+async function loadDebtors() {
+  if (!debtorsTableBody) return;
+  debtorsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายชื่อลูกหนี้...</td></tr>';
+
+  try {
+    const res = await adminFetch('/api/admin/debtors');
+    const data = await res.json();
+
+    if (data.success && data.debtors) {
+      allDebtors = data.debtors;
+      renderDebtorsTable();
+    }
+  } catch (err) {
+    console.error('Error loading debtors:', err);
+    debtorsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #EF4444; padding: 20px;">เกิดข้อผิดพลาดในการโหลดลูกหนี้</td></tr>';
+  }
+}
+
+function renderDebtorsTable() {
+  if (!debtorsTableBody) return;
+
+  const query = (debtorSearchInput?.value || '').toLowerCase().trim();
+  const filtered = allDebtors.filter(d => {
+    return !query ||
+      (d.fullName || '').toLowerCase().includes(query) ||
+      (d.displayName || '').toLowerCase().includes(query) ||
+      (d.userId || '').toLowerCase().includes(query) ||
+      (d.phone || '').includes(query);
+  });
+
+  if (filtered.length === 0) {
+    debtorsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบรายชื่อลูกหนี้</td></tr>';
+    return;
+  }
+
+  debtorsTableBody.innerHTML = filtered.map(d => {
+    return `
+      <tr>
+        <td>
+          <div style="font-weight: 600; color: #FFFFFF;">${d.fullName || d.displayName || 'คุณลูกค้า'}</div>
+          <small style="font-size: 11px; color: var(--text-muted);">${d.displayName || '-'}</small>
+        </td>
+        <td><span style="font-family: monospace; color: #38BDF8; font-size: 12px;">${d.userId}</span></td>
+        <td>${d.phone || '-'}</td>
+        <td style="font-size: 12px; color: var(--text-muted);">${d.registeredAt || '-'}</td>
+        <td><span class="badge-status active">${d.status || 'ACTIVE'}</span></td>
+        <td style="text-align: center;">
+          <button class="topbar-btn primary" style="padding: 5px 12px; font-size: 12px;" onclick="openContractForDebtor('${d.userId}', '${d.fullName || d.displayName || ''}', '${d.phone || ''}', '${d.idCardNumber || ''}')">
+            ➕ เปิดสัญญา
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+if (debtorSearchInput) debtorSearchInput.addEventListener('input', renderDebtorsTable);
+
+// ==============================================================================
+// 10. Automated Reminder Engine (Settings & Logs)
+// ==============================================================================
+function initMonthlyDaysChips() {
+  if (!monthlyDaysGrid) return;
+  monthlyDaysGrid.innerHTML = '';
+
+  for (let i = 1; i <= 31; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'day-chip' + (selectedMonthlyDays.includes(i) ? ' selected' : '');
+    chip.textContent = i;
+    chip.addEventListener('click', () => {
+      if (selectedMonthlyDays.includes(i)) {
+        selectedMonthlyDays = selectedMonthlyDays.filter(d => d !== i);
+        chip.classList.remove('selected');
+      } else {
+        selectedMonthlyDays.push(i);
+        selectedMonthlyDays.sort((a, b) => a - b);
+        chip.classList.add('selected');
+      }
+    });
+    monthlyDaysGrid.appendChild(chip);
+  }
+}
+
 async function loadReminderSettings() {
+  initMonthlyDaysChips();
+
   try {
     const res = await adminFetch('/api/admin/reminder/settings');
-    const json = await res.json();
-    if (!json.success || !json.settings) return;
+    const data = await res.json();
 
-    const s = json.settings;
+    if (data.success && data.settings) {
+      const s = data.settings;
 
-    // Master Switch
-    if (cfgEnabled) {
-      cfgEnabled.checked = s.enabled !== false;
-      updateMasterStatusDisplay(s.enabled !== false);
-    }
+      if (cfgEnabled) cfgEnabled.checked = Boolean(s.enabled);
+      if (cfgScheduleMode) cfgScheduleMode.value = s.scheduleMode || 'COMBINED';
+      if (cfgPrimaryTime) cfgPrimaryTime.value = s.primaryTime || '08:00';
+      if (cfgSecondaryEnabled) cfgSecondaryEnabled.checked = Boolean(s.secondaryTimeEnabled);
+      if (cfgSecondaryTime) cfgSecondaryTime.value = s.secondaryTime || '18:00';
 
-    // Schedule
-    if (cfgPrimaryTime) cfgPrimaryTime.value = s.primaryTime || '08:00';
-    if (cfgSecondaryTimeEnabled) {
-      cfgSecondaryTimeEnabled.checked = !!s.secondaryTimeEnabled;
-      if (secondaryTimeWrapper) {
-        secondaryTimeWrapper.style.display = s.secondaryTimeEnabled ? 'block' : 'none';
+      // Monthly Schedule
+      const m = s.monthlySchedule || {};
+      if (cfgMonthlyEnabled) cfgMonthlyEnabled.checked = Boolean(m.enabled);
+      if (cfgMonthlyLastDay) cfgMonthlyLastDay.checked = Boolean(m.lastDayOfMonth);
+      selectedMonthlyDays = (m.daysOfMonth || [1, 25]).map(Number);
+      initMonthlyDaysChips();
+
+      // Due Date Rules
+      const r = s.rules || {};
+      if (cfgRemindBeforeEnabled) cfgRemindBeforeEnabled.checked = Boolean(r.remindBeforeEnabled);
+      if (cfgRemindBeforeDays) cfgRemindBeforeDays.value = r.remindBeforeDays || 1;
+      if (cfgRemindDueTodayEnabled) cfgRemindDueTodayEnabled.checked = Boolean(r.remindDueTodayEnabled);
+      if (cfgRemindOverdueEnabled) cfgRemindOverdueEnabled.checked = Boolean(r.remindOverdueEnabled);
+      if (cfgOverdueFrequency) cfgOverdueFrequency.value = r.overdueFrequency || 'DAILY';
+
+      // Template & Bank
+      const t = s.template || {};
+      if (cfgTone) cfgTone.value = t.tone || 'POLITE';
+      if (cfgCustomHeader) cfgCustomHeader.value = t.customHeader || '';
+      if (cfgBankName) cfgBankName.value = t.bankName || '';
+      if (cfgAccountNumber) cfgAccountNumber.value = t.accountNumber || '';
+      if (cfgAccountName) cfgAccountName.value = t.accountName || '';
+      if (cfgPromptPay) cfgPromptPay.value = t.promptPayNumber || '';
+      if (cfgCustomFooter) cfgCustomFooter.value = t.customFooter || '';
+      if (cfgNotifyAdmin) cfgNotifyAdmin.checked = Boolean(s.notifyAdminOnRun);
+
+      // Update overview badge
+      const overviewBadge = document.getElementById('overviewReminderStatusBadge');
+      if (overviewBadge) {
+        overviewBadge.textContent = s.enabled ? `เปิดใช้งาน (${s.primaryTime || '08:00'} น.)` : 'ปิดการทำงาน';
+        overviewBadge.className = s.enabled ? 'badge-status active' : 'badge-status overdue';
       }
     }
-    if (cfgSecondaryTime) cfgSecondaryTime.value = s.secondaryTime || '18:00';
-
-    // Rules
-    const r = s.rules || {};
-    if (cfgRemindBeforeEnabled) {
-      cfgRemindBeforeEnabled.checked = r.remindBeforeEnabled !== false;
-      if (remindBeforeDaysWrapper) {
-        remindBeforeDaysWrapper.style.display = r.remindBeforeEnabled !== false ? 'flex' : 'none';
-      }
-    }
-    if (cfgRemindBeforeDays) cfgRemindBeforeDays.value = String(r.remindBeforeDays || 1);
-
-    if (cfgRemindDueTodayEnabled) {
-      cfgRemindDueTodayEnabled.checked = r.remindDueTodayEnabled !== false;
-    }
-
-    if (cfgRemindOverdueEnabled) {
-      cfgRemindOverdueEnabled.checked = r.remindOverdueEnabled !== false;
-      if (overdueFrequencyWrapper) {
-        overdueFrequencyWrapper.style.display = r.remindOverdueEnabled !== false ? 'flex' : 'none';
-      }
-    }
-    if (cfgOverdueFrequency) cfgOverdueFrequency.value = r.overdueFrequency || 'DAILY';
-
-    // Template
-    const tpl = s.template || {};
-    if (cfgTone) cfgTone.value = tpl.tone || 'POLITE';
-    if (cfgBankName) cfgBankName.value = tpl.bankName || '';
-    if (cfgAccountNumber) cfgAccountNumber.value = tpl.accountNumber || '';
-    if (cfgAccountName) cfgAccountName.value = tpl.accountName || '';
-    if (cfgPromptPay) cfgPromptPay.value = tpl.promptPayNumber || '';
-    if (cfgCustomFooter) cfgCustomFooter.value = tpl.customFooter || '';
-
-    // Admin notify
-    if (cfgNotifyAdmin) {
-      cfgNotifyAdmin.checked = s.notifyAdminOnRun !== false;
-    }
-
-    // Update Overview Card
-    updateOverviewReminderCard(s);
-
   } catch (err) {
     console.error('Error loading reminder settings:', err);
   }
 }
 
-function updateMasterStatusDisplay(enabled) {
-  if (!masterStatusBadge) return;
-  if (enabled) {
-    masterStatusBadge.textContent = '🟢 สถานะ: กำลังเปิดทำงานอัตโนมัติ';
-    masterStatusBadge.style.background = 'rgba(16, 185, 129, 0.15)';
-    masterStatusBadge.style.color = '#10B981';
-  } else {
-    masterStatusBadge.textContent = '🔴 สถานะ: ปิดการทำงานชั่วคราว';
-    masterStatusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
-    masterStatusBadge.style.color = '#EF4444';
-  }
-}
+async function saveReminderSettings() {
+  const payload = {
+    enabled: cfgEnabled?.checked,
+    scheduleMode: cfgScheduleMode?.value || 'COMBINED',
+    primaryTime: cfgPrimaryTime?.value || '08:00',
+    secondaryTimeEnabled: cfgSecondaryEnabled?.checked,
+    secondaryTime: cfgSecondaryTime?.value || '18:00',
+    monthlySchedule: {
+      enabled: cfgMonthlyEnabled?.checked,
+      daysOfMonth: selectedMonthlyDays,
+      lastDayOfMonth: cfgMonthlyLastDay?.checked
+    },
+    rules: {
+      remindBeforeEnabled: cfgRemindBeforeEnabled?.checked,
+      remindBeforeDays: Number(cfgRemindBeforeDays?.value) || 1,
+      remindDueTodayEnabled: cfgRemindDueTodayEnabled?.checked,
+      remindOverdueEnabled: cfgRemindOverdueEnabled?.checked,
+      overdueFrequency: cfgOverdueFrequency?.value || 'DAILY'
+    },
+    template: {
+      tone: cfgTone?.value || 'POLITE',
+      customHeader: cfgCustomHeader?.value || '',
+      bankName: cfgBankName?.value || '',
+      accountNumber: cfgAccountNumber?.value || '',
+      accountName: cfgAccountName?.value || '',
+      promptPayNumber: cfgPromptPay?.value || '',
+      customFooter: cfgCustomFooter?.value || ''
+    },
+    notifyAdminOnRun: cfgNotifyAdmin?.checked
+  };
 
-function updateOverviewReminderCard(s) {
-  if (overviewReminderStatusBadge) {
-    if (s.enabled !== false) {
-      overviewReminderStatusBadge.textContent = `เปิดใช้งาน (${s.primaryTime || '08:00'} น.)`;
-      overviewReminderStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-      overviewReminderStatusBadge.style.color = '#10B981';
+  showToast('กำลังบันทึกการตั้งค่า...', '⏳');
+
+  try {
+    const res = await adminFetch('/api/admin/reminder/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('บันทึกการตั้งค่าระบบแจ้งเตือนเรียบร้อยแล้ว!', '✅');
+      loadReminderSettings();
     } else {
-      overviewReminderStatusBadge.textContent = 'ปิดใช้งาน';
-      overviewReminderStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-      overviewReminderStatusBadge.style.color = '#EF4444';
+      showToast(data.message || 'บันทึกไม่สำเร็จ', '❌');
     }
-  }
-
-  if (overviewReminderDesc) {
-    const rules = [];
-    if (s.rules?.remindBeforeEnabled) rules.push(`ก่อนกำหนด ${s.rules.remindBeforeDays || 1} วัน`);
-    if (s.rules?.remindDueTodayEnabled) rules.push('วันครบกำหนด');
-    if (s.rules?.remindOverdueEnabled) rules.push('ค้างชำระ');
-    const rulesStr = rules.length ? rules.join(', ') : 'ไม่มีเงื่อนไขที่เปิด';
-    overviewReminderDesc.textContent = `ระบบทำงานอัตโนมัติทุกเช้า ${s.primaryTime || '08:00'} น. (${rulesStr})`;
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาดในการบันทึก: ' + err.message, '❌');
   }
 }
 
-// UI Interactive Event Listeners
-if (cfgEnabled) {
-  cfgEnabled.addEventListener('change', () => {
-    updateMasterStatusDisplay(cfgEnabled.checked);
-  });
-}
+if (btnSaveReminderSettings) btnSaveReminderSettings.addEventListener('click', saveReminderSettings);
+if (btnSaveReminderSettingsTop) btnSaveReminderSettingsTop.addEventListener('click', saveReminderSettings);
 
-if (cfgSecondaryTimeEnabled) {
-  cfgSecondaryTimeEnabled.addEventListener('change', () => {
-    if (secondaryTimeWrapper) {
-      secondaryTimeWrapper.style.display = cfgSecondaryTimeEnabled.checked ? 'block' : 'none';
-    }
-  });
-}
-
-if (cfgRemindBeforeEnabled) {
-  cfgRemindBeforeEnabled.addEventListener('change', () => {
-    if (remindBeforeDaysWrapper) {
-      remindBeforeDaysWrapper.style.display = cfgRemindBeforeEnabled.checked ? 'flex' : 'none';
-    }
-  });
-}
-
-if (cfgRemindOverdueEnabled) {
-  cfgRemindOverdueEnabled.addEventListener('change', () => {
-    if (overdueFrequencyWrapper) {
-      overdueFrequencyWrapper.style.display = cfgRemindOverdueEnabled.checked ? 'flex' : 'none';
-    }
-  });
-}
-
-// Save Settings Handler
-if (btnSaveReminderSettings) {
-  btnSaveReminderSettings.addEventListener('click', async () => {
-    btnSaveReminderSettings.disabled = true;
-    const originalText = btnSaveReminderSettings.textContent;
-    btnSaveReminderSettings.textContent = '⏳ กำลังบันทึกการตั้งค่า...';
-
-    const payload = {
-      enabled: cfgEnabled ? cfgEnabled.checked : true,
-      primaryTime: cfgPrimaryTime ? cfgPrimaryTime.value : '08:00',
-      secondaryTimeEnabled: cfgSecondaryTimeEnabled ? cfgSecondaryTimeEnabled.checked : false,
-      secondaryTime: cfgSecondaryTime ? cfgSecondaryTime.value : '18:00',
-      timezone: 'Asia/Bangkok',
-      rules: {
-        remindBeforeEnabled: cfgRemindBeforeEnabled ? cfgRemindBeforeEnabled.checked : true,
-        remindBeforeDays: cfgRemindBeforeDays ? parseInt(cfgRemindBeforeDays.value) : 1,
-        remindDueTodayEnabled: cfgRemindDueTodayEnabled ? cfgRemindDueTodayEnabled.checked : true,
-        remindOverdueEnabled: cfgRemindOverdueEnabled ? cfgRemindOverdueEnabled.checked : true,
-        overdueFrequency: cfgOverdueFrequency ? cfgOverdueFrequency.value : 'DAILY'
-      },
-      template: {
-        tone: cfgTone ? cfgTone.value : 'POLITE',
-        bankName: cfgBankName ? cfgBankName.value.trim() : '',
-        accountNumber: cfgAccountNumber ? cfgAccountNumber.value.trim() : '',
-        accountName: cfgAccountName ? cfgAccountName.value.trim() : '',
-        promptPayNumber: cfgPromptPay ? cfgPromptPay.value.trim() : '',
-        customFooter: cfgCustomFooter ? cfgCustomFooter.value.trim() : ''
-      },
-      notifyAdminOnRun: cfgNotifyAdmin ? cfgNotifyAdmin.checked : true
-    };
-
-    try {
-      const res = await adminFetch('/api/admin/reminder/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const json = await res.json();
-      if (json.success) {
-        showToast(json.message || 'บันทึกการตั้งค่าเรียบร้อยแล้ว', '💾');
-        updateOverviewReminderCard(payload);
-      } else {
-        showToast(json.message || 'เกิดข้อผิดพลาดในการบันทึก', '❌');
-      }
-    } catch (err) {
-      showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกการตั้งค่าได้', '❌');
-    } finally {
-      btnSaveReminderSettings.disabled = false;
-      btnSaveReminderSettings.textContent = originalText;
-    }
-  });
-}
-
-// Test Push Handler
 if (btnTestPushToAdmin) {
   btnTestPushToAdmin.addEventListener('click', async () => {
-    btnTestPushToAdmin.disabled = true;
-    const originalText = btnTestPushToAdmin.textContent;
-    btnTestPushToAdmin.textContent = '⏳ กำลังส่งเข้า LINE...';
-
-    const testPayload = {
-      adminUserId: currentAdminUser?.userId,
-      tone: cfgTone ? cfgTone.value : 'POLITE',
-      reminderType: 'DUE_TODAY',
-      template: {
-        tone: cfgTone ? cfgTone.value : 'POLITE',
-        bankName: cfgBankName ? cfgBankName.value.trim() : '',
-        accountNumber: cfgAccountNumber ? cfgAccountNumber.value.trim() : '',
-        accountName: cfgAccountName ? cfgAccountName.value.trim() : '',
-        promptPayNumber: cfgPromptPay ? cfgPromptPay.value.trim() : '',
-        customFooter: cfgCustomFooter ? cfgCustomFooter.value.trim() : ''
-      }
-    };
-
+    showToast('กำลังส่งตัวอย่าง Flex Message เข้า LINE...', '⏳');
     try {
       const res = await adminFetch('/api/admin/reminder/test-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testPayload)
+        body: JSON.stringify({
+          template: {
+            bankName: cfgBankName?.value,
+            accountNumber: cfgAccountNumber?.value,
+            accountName: cfgAccountName?.value,
+            promptPayNumber: cfgPromptPay?.value,
+            customHeader: cfgCustomHeader?.value,
+            customFooter: cfgCustomFooter?.value
+          },
+          tone: cfgTone?.value || 'POLITE',
+          reminderType: 'DUE_TODAY'
+        })
       });
-      const json = await res.json();
-      if (json.success) {
-        showToast('ส่งตัวอย่างเข้า LINE สำเร็จ 📲 ตรวจสอบที่แชทของคุณ', '✅');
+      const data = await res.json();
+      if (data.success) {
+        showToast('ส่งตัวอย่างเข้า LINE ของคุณแล้ว!', '📲');
       } else {
-        showToast(json.message || 'ส่งตัวอย่างไม่สำเร็จ', '❌');
+        showToast(data.message || 'ส่งตัวอย่างไม่สำเร็จ', '❌');
       }
     } catch (err) {
-      showToast('เกิดข้อผิดพลาดในการส่งตัวอย่าง', '❌');
-    } finally {
-      btnTestPushToAdmin.disabled = false;
-      btnTestPushToAdmin.textContent = originalText;
+      showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
     }
   });
 }
 
-// Shared Trigger Cron Now
-async function executeCronTrigger(btnEl) {
-  if (!confirm('ยืนยันสั่งสแกนและยิงแจ้งเตือนลูกหนี้ทุกคนที่เข้าเงื่อนไขในวันนี้ทันที ใช่หรือไม่?')) return;
-
-  const originalText = btnEl ? btnEl.textContent : '';
-  if (btnEl) {
-    btnEl.disabled = true;
-    btnEl.textContent = '⏳ กำลังประมวลผลและยิงข้อความ...';
-  }
-
-  try {
-    const res = await adminFetch('/api/reminder/trigger-now', { method: 'POST' });
-    const json = await res.json();
-
-    if (json.success) {
-      const s = json.summary;
-      showToast(`ยิงเตือนสำเร็จ ${s.sent} ราย (ข้าม ${s.skipped} ราย)`, '🚀');
-      loadReminderLogs();
-    } else {
-      showToast(json.message || 'เกิดข้อผิดพลาดในการยิงแจ้งเตือน', '❌');
-    }
-  } catch (err) {
-    showToast('ไม่สามารถเชื่อมต่อระบบแจ้งเตือนได้', '❌');
-  } finally {
-    if (btnEl) {
-      btnEl.disabled = false;
-      btnEl.textContent = originalText || '🚀 สั่งยิงแจ้งเตือนวันนี้ทันที (Manual Trigger)';
-    }
-  }
-}
-
-if (btnTriggerCronNow) {
-  btnTriggerCronNow.addEventListener('click', () => executeCronTrigger(btnTriggerCronNow));
-}
-
-if (btnTriggerCronFromSettings) {
-  btnTriggerCronFromSettings.addEventListener('click', () => executeCronTrigger(btnTriggerCronFromSettings));
-}
-
-// Load Reminder Logs
 async function loadReminderLogs() {
   if (!reminderLogsContainer) return;
-  reminderLogsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 14px; font-size: 12px;">⏳ กำลังโหลดประวัติ...</div>';
+  reminderLogsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 14px; font-size: 12px;">กำลังโหลดประวัติการแจ้งเตือน...</div>';
 
   try {
-    const res = await adminFetch('/api/admin/reminder/logs?limit=15');
-    const json = await res.json();
-    if (!json.success || !json.logs || json.logs.length === 0) {
-      reminderLogsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 12px;">ยังไม่มีประวัติการส่งแจ้งเตือนในระบบ</div>';
-      return;
-    }
+    const res = await adminFetch('/api/admin/reminder/logs');
+    const data = await res.json();
 
-    const typeLabels = {
-      'BEFORE_DUE': { text: 'ก่อนกำหนด', color: '#60A5FA' },
-      'DUE_TODAY': { text: 'ครบกำหนด', color: '#34D399' },
-      'OVERDUE': { text: 'ค้างชำระ', color: '#F87171' }
-    };
+    if (data.success && data.logs) {
+      const logs = data.logs;
+      if (logs.length === 0) {
+        reminderLogsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 14px; font-size: 12px;">ยังไม่มีประวัติการส่งแจ้งเตือน</div>';
+        return;
+      }
 
-    let html = '';
-    json.logs.forEach(item => {
-      const typeInfo = typeLabels[item.reminderType] || { text: item.reminderType || 'แจ้งเตือน', color: '#94A3B8' };
-      const isSuccess = (item.status || '').toUpperCase() === 'SENT';
-      const statusBadge = isSuccess
-        ? '<span style="color: #10B981; font-weight: 600; font-size: 11px;">✓ สำเร็จ</span>'
-        : '<span style="color: #EF4444; font-weight: 600; font-size: 11px;">✕ ไม่สำเร็จ</span>';
-
-      html += `
-        <div class="log-item">
-          <div style="flex: 1; min-width: 0; margin-right: 8px;">
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-              <span style="background: rgba(255,255,255,0.08); color: ${typeInfo.color}; padding: 1px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 600;">
-                ${typeInfo.text}
-              </span>
-              <strong style="color: #FFFFFF; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${item.debtorName || item.debtId || '-'}
-              </strong>
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted);">
-              สัญญา: ${item.debtId || '-'} | ${item.timestamp || '-'}
-            </div>
-          </div>
-          <div style="text-align: right; flex-shrink: 0;">
-            ${statusBadge}
-          </div>
-        </div>
-      `;
-    });
-
-    reminderLogsContainer.innerHTML = html;
-  } catch (err) {
-    reminderLogsContainer.innerHTML = '<div style="text-align: center; color: #EF4444; padding: 12px; font-size: 12px;">เกิดข้อผิดพลาดในการโหลดประวัติ</div>';
-  }
-}
-
-if (btnRefreshLogs) {
-  btnRefreshLogs.addEventListener('click', () => {
-    loadReminderLogs();
-    showToast('รีเฟรชประวัติการแจ้งเตือนแล้ว', '🔄');
-  });
-}
-
-/**
- * 10. ยิงแจ้งเตือนรายคน
- */
-window.sendSingleReminder = async function(debtId) {
-  if (!confirm(`ต้องการส่ง LINE แจ้งเตือนยอดหนี้สัญญา ${debtId} ใช่หรือไม่?`)) return;
-
-  try {
-    const res = await adminFetch(`/api/admin/remind/${encodeURIComponent(debtId)}`, { method: 'POST' });
-    const json = await res.json();
-    if (json.success) {
-      showToast(json.message || 'ส่งแจ้งเตือนเรียบร้อยแล้ว', '✅');
-      loadReminderLogs();
-    } else {
-      showToast(json.message || 'ส่งแจ้งเตือนไม่สำเร็จ', '❌');
-    }
-  } catch (err) {
-    showToast('เกิดข้อผิดพลาด', '❌');
-  }
-};
-
-btnManualPushSingle.addEventListener('click', () => {
-  const debtId = manualDebtIdInput.value.trim();
-  if (!debtId) {
-    showToast('กรุณาระบุรหัสสัญญา', '⚠️');
-    return;
-  }
-  window.sendSingleReminder(debtId);
-});
-
-/**
- * 11. จัดการรายชื่อลูกหนี้ (Debtors Management)
- */
-async function loadDebtors() {
-  if (!debtorsListContainer) return;
-  try {
-    debtorsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);"><div class="spinner"></div> กำลังโหลดรายชื่อลูกหนี้...</div>';
-    const res = await adminFetch('/api/admin/debtors');
-    const json = await res.json();
-
-    if (json.success && json.debtors) {
-      allDebtors = json.debtors;
-      if (debtorsCountBadge) debtorsCountBadge.textContent = `${allDebtors.length} คน`;
-      if (statTotalDebtors) statTotalDebtors.textContent = `${allDebtors.length} คน`;
-      renderDebtors(allDebtors);
-    } else {
-      debtorsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่สามารถโหลดข้อมูลลูกหนี้ได้</div>';
-    }
-  } catch (err) {
-    console.error('Error loading debtors:', err);
-    debtorsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: #EF4444;">เกิดข้อผิดพลาดในการโหลด</div>';
-  }
-}
-
-function renderDebtors(list) {
-  if (!debtorsListContainer) return;
-
-  if (!list || list.length === 0) {
-    debtorsListContainer.innerHTML = `
-      <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
-        <div style="font-size: 44px; margin-bottom: 12px;">👥</div>
-        <div style="font-weight: 600; color: #FFFFFF; font-size: 15px; margin-bottom: 4px;">ยังไม่มีรายชื่อลูกหนี้ในระบบ</div>
-        <div style="font-size: 12px; line-height: 1.6;">เมื่อมีผู้ใช้ล็อกอินผ่าน LINE Client Portal หรือสร้างสัญญา รายชื่อจะเข้ามาแสดงที่นี่โดยอัตโนมัติ</div>
-      </div>
-    `;
-    return;
-  }
-
-  debtorsListContainer.innerHTML = list.map(d => {
-    const displayName = d.displayName || 'ผู้ใช้ LINE';
-    const fullName = d.fullName && d.fullName !== d.displayName ? d.fullName : '';
-    const initial = (displayName.charAt(0) || 'U').toUpperCase();
-
-    return `
-      <div class="debtor-card">
-        <div class="debtor-top">
-          <div class="debtor-avatar-name">
-            <div class="debtor-avatar-circle">${initial}</div>
+      reminderLogsContainer.innerHTML = logs.slice(0, 15).map(l => {
+        const isSuccess = l.status === 'SUCCESS';
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 6px; font-size: 12px;">
             <div>
-              <div class="debtor-name">${displayName}</div>
-              ${fullName ? `<div class="debtor-line-name">👤 ชื่อจริง: ${fullName}</div>` : ''}
-              <div class="debtor-line-name" style="font-family: monospace; color: #94A3B8;">LINE ID: ${d.userId}</div>
+              <strong style="color: #FFFFFF;">${l.debtId}</strong>
+              <span style="color: var(--text-muted); font-size: 11px; margin-left: 6px;">[${l.reminderType}]</span>
+            </div>
+            <div style="text-align: right;">
+              <span class="badge-status ${isSuccess ? 'active' : 'overdue'}" style="font-size: 10px;">${l.status}</span>
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${l.sentAt || '-'}</div>
             </div>
           </div>
-          <span style="font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #10B981; font-weight: 600;">
-            ${d.status || 'ACTIVE'}
-          </span>
-        </div>
-
-        <div class="debtor-meta-row">
-          <span>📞 เบอร์: <strong>${d.phone || 'ยังไม่ระบุ'}</strong></span>
-          <span>📅 วันที่เข้าใช้: <strong>${d.registeredAt || '-'}</strong></span>
-        </div>
-
-        <div class="debtor-actions">
-          <button class="btn-debtor-action btn-debtor-contract" onclick="openContractForUser('${d.userId}', '${(d.fullName || d.displayName || '').replace(/'/g, "\\'")}', '${d.phone || ''}')">
-            ➕ เปิดสัญญาใหม่
-          </button>
-          <button class="btn-debtor-action btn-debtor-copy" onclick="copyText('${d.userId}', 'คัดลอก LINE ID เรียบร้อยแล้ว')">
-            📋 คัดลอก ID
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-window.openContractForUser = function(userId, name, phone) {
-  switchView('view-admin-contracts');
-  const newUserIdInput = document.getElementById('newUserId');
-  const newDebtorNameInput = document.getElementById('newDebtorName');
-  const newPhoneInput = document.getElementById('newPhone');
-  const newTotalAmountInput = document.getElementById('newTotalAmount');
-
-  if (newUserIdInput) newUserIdInput.value = userId;
-  if (newDebtorNameInput) newDebtorNameInput.value = name;
-  if (newPhoneInput) newPhoneInput.value = phone;
-
-  showToast('นำข้อมูลลูกหนี้ใส่ในฟอร์มแล้ว', '📝');
-  if (newTotalAmountInput) {
-    setTimeout(() => newTotalAmountInput.focus(), 250);
-  }
-};
-
-window.copyText = function(text, successMsg = 'คัดลอกแล้ว') {
-  navigator.clipboard.writeText(text).then(() => {
-    showToast(successMsg, '📋');
-  }).catch(() => {
-    showToast('ข้อความ: ' + text, '📋');
-  });
-};
-
-if (debtorSearchInput) {
-  debtorSearchInput.addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase().trim();
-    if (!q) {
-      renderDebtors(allDebtors);
-      return;
+        `;
+      }).join('');
     }
-    const filtered = allDebtors.filter(d => 
-      (d.displayName && d.displayName.toLowerCase().includes(q)) ||
-      (d.fullName && d.fullName.toLowerCase().includes(q)) ||
-      (d.userId && d.userId.toLowerCase().includes(q)) ||
-      (d.phone && d.phone.includes(q))
-    );
-    renderDebtors(filtered);
-  });
+  } catch (err) {
+    console.warn('Could not load reminder logs:', err.message);
+  }
 }
 
-// ==============================================================================
-// 7. จัดการผู้ดูแลระบบ (Admin Managers Management)
-// ==============================================================================
+if (btnRefreshLogs) btnRefreshLogs.addEventListener('click', loadReminderLogs);
 
+// ==============================================================================
+// 11. Admins Management Hub
+// ==============================================================================
 async function loadAdmins() {
-  if (!adminsListContainer) return;
-  adminsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายชื่อผู้ดูแลระบบ...</div>';
+  if (!adminsTableBody) return;
+  adminsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายชื่อผู้ดูแลระบบ...</td></tr>';
 
   try {
     const res = await adminFetch('/api/admin/admins');
     const data = await res.json();
 
-    if (data.success && Array.isArray(data.admins)) {
+    if (data.success && data.admins) {
       allAdminsList = data.admins;
-      if (adminsCountBadge) adminsCountBadge.textContent = `${allAdminsList.length} คน`;
-      renderAdmins(allAdminsList);
-    } else {
-      adminsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: #EF4444;">ไม่สามารถโหลดข้อมูลแอดมินได้</div>';
+      renderAdminsTable();
     }
   } catch (err) {
     console.error('Error loading admins:', err);
-    adminsListContainer.innerHTML = '<div style="text-align: center; padding: 30px; color: #EF4444;">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>';
+    adminsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #EF4444; padding: 20px;">เกิดข้อผิดพลาดในการโหลดแอดมิน</td></tr>';
   }
 }
 
-function renderAdmins(admins) {
-  if (!adminsListContainer) return;
+function renderAdminsTable() {
+  if (!adminsTableBody) return;
 
-  if (!admins || admins.length === 0) {
-    adminsListContainer.innerHTML = `
-      <div style="text-align: center; padding: 40px 20px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px dashed var(--surface-border);">
-        <div style="font-size: 32px; margin-bottom: 8px;">🛡️</div>
-        <div style="font-size: 14px; font-weight: 600; color: #FFFFFF; margin-bottom: 4px;">ยังไม่มีรายชื่อผู้ดูแลระบบในชีต admin</div>
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
-          คุณสามารถกดปุ่ม "เพิ่มแอดมิน" เพื่อเพิ่มสิทธิ์ให้บัญชี LINE ของคุณหรือทีมงานได้ทันที
-        </p>
-        <button class="btn-primary-admin" onclick="openAddAdminModal()" style="display: inline-block; width: auto; padding: 8px 18px; font-size: 13px;">
-          ➕ เพิ่มผู้ดูแลระบบคนแรก
-        </button>
-      </div>
-    `;
+  const query = (adminSearchInput?.value || '').toLowerCase().trim();
+  const filtered = allAdminsList.filter(a => {
+    return !query ||
+      (a.displayName || '').toLowerCase().includes(query) ||
+      (a.userId || '').toLowerCase().includes(query) ||
+      (a.phone || '').includes(query);
+  });
+
+  if (filtered.length === 0) {
+    adminsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">ไม่พบข้อมูลผู้ดูแลระบบ</td></tr>';
     return;
   }
 
-  adminsListContainer.innerHTML = admins.map(admin => {
-    const isSuper = admin.isSuperAdmin || admin.role === 'SUPER_ADMIN';
-    const isActive = admin.status === 'ACTIVE';
-    const roleBadge = isSuper
-      ? '<span class="badge-role-super">👑 Super Admin</span>'
-      : '<span class="badge-role-admin">🛡️ Admin</span>';
-    const statusBadge = isActive
-      ? '<span class="badge-status-active">🟢 ใช้งานอยู่</span>'
-      : '<span class="badge-status-inactive">⚪ ระงับสิทธิ์</span>';
-
-    const safeName = (admin.displayName || 'ผู้ดูแลระบบ').replace(/'/g, "\\'");
-    const isCurrentUser = currentAdminUser && currentAdminUser.userId === admin.userId;
+  adminsTableBody.innerHTML = filtered.map(a => {
+    const isSuper = a.role === 'SUPER_ADMIN';
+    const isActive = a.status === 'ACTIVE';
 
     return `
-      <div class="admin-card">
-        <div class="admin-card-header">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="admin-avatar">
-              ${isSuper ? '👑' : '🛡️'}
-            </div>
-            <div>
-              <div style="font-size: 14px; font-weight: 600; color: #FFFFFF; display: flex; align-items: center; gap: 6px;">
-                <span>${admin.displayName || 'ไม่ระบุชื่อ'}</span>
-                ${isCurrentUser ? '<span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #38BDF8;">คุณ</span>' : ''}
-              </div>
-              <div style="font-size: 11px; font-family: monospace; color: #94A3B8; margin-top: 2px;">
-                ${admin.userId}
-              </div>
-            </div>
-          </div>
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-            ${roleBadge}
-            ${statusBadge}
-          </div>
-        </div>
-
-        ${(admin.phone || admin.note) ? `
-          <div style="font-size: 11.5px; color: var(--text-muted); background: rgba(0,0,0,0.15); padding: 6px 10px; border-radius: 6px; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 12px;">
-            ${admin.phone ? `<div>📞 ${admin.phone}</div>` : ''}
-            ${admin.note ? `<div>📝 ${admin.note}</div>` : ''}
-          </div>
-        ` : ''}
-
-        <div class="admin-card-actions">
-          <button class="btn-card-action btn-action-edit" onclick="openEditAdminModal('${admin.userId}')">
-            ✏️ แก้ไข
+      <tr>
+        <td>
+          <div style="font-weight: 600; color: #FFFFFF;">${a.displayName || 'ผู้ดูแลระบบ'}</div>
+          <small style="font-size: 11px; color: var(--text-muted);">${a.note || '-'}</small>
+        </td>
+        <td><span style="font-family: monospace; color: #38BDF8; font-size: 12px;">${a.userId}</span></td>
+        <td><span class="badge-status ${isSuper ? 'due-today' : 'paid'}">${a.role || 'ADMIN'}</span></td>
+        <td>${a.phone || '-'}</td>
+        <td><span class="badge-status ${isActive ? 'active' : 'overdue'}">${a.status || 'ACTIVE'}</span></td>
+        <td style="text-align: center;">
+          <button class="btn-action-icon delete" onclick="deleteAdmin('${a.userId}')" title="ลบสิทธิ์แอดมิน">
+            🗑️
           </button>
-          <button class="btn-card-action btn-action-delete" onclick="confirmDeleteAdmin('${admin.userId}', '${safeName}')">
-            🗑️ ลบสิทธิ์
-          </button>
-          <button class="btn-card-action" style="background: rgba(255,255,255,0.06); color: #94A3B8;" onclick="copyText('${admin.userId}', 'คัดลอก LINE ID แอดมินแล้ว')">
-            📋 คัดลอก ID
-          </button>
-        </div>
-      </div>
+        </td>
+      </tr>
     `;
   }).join('');
 }
 
-window.openAddAdminModal = function() {
-  if (!modalAdminForm) return;
-  if (adminManagerForm) adminManagerForm.reset();
-  if (adminFormMode) adminFormMode.value = 'create';
-  if (modalAdminTitle) modalAdminTitle.textContent = '➕ เพิ่มผู้ดูแลระบบใหม่';
-  if (adminInputUserId) {
-    adminInputUserId.readOnly = false;
-    adminInputUserId.style.opacity = '1';
-  }
-  if (adminInputStatus) adminInputStatus.value = 'ACTIVE';
-  if (adminInputRole) adminInputRole.value = 'ADMIN';
+if (adminSearchInput) adminSearchInput.addEventListener('input', renderAdminsTable);
 
-  // หากปัจจุบันล็อกอินอยู่ และยังไม่มีในชีต อำนวยความสะดวกกรอกอัตโนมัติ
-  if (currentAdminUser && (!allAdminsList.some(a => a.userId === currentAdminUser.userId))) {
-    if (adminInputUserId) adminInputUserId.value = currentAdminUser.userId;
-    if (adminInputDisplayName) adminInputDisplayName.value = currentAdminUser.displayName || '';
-    if (adminInputRole) adminInputRole.value = 'SUPER_ADMIN';
-  }
-
-  modalAdminForm.style.display = 'flex';
-  modalAdminForm.classList.remove('hidden');
-};
-
-window.openEditAdminModal = function(userId) {
-  const admin = allAdminsList.find(a => a.userId === userId);
-  if (!admin || !modalAdminForm) return;
-
-  if (adminFormMode) adminFormMode.value = 'edit';
-  if (modalAdminTitle) modalAdminTitle.textContent = '✏️ แก้ไขข้อมูลผู้ดูแลระบบ';
-  if (adminInputUserId) {
-    adminInputUserId.value = admin.userId;
-    adminInputUserId.readOnly = true;
-    adminInputUserId.style.opacity = '0.7';
-  }
-  if (adminInputDisplayName) adminInputDisplayName.value = admin.displayName || '';
-  if (adminInputRole) adminInputRole.value = admin.role || 'ADMIN';
-  if (adminInputPhone) adminInputPhone.value = admin.phone || '';
-  if (adminInputNote) adminInputNote.value = admin.note || '';
-  if (adminInputStatus) adminInputStatus.value = admin.status || 'ACTIVE';
-
-  modalAdminForm.style.display = 'flex';
-  modalAdminForm.classList.remove('hidden');
-};
+if (btnOpenAddAdminModal && modalAdminForm) {
+  btnOpenAddAdminModal.addEventListener('click', () => {
+    adminManagerForm.reset();
+    if (adminFormMode) adminFormMode.value = 'create';
+    if (modalAdminTitle) modalAdminTitle.textContent = '➕ เพิ่มผู้ดูแลระบบใหม่';
+    modalAdminForm.classList.remove('hidden');
+    modalAdminForm.style.display = 'flex';
+  });
+}
 
 function closeAdminModal() {
   if (modalAdminForm) {
-    modalAdminForm.style.display = 'none';
     modalAdminForm.classList.add('hidden');
+    modalAdminForm.style.display = 'none';
   }
 }
 
 if (btnCloseAdminModal) btnCloseAdminModal.addEventListener('click', closeAdminModal);
 if (btnCancelAdminModal) btnCancelAdminModal.addEventListener('click', closeAdminModal);
-if (btnOpenAddAdminModal) btnOpenAddAdminModal.addEventListener('click', window.openAddAdminModal);
-
-// คลิกพื้นหลังสีดำรอบนอกเพื่อปิด modal
-if (modalAdminForm) {
-  modalAdminForm.addEventListener('click', (e) => {
-    if (e.target === modalAdminForm) {
-      closeAdminModal();
-    }
-  });
-}
-
-// กดปุ่ม Escape เพื่อปิด modal
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && modalAdminForm && !modalAdminForm.classList.contains('hidden')) {
-    closeAdminModal();
-  }
-});
-
-if (btnSelectFromDebtors) {
-  btnSelectFromDebtors.addEventListener('click', () => {
-    if (allDebtors.length === 0) {
-      showToast('ไม่มีรายชื่อลูกหนี้ในระบบ', 'ℹ️');
-      return;
-    }
-    const promptText = allDebtors.slice(0, 10).map((d, i) => `${i + 1}. ${d.displayName || d.fullName} (${d.userId.slice(0, 8)}...)`).join('\n');
-    const idx = prompt(`เลือกลำดับลูกหนี้ที่จะเพิ่มเป็นแอดมิน:\n${promptText}`);
-    if (idx) {
-      const selected = allDebtors[parseInt(idx) - 1];
-      if (selected) {
-        if (adminInputUserId) adminInputUserId.value = selected.userId;
-        if (adminInputDisplayName) adminInputDisplayName.value = selected.displayName || selected.fullName || '';
-        if (adminInputPhone) adminInputPhone.value = selected.phone || '';
-      }
-    }
-  });
-}
 
 if (adminManagerForm) {
   adminManagerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btnSubmit = document.getElementById('btnSaveAdminSubmit');
-    if (btnSubmit) {
-      btnSubmit.disabled = true;
-      btnSubmit.textContent = 'กำลังบันทึกลงชีต...';
+
+    const payload = {
+      userId: adminInputUserId?.value.trim(),
+      displayName: adminInputDisplayName?.value.trim(),
+      role: adminInputRole?.value || 'ADMIN',
+      phone: adminInputPhone?.value.trim() || '',
+      note: '',
+      status: adminInputStatus?.value || 'ACTIVE'
+    };
+
+    if (!payload.userId) {
+      showToast('กรุณาระบุ LINE User ID', '⚠️');
+      return;
     }
 
     try {
-      const payload = {
-        userId: adminInputUserId.value.trim(),
-        displayName: adminInputDisplayName.value.trim(),
-        role: adminInputRole.value,
-        phone: adminInputPhone.value.trim(),
-        note: adminInputNote.value.trim(),
-        status: adminInputStatus.value
-      };
-
       const res = await adminFetch('/api/admin/admins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
       const data = await res.json();
       if (data.success) {
-        showToast(data.message || 'บันทึกข้อมูลเรียบร้อยแล้ว', '✅');
+        showToast('บันทึกข้อมูลผู้ดูแลระบบสำเร็จ!', '✅');
         closeAdminModal();
-        await loadAdmins();
+        loadAdmins();
       } else {
-        showToast(data.message || 'บันทึกไม่สำเร็จ', '⚠️');
+        showToast(data.message || 'บันทึกไม่สำเร็จ', '❌');
       }
     } catch (err) {
-      console.error('Error saving admin:', err);
-      showToast('เกิดข้อผิดพลาดในการบันทึก', '⛔');
-    } finally {
-      if (btnSubmit) {
-        btnSubmit.disabled = false;
-        btnSubmit.textContent = 'บันทึกข้อมูล';
-      }
+      showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
     }
   });
 }
 
-window.confirmDeleteAdmin = async function(userId, name) {
-  if (currentAdminUser && currentAdminUser.userId === userId) {
-    alert('⚠️ ไม่สามารถลบบัญชีของคุณเองที่กำลังใช้งานอยู่ได้');
-    return;
-  }
-
-  if (!confirm(`คุณต้องการลบสิทธิ์แอดมินของ "${name}" (${userId}) ใช่หรือไม่?\nข้อมูลจะถูกลบออกจากชีต admin ทันที`)) {
-    return;
-  }
+window.deleteAdmin = async function(userId) {
+  if (!confirm(`ต้องการลบสิทธิ์ผู้ดูแลระบบของบัญชี ${userId} ใช่หรือไม่?`)) return;
 
   try {
-    const res = await adminFetch(`/api/admin/admins/${encodeURIComponent(userId)}`, {
-      method: 'DELETE'
-    });
+    const res = await adminFetch(`/api/admin/admins/${userId}`, { method: 'DELETE' });
     const data = await res.json();
-
     if (data.success) {
-      showToast('ลบแอดมินออกจากระบบแล้ว', '🗑️');
-      await loadAdmins();
+      showToast('ลบสิทธิ์แอดมินสำเร็จ', '✅');
+      loadAdmins();
     } else {
-      showToast(data.message || 'ไม่สามารถลบได้', '⚠️');
+      showToast(data.message || 'ลบไม่สำเร็จ', '❌');
     }
   } catch (err) {
-    console.error('Error deleting admin:', err);
-    showToast('เกิดข้อผิดพลาดในการลบ', '⛔');
+    showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
   }
 };
 
-if (adminSearchInput) {
-  adminSearchInput.addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase().trim();
-    if (!q) {
-      renderAdmins(allAdminsList);
-      return;
-    }
-    const filtered = allAdminsList.filter(a => 
-      (a.displayName && a.displayName.toLowerCase().includes(q)) ||
-      (a.userId && a.userId.toLowerCase().includes(q)) ||
-      (a.phone && a.phone.includes(q)) ||
-      (a.note && a.note.toLowerCase().includes(q)) ||
-      (a.role && a.role.toLowerCase().includes(q))
-    );
-    renderAdmins(filtered);
-  });
-}
-
-// เริ่มต้นระบบ
+// ==============================================================================
+// 12. App Initialization
+// ==============================================================================
 window.addEventListener('DOMContentLoaded', () => {
-  // ตั้งค่าวันครบกำหนดเริ่มต้นเป็น 30 วันข้างหน้าในฟอร์มสร้างสัญญา
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  const newDueDate = document.getElementById('newDueDate');
-  if (newDueDate) newDueDate.value = d.toISOString().split('T')[0];
-
-  // ตรวจสอบสิทธิ์ Admin ผ่าน LINE
   initAdminAuth();
 });
