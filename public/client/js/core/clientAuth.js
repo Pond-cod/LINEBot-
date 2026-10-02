@@ -1,10 +1,10 @@
 /**
  * Client Portal LIFF & LINE Login Authentication Service
- * Features Infinite Redirect Loop Guard and Localhost HTTP Dev Fallback
+ * Features Infinite Redirect Loop Guard, Localhost Dev Fallback, and Resilient Init
  */
 
-import { resolveLiffId, showToast } from './clientApi.js';
-import { store, eventBus, DEFAULT_AVATAR } from './clientState.js';
+import { resolveLiffId, CLIENT_LIFF_ID, showToast } from './clientApi.js';
+import { store, DEFAULT_AVATAR } from './clientState.js';
 
 export function getValidClientRedirectUri() {
   let redirectPath = window.location.pathname;
@@ -37,7 +37,6 @@ export function handleLineLogout() {
     liff.logout();
     showToast('ออกจากระบบ LINE แล้ว', '👋');
     setTimeout(() => {
-      // ใส่ ?guest=1 เพื่อไม่ให้ redirect ล็อกอินทันทีหลังกดออกจากระบบ
       window.location.href = getValidClientRedirectUri() + '?guest=1';
     }, 600);
   }
@@ -92,8 +91,32 @@ export async function initLiffAuth() {
   const userAvatarEl = document.getElementById('userAvatar');
   const clientStatusBadge = document.getElementById('clientStatusBadge');
 
+  if (typeof liff === 'undefined') {
+    console.warn('LINE LIFF SDK is not loaded. Operating in guest mode.');
+    store.setCurrentUser({
+      userId: 'U_DEMO_GUEST',
+      displayName: 'ผู้ใช้งานทั่วไป (Guest)',
+      pictureUrl: DEFAULT_AVATAR
+    });
+    setLoginUiState(false);
+    return true;
+  }
+
+  let liffId = CLIENT_LIFF_ID;
   try {
-    const liffId = await resolveLiffId();
+    const resolved = await resolveLiffId();
+    if (resolved && typeof resolved === 'string' && resolved.trim()) {
+      liffId = resolved.trim();
+    }
+  } catch (e) {
+    liffId = CLIENT_LIFF_ID;
+  }
+
+  if (!liffId || typeof liffId !== 'string' || liffId.trim() === '') {
+    liffId = CLIENT_LIFF_ID;
+  }
+
+  try {
     await liff.init({ liffId });
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -101,7 +124,6 @@ export async function initLiffAuth() {
     const hasError = urlParams.has('error');
     const hasCode = urlParams.has('code');
 
-    // ตรวจสอบว่าเพิ่งพยายามล็อกอินไปเมื่อไม่กี่วินาทีนี้หรือไม่ เพื่อป้องกัน Infinite Redirect Loop
     const lastAttempt = sessionStorage.getItem('client_login_attempt');
     const isRecentAttempt = lastAttempt && (Date.now() - Number(lastAttempt) < 25000);
 
@@ -116,7 +138,6 @@ export async function initLiffAuth() {
       setLoginUiState(true);
     } else {
       if (isGuest || hasError || (hasCode && !liff.isLoggedIn()) || isRecentAttempt) {
-        // โหมด Guest เพื่อไม่ให้เกิดลูป Redirect วนไม่รู้จบ
         sessionStorage.removeItem('client_login_attempt');
         store.setCurrentUser({
           userId: 'U_DEMO_GUEST',
@@ -125,7 +146,6 @@ export async function initLiffAuth() {
         });
         setLoginUiState(false);
       } else {
-        // หากเปิดบน HTTP Localhost ให้เปิดโหมดทดสอบ Local ทันที
         if (window.location.protocol === 'http:' && !liff.isInClient()) {
           console.warn('Cannot auto-redirect to LINE Login on HTTP localhost. Using local client demo session.');
           store.setCurrentUser({
@@ -135,7 +155,7 @@ export async function initLiffAuth() {
           });
           setLoginUiState(false);
         } else {
-          // บังคับ Redirect ไปหน้า LINE Login เมื่ออยู่บน HTTPS / Production
+          // Redirect to LINE Login on HTTPS
           if (userNameEl) userNameEl.textContent = 'กำลังเข้าสู่ระบบ LINE...';
           if (clientStatusBadge) clientStatusBadge.textContent = '⏳ เข้าสู่ระบบ...';
           showToast('กำลังนำเข้าสู่ระบบ LINE...', '⏳');
@@ -146,17 +166,17 @@ export async function initLiffAuth() {
       }
     }
   } catch (err) {
-    console.error('LIFF init error:', err);
+    console.warn('LIFF init caught warning (falling back to guest mode):', err);
     sessionStorage.removeItem('client_login_attempt');
     store.setCurrentUser({
       userId: 'U_DEMO_GUEST',
-      displayName: 'โหมดออฟไลน์ (ทดสอบ)',
+      displayName: 'ผู้ใช้งานทั่วไป (Guest)',
       pictureUrl: DEFAULT_AVATAR
     });
     setLoginUiState(false);
   }
 
-  // อัปเดตข้อมูลบน Header
+  // Update Header UI
   if (userNameEl) userNameEl.textContent = store.currentUser.displayName;
   if (userAvatarEl && store.currentUser.pictureUrl) {
     userAvatarEl.src = store.currentUser.pictureUrl;

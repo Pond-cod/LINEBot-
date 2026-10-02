@@ -1,17 +1,17 @@
 /**
- * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.0 Modular ES)
+ * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.1 Modular ES)
  * Coordinates HashRouter, LIFF Auth, SWR Caching, and Sub-views
  */
 
-import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js';
-import { fetchClientProfileApi, showToast } from './core/clientApi.js';
-import { initLiffAuth } from './core/clientAuth.js';
-import { clientRouter } from './core/clientRouter.js';
+import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.1';
+import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.1';
+import { initLiffAuth } from './core/clientAuth.js?v=7.1';
+import { clientRouter } from './core/clientRouter.js?v=7.1';
 
-import { initDashboardView } from './views/dashboardView.js';
-import { initPayView } from './views/payView.js';
-import { initHistoryView } from './views/historyView.js';
-import { initProfileView } from './views/profileView.js';
+import { initDashboardView } from './views/dashboardView.js?v=7.1';
+import { initPayView } from './views/payView.js?v=7.1';
+import { initHistoryView } from './views/historyView.js?v=7.1';
+import { initProfileView } from './views/profileView.js?v=7.1';
 
 /**
  * 1. Data Loading with Stale-While-Revalidate (SWR) (0ms instant render)
@@ -34,9 +34,10 @@ export async function loadClientData() {
       saveCachedData(userId, json.data);
     }
   } catch (err) {
-    console.error('Failed to revalidate client data:', err);
+    console.warn('Network revalidation notice:', err.message);
     if (!store.clientData.activeDebt && !store.clientData.debtor) {
-      showToast('ไม่สามารถดึงข้อมูลได้', '⚠️');
+      // Ensure UI reflects empty/guest state gracefully
+      store.setClientData(store.clientData);
     }
   }
 }
@@ -90,8 +91,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Initialize Auth & LIFF
-  const shouldProceed = await initLiffAuth();
-  if (shouldProceed) {
-    await loadClientData();
+  let shouldProceed = false;
+  try {
+    shouldProceed = await initLiffAuth();
+  } catch (authErr) {
+    console.warn('Auth init caught exception:', authErr);
   }
+
+  // Always load client data so UI never stays stuck
+  await loadClientData();
 });

@@ -3,23 +3,29 @@
  * Handles network requests, error capturing, and user toast notifications
  */
 
-let LIFF_ID = '2011816015-RfpKwHVZ';
+export const CLIENT_LIFF_ID = '2011816015-RfpKwHVZ';
+
+export function getClientLiffId() {
+  if (typeof window !== 'undefined' && window.ENV_LIFF_ID && typeof window.ENV_LIFF_ID === 'string' && window.ENV_LIFF_ID.trim()) {
+    return window.ENV_LIFF_ID.trim();
+  }
+  return CLIENT_LIFF_ID;
+}
 
 export async function resolveLiffId() {
+  let liffId = getClientLiffId();
   try {
     const res = await fetch('/api/config');
-    const data = await res.json();
-    if (data && data.liffId) {
-      LIFF_ID = data.liffId;
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data.liffId === 'string' && data.liffId.trim() !== '') {
+        liffId = data.liffId.trim();
+      }
     }
   } catch (e) {
     console.warn('Using default LIFF ID fallback:', e.message);
   }
-  return LIFF_ID;
-}
-
-export function getLiffId() {
-  return LIFF_ID;
+  return liffId || CLIENT_LIFF_ID;
 }
 
 export async function fetchClientProfileApi(userId, displayName) {
