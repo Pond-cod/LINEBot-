@@ -34,12 +34,47 @@ async function getClientData(req, res) {
       }
     }
 
-    const debts = await sheetsService.getDebtsByUserId(userId);
+    let debts = await sheetsService.getDebtsByUserId(userId);
+
+    // Fallback: หากไม่พบสัญญาด้วย userId โดยตรง ให้ค้นหาด้วย displayName / debtorName
+    // (ป้องกันกรณี LIFF Channel อยู่คนละ Provider กับ LINE Bot ทำให้ userId เป็นคนละชุดกัน)
+    if (debts.length === 0 && displayName) {
+      const cleanName = displayName.trim().toLowerCase();
+      const allDebts = await sheetsService.getAllDebts();
+      const matchedByName = allDebts.filter(d => 
+        (d.debtorName && d.debtorName.trim().toLowerCase() === cleanName) ||
+        (debtor && d.userId === debtor.userId)
+      );
+
+      if (matchedByName.length > 0) {
+        debts = matchedByName.sort((a, b) => {
+          const aActive = a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE';
+          const bActive = b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE';
+          if (aActive && !bActive) return -1;
+          if (!aActive && bActive) return 1;
+          return (b.rowIndex || 0) - (a.rowIndex || 0);
+        });
+      }
+
+      if (!debtor) {
+        const allDebtors = await sheetsService.getAllDebtors();
+        debtor = allDebtors.find(d => 
+          (d.displayName && d.displayName.trim().toLowerCase() === cleanName) ||
+          (d.fullName && d.fullName.trim().toLowerCase() === cleanName)
+        ) || null;
+      }
+    }
+
     const activeDebts = debts.filter(d => d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE');
     const activeDebt = activeDebts.length > 0 ? activeDebts[0] : (debts.length > 0 ? debts[0] : null);
 
     const totalRemainingAll = activeDebts.reduce((sum, d) => sum + (Number(d.remainingBalance) || 0), 0);
-    const payments = await sheetsService.getPaymentsByUserId(userId);
+    let payments = await sheetsService.getPaymentsByUserId(userId);
+    if (payments.length === 0 && debts.length > 0) {
+      const debtIds = new Set(debts.map(d => d.debtId));
+      const allPayments = await sheetsService.getAllPayments();
+      payments = allPayments.filter(p => debtIds.has(p.debtId) || p.userId === userId);
+    }
 
     return res.status(200).json({
       success: true,

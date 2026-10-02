@@ -114,7 +114,8 @@ export function loadCachedData(userId) {
     const raw = localStorage.getItem(`client_cache_${userId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
+      // Valid cache must have cacheVersion 7.5 and must have debts array
+      if (parsed && typeof parsed === 'object' && parsed._cv === '7.5' && Array.isArray(parsed.debts) && parsed.debts.length > 0) {
         return parsed;
       }
     }
@@ -127,14 +128,25 @@ export function loadCachedData(userId) {
 export function saveCachedData(userId, data) {
   if (!userId || !data) return;
   try {
-    localStorage.setItem(`client_cache_${userId}`, JSON.stringify(data));
+    const toSave = { ...data, _cv: '7.5' };
+    localStorage.setItem(`client_cache_${userId}`, JSON.stringify(toSave));
   } catch (e) {
     console.warn('Cache write notice:', e);
   }
 }
 
 export function clearCachedData(userId) {
-  if (!userId) return;
+  if (!userId) {
+    // Clear all client cache keys
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('client_cache_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {}
+    return;
+  }
   try {
     localStorage.removeItem(`client_cache_${userId}`);
   } catch (e) {}

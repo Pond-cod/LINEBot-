@@ -29,8 +29,8 @@ export async function resolveLiffId() {
 }
 
 export async function fetchClientProfileApi(userId, displayName) {
-  const url = `/api/client/profile/${encodeURIComponent(userId)}?displayName=${encodeURIComponent(displayName || '')}`;
-  const res = await fetch(url);
+  const url = `/api/client/profile/${encodeURIComponent(userId)}?displayName=${encodeURIComponent(displayName || '')}&_t=${Date.now()}`;
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`HTTP Error ${res.status}`);
   }
