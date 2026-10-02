@@ -41,6 +41,9 @@ const sidebarNavItems = document.querySelectorAll('.sidebar-nav-item');
 const subViews = document.querySelectorAll('.sub-view');
 const sidebarContractsBadge = document.getElementById('sidebarContractsBadge');
 const sidebarSlipsBadge = document.getElementById('sidebarSlipsBadge');
+const btnThemeToggle = document.getElementById('btnThemeToggle');
+const themeToggleIcon = document.getElementById('themeToggleIcon');
+const themeToggleText = document.getElementById('themeToggleText');
 
 // Toast
 const toast = document.getElementById('toast');
@@ -1972,8 +1975,41 @@ if (btnTestTriggerReminderNow) {
 }
 
 // ==============================================================================
+// 12b. Theme Management (Vibrant Light SaaS / Obsidian Dark)
+// ==============================================================================
+function initTheme() {
+  const savedTheme = localStorage.getItem('admin_theme') || 'light';
+  applyTheme(savedTheme);
+
+  if (btnThemeToggle) {
+    btnThemeToggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      applyTheme(newTheme);
+      showToast(`เปลี่ยนธีมเป็น: ${newTheme === 'dark' ? 'โหมดมืด (Dark)' : 'โหมดสว่าง (Light)'}`, '🎨');
+    });
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('admin_theme', theme);
+
+  if (themeToggleIcon && themeToggleText) {
+    if (theme === 'dark') {
+      themeToggleIcon.textContent = '🌙';
+      themeToggleText.textContent = 'โหมดมืด';
+    } else {
+      themeToggleIcon.textContent = '☀️';
+      themeToggleText.textContent = 'โหมดสว่าง';
+    }
+  }
+}
+
+// ==============================================================================
 // 13. App Initialization
 // ==============================================================================
 window.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   initAdminAuth();
 });

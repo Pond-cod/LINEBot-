@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/admin.css?v=5.0">
+  <link rel="stylesheet" href="css/admin.css?v=6.0">
   <!-- LINE Front-end Framework (LIFF) SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -117,6 +117,10 @@
           </div>
         </div>
         <div class="topbar-right">
+          <button class="theme-toggle-btn" id="btnThemeToggle" title="สลับโหมด สีสว่าง / โหมดมืด">
+            <span id="themeToggleIcon">☀️</span>
+            <span id="themeToggleText">โหมดสว่าง</span>
+          </button>
           <button class="topbar-btn primary" onclick="switchView('view-admin-new-contract')">
             <span>➕ สร้างสัญญาใหม่</span>
           </button>
@@ -203,7 +207,7 @@
             <!-- Left: Form -->
             <div class="panel-card">
               <form id="createContractWizardForm">
-                <div style="font-size: 14px; font-weight: 600; color: #38BDF8; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
                   <span>1. ข้อมูลผู้กู้ (Borrower Details)</span>
                 </div>
 
@@ -217,11 +221,11 @@
 
                 <div class="form-row">
                   <div class="form-group">
-                    <label class="form-label">LINE User ID ผู้กู้ <span style="color: #EF4444;">*</span></label>
+                    <label class="form-label">LINE User ID ผู้กู้ <span style="color: var(--danger);">*</span></label>
                     <input type="text" id="wizardUserId" class="form-control" placeholder="เช่น U16565ee5abb..." required style="font-family: monospace;">
                   </div>
                   <div class="form-group">
-                    <label class="form-label">ชื่อ - นามสกุล ผู้กู้ <span style="color: #EF4444;">*</span></label>
+                    <label class="form-label">ชื่อ - นามสกุล ผู้กู้ <span style="color: var(--danger);">*</span></label>
                     <input type="text" id="wizardDebtorName" class="form-control" placeholder="เช่น นายสมชาย ใจดี" required>
                   </div>
                 </div>
@@ -237,13 +241,13 @@
                   </div>
                 </div>
 
-                <div style="font-size: 14px; font-weight: 600; color: #38BDF8; margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--primary); margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
                   <span>2. เงื่อนไขทางการเงิน & ค่างวด (Financials & Calculator)</span>
                 </div>
 
                 <div class="form-row">
                   <div class="form-group">
-                    <label class="form-label">ยอดหนี้เงินกู้รวม (บาท) <span style="color: #EF4444;">*</span></label>
+                    <label class="form-label">ยอดหนี้เงินกู้รวม (บาท) <span style="color: var(--danger);">*</span></label>
                     <input type="number" id="wizardTotalAmount" class="form-control" placeholder="เช่น 20000" required min="1">
                   </div>
                   <div class="form-group">
@@ -254,7 +258,7 @@
 
                 <div class="form-row">
                   <div class="form-group">
-                    <label class="form-label">ค่างวดต่องวด (บาท) <span style="color: #EF4444;">*</span></label>
+                    <label class="form-label">ค่างวดต่องวด (บาท) <span style="color: var(--danger);">*</span></label>
                     <input type="number" id="wizardInstallmentAmount" class="form-control" placeholder="เช่น 2000" required min="1">
                     <small style="color: var(--text-muted); font-size: 11px;">ระบบคำนวณจาก ยอดรวม / จำนวนงวด ให้อัตโนมัติ (สามารถแก้ไขเองได้)</small>
                   </div>
@@ -270,7 +274,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">วันครบกำหนดชำระงวดแรก <span style="color: #EF4444;">*</span></label>
+                  <label class="form-label">วันครบกำหนดชำระงวดแรก <span style="color: var(--danger);">*</span></label>
                   <input type="date" id="wizardDueDate" class="form-control" required>
                 </div>
 
@@ -284,22 +288,22 @@
                   <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                       <input type="checkbox" id="wizardReminderEnabled" checked style="width: 18px; height: 18px;">
-                      <span style="font-size: 13px; color: #FFFFFF; font-weight: 500;">เปิดระบบแจ้งเตือนอัตโนมัติ</span>
+                      <span style="font-size: 13px; color: var(--text-main); font-weight: 500;">เปิดระบบแจ้งเตือนอัตโนมัติ</span>
                     </label>
                   </div>
                 </div>
 
-                <div style="font-size: 14px; font-weight: 600; color: #38BDF8; margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--primary); margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
                   <span>3. ตัวเลือกการแจ้งเตือน (LINE Push Notification)</span>
                 </div>
 
                 <!-- Checkbox Send LINE Push -->
-                <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 20px;">
+                <div style="background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 20px;">
                   <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
                     <input type="checkbox" id="wizardSendPushCheck" checked style="width: 18px; height: 18px; margin-top: 2px;">
                     <div>
-                      <strong style="color: #FFFFFF; font-size: 13.5px;">ส่งข้อความเปิดสัญญาไปยัง LINE ลูกหนี้ทันที</strong>
-                      <div style="font-size: 11.5px; color: #94A3B8; margin-top: 2px;">
+                      <strong style="color: var(--text-main); font-size: 13.5px;">ส่งข้อความเปิดสัญญาไปยัง LINE ลูกหนี้ทันที</strong>
+                      <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
                         เมื่อบันทึกสัญญา ระบบจะยิง Flex Message แจ้งรายละเอียดสัญญาเงินกู้ พร้อมปุ่มดูสัญญาและแนบสลิปไปยัง LINE ของผู้กู้ทันที
                       </div>
                     </div>
@@ -336,11 +340,11 @@
                 </div>
                 <div class="preview-detail-item">
                   <span class="preview-detail-label">💵 ค่างวดต่องวด:</span>
-                  <span class="preview-detail-value" id="prevInstallment" style="color: #10B981;">฿0.00</span>
+                  <span class="preview-detail-value" id="prevInstallment" style="color: var(--success);">฿0.00</span>
                 </div>
                 <div class="preview-detail-item">
                   <span class="preview-detail-label">📅 กำหนดงวดแรก:</span>
-                  <span class="preview-detail-value" id="prevDueDate" style="color: #F59E0B;">-</span>
+                  <span class="preview-detail-value" id="prevDueDate" style="color: var(--warning);">-</span>
                 </div>
                 <div class="preview-detail-item">
                   <span class="preview-detail-label">🔄 รอบการชำระ:</span>
@@ -348,15 +352,15 @@
                 </div>
                 <div class="preview-detail-item">
                   <span class="preview-detail-label">⏰ รูปแบบแจ้งเตือน:</span>
-                  <span class="preview-detail-value" id="prevReminderProfile" style="color: #A855F7;">รูปแบบเริ่มต้น</span>
+                  <span class="preview-detail-value" id="prevReminderProfile" style="color: var(--purple);">รูปแบบเริ่มต้น</span>
                 </div>
                 <div class="preview-detail-item">
                   <span class="preview-detail-label">🔔 ส่งแจ้งเตือน LINE:</span>
-                  <span class="preview-detail-value" id="prevSendPush" style="color: #38BDF8;">ส่งทันที</span>
+                  <span class="preview-detail-value" id="prevSendPush" style="color: var(--primary);">ส่งทันที</span>
                 </div>
               </div>
 
-              <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; font-size: 11.5px; color: var(--text-muted); line-height: 1.5;">
+              <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; font-size: 11.5px; color: var(--text-muted); line-height: 1.5;">
                 💡 สัญญานี้จะถูกบันทึกลงใน Google Sheet แท็บ <code>Debts</code> และคำนวณเข้าสู่ระบบแจ้งเตือนอัตโนมัติทันที
               </div>
             </div>
@@ -530,10 +534,10 @@
           </div>
 
           <!-- Master Switch Card -->
-          <div class="panel-card" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%); border-color: rgba(14, 165, 233, 0.3); margin-bottom: 20px;">
+          <div class="panel-card" style="background: linear-gradient(135deg, var(--primary-light) 0%, var(--success-light) 100%); border-color: var(--primary-border); margin-bottom: 20px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div>
-                <h3 style="font-size: 16px; font-weight: 700; color: #FFFFFF;">🔔 เปิดใช้งานระบบแจ้งเตือนอัตโนมัติ (Master Switch)</h3>
+                <h3 style="font-size: 16px; font-weight: 700; color: var(--text-main);">🔔 เปิดใช้งานระบบแจ้งเตือนอัตโนมัติ (Master Switch)</h3>
                 <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
                   เมื่อเปิดใช้งาน ระบบจะตรวจเช็กและส่ง Push Message หาผู้กู้ตามเงื่อนไขที่กำหนดด้านล่าง
                 </p>
@@ -549,7 +553,7 @@
           <div class="panel-card" style="margin-bottom: 24px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
               <div>
-                <h3 style="font-size: 15px; font-weight: 700; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
+                <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
                   <span>📁 รูปแบบการแจ้งเตือน (Reminder Profiles)</span>
                   <span id="badgeProfileCount" class="badge-status active" style="font-size: 11px;">กำลังโหลด...</span>
                 </h3>
@@ -592,9 +596,9 @@
                 </div>
 
                 <!-- Monthly Days Selector -->
-                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px; margin-bottom: 14px;">
+                <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 10px; padding: 14px; margin-bottom: 14px;">
                   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                    <strong style="font-size: 13px; color: #38BDF8;">📆 กำหนดวันที่แจ้งเตือนในแต่ละเดือน (Monthly Days)</strong>
+                    <strong style="font-size: 13px; color: var(--primary);">📆 กำหนดวันที่แจ้งเตือนในแต่ละเดือน (Monthly Days)</strong>
                     <label class="switch-toggle">
                       <input type="checkbox" id="cfgMonthlyEnabled">
                       <span class="slider-toggle"></span>
@@ -609,7 +613,7 @@
                   </div>
 
                   <div style="margin-top: 10px;">
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
                       <input type="checkbox" id="cfgMonthlyLastDay">
                       <span>📌 แจ้งเตือนใน <strong>วันสิ้นเดือน</strong> เสมอ (28, 29, 30 หรือ 31)</span>
                     </label>
@@ -640,9 +644,9 @@
                 <div class="panel-title" style="margin-bottom: 14px;">🎯 เงื่อนไขอิงตามวันครบกำหนด (Due Date Rules)</div>
 
                 <!-- Pre-due -->
-                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
                   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                    <strong style="font-size: 13px; color: #FBBF24;">1. แจ้งเตือนล่วงหน้า (Pre-due)</strong>
+                    <strong style="font-size: 13px; color: var(--warning);">1. แจ้งเตือนล่วงหน้า (Pre-due)</strong>
                     <label class="switch-toggle">
                       <input type="checkbox" id="cfgRemindBeforeEnabled" checked>
                       <span class="slider-toggle"></span>
@@ -661,9 +665,9 @@
                 </div>
 
                 <!-- Due Today -->
-                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
                   <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <strong style="font-size: 13px; color: #34D399;">2. แจ้งเตือนในวันครบกำหนด (Due Today)</strong>
+                    <strong style="font-size: 13px; color: var(--success);">2. แจ้งเตือนในวันครบกำหนด (Due Today)</strong>
                     <label class="switch-toggle">
                       <input type="checkbox" id="cfgRemindDueTodayEnabled" checked>
                       <span class="slider-toggle"></span>
@@ -672,9 +676,9 @@
                 </div>
 
                 <!-- Overdue -->
-                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 12px;">
+                <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px;">
                   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                    <strong style="font-size: 13px; color: #F87171;">3. แจ้งเตือนยอดค้างชำระ (Overdue)</strong>
+                    <strong style="font-size: 13px; color: var(--danger);">3. แจ้งเตือนยอดค้างชำระ (Overdue)</strong>
                     <label class="switch-toggle">
                       <input type="checkbox" id="cfgRemindOverdueEnabled" checked>
                       <span class="slider-toggle"></span>
@@ -740,7 +744,7 @@
                 </div>
 
                 <div style="display: flex; align-items: center; justify-content: space-between; margin: 14px 0;">
-                  <span style="font-size: 12.5px; color: #CBD5E1;">🔔 ส่งสรุปผลเข้า LINE แอดมินทุกครั้งที่ระบบทำงาน</span>
+                  <span style="font-size: 12.5px; color: var(--text-body);">🔔 ส่งสรุปผลเข้า LINE แอดมินทุกครั้งที่ระบบทำงาน</span>
                   <label class="switch-toggle">
                     <input type="checkbox" id="cfgNotifyAdmin" checked>
                     <span class="slider-toggle"></span>
@@ -889,14 +893,14 @@
       <!-- State 1: Checking -->
       <div id="authCheckingState" style="text-align: center;">
         <div class="auth-spinner"></div>
-        <h3 style="font-size: 16px; font-weight: 600; margin-top: 14px; color: #FFFFFF;">ระบบความปลอดภัย Admin</h3>
+        <h3 style="font-size: 16px; font-weight: 600; margin-top: 14px; color: var(--text-main);">ระบบความปลอดภัย Admin</h3>
         <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">กำลังตรวจสอบสิทธิ์การเข้าใช้งาน...</p>
       </div>
 
       <!-- State 2: Not Logged In -->
       <div id="authLoginState" style="display: none; text-align: center;">
         <div class="auth-icon-circle" style="font-size: 36px; margin-bottom: 8px;">🛡️</div>
-        <h3 style="font-size: 17px; font-weight: 700; color: #FFFFFF;">เข้าสู่ระบบผู้ดูแลระบบ</h3>
+        <h3 style="font-size: 17px; font-weight: 700; color: var(--text-main);">เข้าสู่ระบบผู้ดูแลระบบ</h3>
         <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 16px 0; line-height: 1.5;">
           สงวนสิทธิ์เฉพาะบัญชี LINE ของผู้ดูแลระบบที่ได้รับอนุญาตเท่านั้น
         </p>
@@ -906,47 +910,50 @@
         </button>
 
         <!-- Localhost / Dev Mode Login Section -->
-        <div id="localLoginSection" style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: left;">
-          <div style="font-size: 12px; font-weight: 600; color: #F59E0B; margin-bottom: 6px;">
+        <div id="localLoginSection" style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--surface-border); text-align: left;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--warning); margin-bottom: 6px;">
             <span>🔑 เข้าสู่ระบบในเครื่อง (Localhost Mode)</span>
           </div>
-          <p style="font-size: 11px; color: #94A3B8; margin-bottom: 10px; line-height: 1.4;">
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4;">
             กรณีทดสอบบนเครื่อง (http://localhost) ซึ่ง LINE Login ไม่อนุญาต ให้ระบุ LINE User ID ของแอดมิน:
           </p>
           <div style="display: flex; gap: 8px; margin-bottom: 8px;">
             <input type="text" id="inputLocalAdminUserId" placeholder="เช่น U16565ee5abb..." 
-              style="flex: 1; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 8px 10px; color: #FFF; font-size: 12px; font-family: monospace;" />
+              style="flex: 1; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px; padding: 8px 10px; color: var(--text-main); font-size: 12px; font-family: monospace;" />
             <button id="btnLocalAdminLogin" type="button" 
-              style="background: #3B82F6; color: #FFF; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+              style="background: var(--primary); color: #FFF; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;">
               เข้าสู่ระบบ
             </button>
           </div>
           <button id="btnQuickAdminLogin" type="button" 
-            style="width: 100%; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #60A5FA; border-radius: 8px; padding: 8px; font-size: 11.5px; font-weight: 500; cursor: pointer;">
+            style="width: 100%; background: var(--primary-light); border: 1px solid var(--primary-border); color: var(--primary); border-radius: 8px; padding: 8px; font-size: 11.5px; font-weight: 500; cursor: pointer;">
             ⚡ ล็อกอินทันทีด้วยบัญชีแอดมินหลัก (😾POND-IT😸)
           </button>
         </div>
 
         <div style="margin-top: 15px;">
-          <a href="/client/" style="font-size: 12px; color: #64748B; text-decoration: none;">← ไปยังหน้าลูกหนี้ (Client Portal)</a>
+          <a href="/client/" style="font-size: 12px; color: var(--text-muted); text-decoration: none;">← ไปยังหน้าลูกหนี้ (Client Portal)</a>
         </div>
       </div>
 
       <!-- State 3: Logged in but Unauthorized -->
       <div id="authDeniedState" style="display: none; text-align: center;">
         <div style="font-size: 36px; margin-bottom: 8px;">⛔</div>
-        <h3 style="font-size: 17px; font-weight: 700; color: #EF4444;">ปฏิเสธการเข้าถึง (Access Denied)</h3>
+        <h3 style="font-size: 17px; font-weight: 700; color: var(--danger);">ปฏิเสธการเข้าถึง (Access Denied)</h3>
         <p id="deniedReasonText" style="font-size: 12px; color: var(--text-muted); margin: 6px 0 16px 0; line-height: 1.5;">
           ไม่พบบัญชี LINE ของคุณในรายการผู้ดูแลระบบ
         </p>
-        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 12px;">
-          <div style="color: #94A3B8;">ชื่อบัญชี LINE: <strong id="deniedDisplayName" style="color: #FFFFFF;">-</strong></div>
-          <div style="color: #94A3B8; margin-top: 4px;">LINE ID: <span id="deniedUserId" style="font-family: monospace; color: #38BDF8;">-</span></div>
+        <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 10px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 12px;">
+          <div style="color: var(--text-muted);">ชื่อบัญชี LINE: <strong id="deniedDisplayName" style="color: var(--text-main);">-</strong></div>
+          <div style="color: var(--text-muted); margin-top: 4px;">LINE ID: <span id="deniedUserId" style="font-family: monospace; color: var(--primary);">-</span></div>
         </div>
         <button id="btnSwitchAccount" class="topbar-btn" style="width: 100%; justify-content: center; padding: 10px;">
           🔄 สลับบัญชีผู้ใช้งาน
         </button>
       </div>
+    </div>
+  </div>
+
   <!-- Modal ตรวจสอบและซูมดูรูปสลิปความละเอียดสูง (Slip Lightbox Modal) -->
   <div id="slipLightboxModal" class="modal-overlay" style="display: none;">
     <div class="modal-container slip-modal-container" style="max-width: 720px; width: 95%;">
@@ -954,18 +961,18 @@
         <div class="modal-title" style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 24px;">🧾</span>
           <div>
-            <h3 id="modalSlipDebtorName" style="font-size: 16px; font-weight: 700;">ตรวจสอบสลิปโอนเงิน</h3>
+            <h3 id="modalSlipDebtorName" style="font-size: 16px; font-weight: 700; color: var(--text-main);">ตรวจสอบสลิปโอนเงิน</h3>
             <p id="modalSlipMeta" style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">สัญญา: - | รหัส: -</p>
           </div>
         </div>
-        <button class="modal-close" id="btnCloseSlipModal" style="background: transparent; border: none; font-size: 20px; color: #94A3B8; cursor: pointer;">✕</button>
+        <button class="modal-close" id="btnCloseSlipModal" style="background: transparent; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer;">✕</button>
       </div>
 
       <div class="modal-body" style="padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
         <!-- คอลัมน์ซ้าย: รูปสลิปพร้อมปุ่มเปิดภาพต้นฉบับ -->
-        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 340px; position: relative;">
+        <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 340px; position: relative;">
           <img id="lightboxImg" src="" alt="สลิปโอนเงิน" style="max-width: 100%; max-height: 380px; object-fit: contain; border-radius: 8px;">
-          <a id="btnOpenSlipFull" href="#" target="_blank" style="margin-top: 10px; font-size: 11.5px; color: #38BDF8; text-decoration: none; padding: 6px 12px; background: rgba(56, 189, 248, 0.1); border-radius: 6px;">
+          <a id="btnOpenSlipFull" href="#" target="_blank" style="margin-top: 10px; font-size: 11.5px; color: var(--primary); text-decoration: none; padding: 6px 12px; background: var(--primary-light); border-radius: 6px; font-weight: 500;">
             🔍 เปิดดูไฟล์ต้นฉบับเต็มจอ ↗
           </a>
         </div>
@@ -973,14 +980,14 @@
         <!-- คอลัมน์ขวา: รายละเอียดและคำสั่งอนุมัติ/ปฏิเสธ -->
         <div style="display: flex; flex-direction: column; justify-content: space-between;">
           <div style="display: flex; flex-direction: column; gap: 12px;">
-            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px;">
+            <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 10px; padding: 12px;">
               <span style="font-size: 11px; color: var(--text-muted); display: block;">ยอดเงินที่ระบุในสลิป</span>
-              <div id="modalSlipAmount" style="font-size: 24px; font-weight: 800; color: #10B981; margin-top: 2px;">฿0.00</div>
+              <div id="modalSlipAmount" style="font-size: 24px; font-weight: 800; color: var(--success); margin-top: 2px;">฿0.00</div>
             </div>
 
-            <div style="font-size: 12.5px; line-height: 1.8; color: #E2E8F0;">
+            <div style="font-size: 12.5px; line-height: 1.8; color: var(--text-body);">
               <div>📅 <strong>เวลาส่งสลิป:</strong> <span id="modalSlipDate">-</span></div>
-              <div>📑 <strong>สัญญาเลขที่:</strong> <span id="modalSlipDebtId" style="color: #38BDF8; font-family: monospace;">-</span></div>
+              <div>📑 <strong>สัญญาเลขที่:</strong> <span id="modalSlipDebtId" style="color: var(--primary); font-family: monospace;">-</span></div>
               <div>👤 <strong>ผู้กู้ (ลูกหนี้):</strong> <span id="modalSlipDebtor">-</span></div>
               <div>📱 <strong>เบอร์โทรศัพท์:</strong> <span id="modalSlipPhone">-</span></div>
               <div>📌 <strong>สถานะปัจจุบัน:</strong> <span id="modalSlipStatusBadge" class="badge-status">-</span></div>
@@ -988,10 +995,10 @@
           </div>
 
           <div id="modalSlipActions" style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
-            <button class="topbar-btn primary" id="btnModalApprove" style="width: 100%; justify-content: center; padding: 12px; font-size: 13.5px; background: #10B981; border: none; font-weight: 700;">
+            <button class="topbar-btn primary" id="btnModalApprove" style="width: 100%; justify-content: center; padding: 12px; font-size: 13.5px; background: var(--success); border: none; font-weight: 700;">
               ✅ อนุมัติ & หักลดยอดหนี้ทันที
             </button>
-            <button class="topbar-btn" id="btnModalReject" style="width: 100%; justify-content: center; padding: 10px; font-size: 12px; color: #EF4444; border-color: rgba(239, 68, 68, 0.4);">
+            <button class="topbar-btn" id="btnModalReject" style="width: 100%; justify-content: center; padding: 10px; font-size: 12px; color: var(--danger); border-color: var(--danger-border);">
               ❌ ปฏิเสธสลิป (ระบุเหตุผล)
             </button>
           </div>
@@ -1004,7 +1011,7 @@
   <div id="modalReminderProfile" class="admin-modal">
     <div class="modal-dialog" style="max-width: 620px;">
       <div class="modal-header">
-        <h3 id="modalProfileTitle" style="font-size: 16px; font-weight: 700; color: #FFFFFF;">➕ สร้างรูปแบบการแจ้งเตือนใหม่</h3>
+        <h3 id="modalProfileTitle" style="font-size: 16px; font-weight: 700; color: var(--text-main);">➕ สร้างรูปแบบการแจ้งเตือนใหม่</h3>
         <button type="button" class="modal-close-btn" onclick="closeProfileModal()">&times;</button>
       </div>
       <form id="formReminderProfile">
@@ -1012,13 +1019,13 @@
         <div class="modal-body" style="max-height: 72vh; overflow-y: auto; padding-right: 8px;">
           <!-- Basic Info -->
           <div class="form-group">
-            <label class="form-label">ชื่อรูปแบบการแจ้งเตือน <span style="color: #EF4444;">*</span></label>
+            <label class="form-label">ชื่อรูปแบบการแจ้งเตือน <span style="color: var(--danger);">*</span></label>
             <input type="text" id="profFormName" class="form-control" placeholder="เช่น เตือนทุกสิ้นเดือน เวลา 08:00" required>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">ประเภทความถี่ (Frequency) <span style="color: #EF4444;">*</span></label>
+              <label class="form-label">ประเภทความถี่ (Frequency) <span style="color: var(--danger);">*</span></label>
               <select id="profFormFrequency" class="form-control" onchange="onProfileFrequencyChange(this.value)">
                 <option value="DAILY">📅 รายวัน (Daily)</option>
                 <option value="END_OF_MONTH">📆 ทุกๆ วันสิ้นเดือน (End of Month)</option>
@@ -1028,7 +1035,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">เวลาส่งรอบเช้า (เวลาหลัก) <span style="color: #EF4444;">*</span></label>
+              <label class="form-label">เวลาส่งรอบเช้า (เวลาหลัก) <span style="color: var(--danger);">*</span></label>
               <input type="time" id="profFormPrimaryTime" class="form-control" value="08:00" required>
             </div>
           </div>
@@ -1041,13 +1048,13 @@
             <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
               <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                 <input type="checkbox" id="profFormIsDefault" style="width: 18px; height: 18px;">
-                <span style="font-size: 13px; color: #38BDF8; font-weight: 600;">ตั้งเป็นรูปแบบเริ่มต้น (Default)</span>
+                <span style="font-size: 13px; color: var(--primary); font-weight: 600;">ตั้งเป็นรูปแบบเริ่มต้น (Default)</span>
               </label>
             </div>
           </div>
 
           <!-- Frequency Specific Settings -->
-          <div id="profDailySettings" class="form-group" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px; border-radius: 8px;">
+          <div id="profDailySettings" class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px;">
             <label class="form-label">ช่วงห่างการส่ง (วัน)</label>
             <select id="profDailyInterval" class="form-control">
               <option value="1">ทุกวัน (Every 1 Day)</option>
@@ -1057,28 +1064,28 @@
             </select>
           </div>
 
-          <div id="profSpecificDaysSettings" class="form-group" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px; border-radius: 8px;">
+          <div id="profSpecificDaysSettings" class="form-group" style="display: none; background: var(--surface-raised); border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px;">
             <label class="form-label">เลือกวันที่ของเดือนที่ต้องการให้แจ้งเตือน</label>
             <div id="modalDaysChipsGrid" class="days-checkbox-grid" style="margin-bottom: 10px;"></div>
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
               <input type="checkbox" id="profSpecificLastDay">
               <span>📌 รวมวันสิ้นเดือนด้วยเสมอ</span>
             </label>
           </div>
 
           <!-- Due-date Relative Rules -->
-          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px; border-radius: 8px; margin-bottom: 14px;">
-            <div style="font-size: 12.5px; font-weight: 600; color: #38BDF8; margin-bottom: 10px;">🎯 เงื่อนไขอิงวันครบกำหนดชำระ</div>
+          <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px; margin-bottom: 14px;">
+            <div style="font-size: 12.5px; font-weight: 600; color: var(--primary); margin-bottom: 10px;">🎯 เงื่อนไขอิงวันครบกำหนดชำระ</div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
                 <input type="checkbox" id="profRemindDueToday" checked>
                 <span>เตือนตรงวันครบกำหนด</span>
               </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
                 <input type="checkbox" id="profRemindOverdue" checked>
                 <span>เตือนเมื่อเลยกำหนด (Overdue)</span>
               </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #CBD5E1; cursor: pointer;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
                 <input type="checkbox" id="profRemindBefore">
                 <span>เตือนล่วงหน้า (Pre-due)</span>
               </label>
@@ -1125,14 +1132,14 @@
   <div id="modalAssignReminder" class="admin-modal">
     <div class="modal-dialog" style="max-width: 480px;">
       <div class="modal-header">
-        <h3 id="modalAssignTitle" style="font-size: 15px; font-weight: 700; color: #FFFFFF;">🔔 ตั้งค่าการแจ้งเตือน</h3>
+        <h3 id="modalAssignTitle" style="font-size: 15px; font-weight: 700; color: var(--text-main);">🔔 ตั้งค่าการแจ้งเตือน</h3>
         <button type="button" class="modal-close-btn" onclick="closeAssignReminderModal()">&times;</button>
       </div>
       <form id="formAssignReminder">
         <input type="hidden" id="assignTargetType" value="">
         <input type="hidden" id="assignTargetId" value="">
         <div class="modal-body">
-          <p id="assignTargetName" style="font-size: 13.5px; color: #38BDF8; font-weight: 600; margin-bottom: 14px;">-</p>
+          <p id="assignTargetName" style="font-size: 13.5px; color: var(--primary); font-weight: 600; margin-bottom: 14px;">-</p>
           
           <div class="form-group">
             <label class="form-label">เลือกรูปแบบการแจ้งเตือน (Reminder Profile)</label>
@@ -1141,10 +1148,10 @@
             </select>
           </div>
 
-          <div class="form-group" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; margin-top: 10px;">
+          <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-top: 10px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div>
-                <strong style="font-size: 13px; color: #FFFFFF;">เปิดรับการแจ้งเตือน</strong>
+                <strong style="font-size: 13px; color: var(--text-main);">เปิดรับการแจ้งเตือน</strong>
                 <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">หากปิด ระบบจะไม่ส่งข้อความแจ้งเตือน</div>
               </div>
               <label class="switch-toggle">
