@@ -242,27 +242,37 @@ function resetSlipUpload() {
   if (btnSubmitSlip) btnSubmitSlip.disabled = true;
 }
 
+function getValidClientRedirectUri() {
+  let redirectPath = window.location.pathname;
+  if (!redirectPath.endsWith('/') && !redirectPath.includes('.')) {
+    redirectPath += '/';
+  }
+  return window.location.origin + redirectPath;
+}
+
 /**
  * 5. ฟังก์ชัน Login / Logout ผ่าน LINE LIFF
  */
 function handleLineLogin() {
   if (!liff.isLoggedIn()) {
     if (window.location.protocol === 'http:') {
-      alert('⚠️ LINE Login ไม่อนุญาตให้ใช้งานผ่าน http://localhost ได้โดยตรงตามข้อกำหนดของ LINE\n\n👉 ระบบเปิดหน้าต่างพรีวิวและฟังก์ชันส่งสลิปให้ทดสอบได้ทันที\n🌐 หากต้องการทดสอบระบบ LINE Login จริง ให้เปิดผ่าน HTTPS ด้วย Ngrok');
+      alert('⚠️ LINE Login ไม่อนุญาตให้ใช้งานผ่าน http://localhost ได้โดยตรงตามข้อกำหนดของ LINE\n\n👉 ระบบเปิดหน้าต่างพรีวิวและฟังก์ชันส่งสลิปให้ทดสอบได้ทันที\n🌐 หากต้องการทดสอบระบบ LINE Login จริง ให้เปิดผ่าน HTTPS ด้วย Ngrok หรือ Vercel');
       return;
     }
     showToast('กำลังนำไปสู่หน้า LINE Login...', '⏳');
-    liff.login({ redirectUri: window.location.origin + window.location.pathname });
+    sessionStorage.setItem('client_login_attempt', Date.now().toString());
+    liff.login({ redirectUri: getValidClientRedirectUri() });
   }
 }
 
 function handleLineLogout() {
   if (liff.isLoggedIn()) {
+    sessionStorage.removeItem('client_login_attempt');
     liff.logout();
     showToast('ออกจากระบบ LINE แล้ว', '👋');
     setTimeout(() => {
       // ใส่ ?guest=1 เพื่อไม่ให้ redirect ล็อกอินทันทีหลังกดออกจากระบบ
-      window.location.href = window.location.origin + window.location.pathname + '?guest=1';
+      window.location.href = getValidClientRedirectUri() + '?guest=1';
     }, 600);
   }
 }
@@ -311,7 +321,7 @@ function setLoginUiState(isLoggedIn) {
 }
 
 /**
- * 6. เริ่มต้น LIFF และดึงข้อมูล (บังคับ Auto-Login)
+ * 6. เริ่มต้น LIFF และดึงข้อมูล (พร้อมป้องกัน Infinite Redirect Loop)
  */
 async function initApp() {
   try {
@@ -319,8 +329,15 @@ async function initApp() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const isGuest = urlParams.get('guest') === '1';
+    const hasError = urlParams.has('error');
+    const hasCode = urlParams.has('code');
+
+    // ตรวจสอบว่าเพิ่งพยายามล็อกอินไปเมื่อไม่กี่วินาทีนี้หรือไม่ เพื่อป้องกัน Infinite Redirect Loop
+    const lastAttempt = sessionStorage.getItem('client_login_attempt');
+    const isRecentAttempt = lastAttempt && (Date.now() - Number(lastAttempt) < 25000);
 
     if (liff.isLoggedIn()) {
+      sessionStorage.removeItem('client_login_attempt');
       const profile = await liff.getProfile();
       currentUser = {
         userId: profile.userId,
@@ -329,8 +346,10 @@ async function initApp() {
       };
       setLoginUiState(true);
     } else {
-      if (isGuest) {
-        // ให้สิทธิ์เข้าชมแบบ Guest ถ้ามี ?guest=1
+      if (isGuest || hasError || (hasCode && !liff.isLoggedIn()) || isRecentAttempt) {
+        // หากผู้ใช้เลือกเข้าแบบ Guest, เกิดข้อผิดพลาดจาก LINE Login, หรือเพิ่ง Redirect กลับมาแต่ Login ไม่สำเร็จ
+        // ให้อยู่ในโหมด Guest และแสดงปุ่ม Login เพื่อไม่ให้เกิดลูป Redirect วนไม่รู้จบ
+        sessionStorage.removeItem('client_login_attempt');
         currentUser = {
           userId: 'U_DEMO_GUEST',
           displayName: 'ผู้ใช้งานทั่วไป (Guest)',
@@ -352,13 +371,15 @@ async function initApp() {
           if (userNameEl) userNameEl.textContent = 'กำลังเข้าสู่ระบบ LINE...';
           if (clientStatusBadge) clientStatusBadge.textContent = '⏳ เข้าสู่ระบบ...';
           showToast('กำลังนำเข้าสู่ระบบ LINE...', '⏳');
-          liff.login({ redirectUri: window.location.origin + window.location.pathname });
+          sessionStorage.setItem('client_login_attempt', Date.now().toString());
+          liff.login({ redirectUri: getValidClientRedirectUri() });
           return;
         }
       }
     }
   } catch (err) {
     console.error('LIFF init error:', err);
+    sessionStorage.removeItem('client_login_attempt');
     currentUser = {
       userId: 'U_DEMO_GUEST',
       displayName: 'โหมดออฟไลน์ (ทดสอบ)',

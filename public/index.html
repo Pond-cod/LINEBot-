@@ -4,6 +4,43 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ระบบจัดการหนี้ รับสลิป และแจ้งเตือนอัตโนมัติ</title>
+  
+  <!-- LIFF State Router: นำทางอัตโนมัติเมื่อ LINE Login หรือ LIFF ส่งกลับมาที่ Endpoint URL -->
+  <script>
+    (function() {
+      try {
+        const search = window.location.search;
+        if (!search) return;
+        const urlParams = new URLSearchParams(search);
+        const liffState = urlParams.get('liff.state') || urlParams.get('liffRedirectUri');
+        if (liffState) {
+          let target = decodeURIComponent(liffState);
+          // หาก liffState เป็น Full URL ให้ตัดเหลือเฉพาะ Path
+          if (target.startsWith('http://') || target.startsWith('https://')) {
+            try {
+              const u = new URL(target);
+              target = u.pathname;
+            } catch (e) {}
+          }
+          if (!target.startsWith('/')) target = '/' + target;
+
+          const cleanPath = target.split('?')[0].split('#')[0];
+          // ป้องกันการ redirect วนลูปถ้า target เป็นหน้า root หรือ index.html
+          if (cleanPath !== '/' && cleanPath !== '/index.html' && cleanPath !== '') {
+            let dest = cleanPath;
+            if (!dest.endsWith('/') && !dest.includes('.')) {
+              dest += '/';
+            }
+            dest += window.location.search + window.location.hash;
+            window.location.replace(dest);
+          }
+        }
+      } catch (err) {
+        console.error('LIFF State Router Error:', err);
+      }
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
