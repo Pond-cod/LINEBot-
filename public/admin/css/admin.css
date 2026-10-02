@@ -1,27 +1,27 @@
 :root {
-  --primary: #0EA5E9;
+  --primary: #38BDF8;
   --primary-dark: #0284C7;
-  --primary-light: rgba(14, 165, 233, 0.12);
-  --success: #10B981;
-  --success-light: rgba(16, 185, 129, 0.12);
-  --danger: #EF4444;
-  --danger-light: rgba(239, 68, 68, 0.12);
-  --warning: #F59E0B;
-  --warning-light: rgba(245, 158, 11, 0.12);
+  --primary-light: rgba(56, 189, 248, 0.12);
+  --success: #00E599;
+  --success-light: rgba(0, 229, 153, 0.12);
+  --danger: #F43F5E;
+  --danger-light: rgba(244, 63, 94, 0.12);
+  --warning: #FBBF24;
+  --warning-light: rgba(251, 191, 36, 0.12);
   
-  --bg-app: #070B14;
-  --bg-sidebar: #0D1526;
-  --surface: #131D33;
-  --surface-border: #1E293B;
-  --surface-raised: #1A2642;
+  --bg-app: #080C15;
+  --bg-sidebar: #0C1220;
+  --surface: #111827;
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-raised: #182236;
   
   --text-main: #F8FAFC;
   --text-muted: #94A3B8;
   --text-sub: #64748B;
   
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
   --radius-full: 9999px;
   
   --safe-top: env(safe-area-inset-top, 0px);
@@ -42,6 +42,20 @@ body {
   min-height: 100vh;
   width: 100vw;
   overflow-x: hidden;
+}
+
+/* Shimmer Skeleton Loader */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.03) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+  color: transparent !important;
 }
 
 /* ==============================================================================
@@ -443,11 +457,12 @@ body {
 }
 
 .stat-val {
-  font-size: 22px;
+  font-family: 'Outfit', 'Prompt', sans-serif;
+  font-size: 24px;
   font-weight: 700;
   color: #FFFFFF;
   margin-top: 4px;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
 }
 
 .stat-val.primary { color: var(--primary); }

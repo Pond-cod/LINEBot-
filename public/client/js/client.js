@@ -226,9 +226,15 @@ function compressImage(srcBase64, maxWidth, quality, callback) {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, width, height);
 
-    const compressed = canvas.toDataURL('image/jpeg', quality);
+    // Prefer modern WebP (3x smaller payload), fallback to JPEG
+    let compressed = canvas.toDataURL('image/webp', quality);
+    if (!compressed.startsWith('data:image/webp')) {
+      compressed = canvas.toDataURL('image/jpeg', quality);
+    }
     callback(compressed);
   };
 }
@@ -399,9 +405,28 @@ async function initApp() {
 }
 
 /**
- * 7. ดึงข้อมูลจาก Backend API
+ * 7. ดึงข้อมูลจาก Backend API (Stale-While-Revalidate: Instant 0ms Load + Background Sync)
  */
 async function loadClientData() {
+  const cacheKey = `client_cache_${currentUser.userId}`;
+
+  // 1. Instant Cache Render (0ms)
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && typeof parsed === 'object') {
+        clientData = parsed;
+        renderDashboard();
+        renderHistory();
+        renderProfile();
+      }
+    }
+  } catch (cacheErr) {
+    console.warn('Cache read notice:', cacheErr);
+  }
+
+  // 2. Background Revalidation from High-Speed Backend
   try {
     const url = `/api/client/profile/${encodeURIComponent(currentUser.userId)}?displayName=${encodeURIComponent(currentUser.displayName)}`;
     const res = await fetch(url);
@@ -409,13 +434,18 @@ async function loadClientData() {
 
     if (json.success && json.data) {
       clientData = json.data;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(clientData));
+      } catch (saveErr) {}
       renderDashboard();
       renderHistory();
       renderProfile();
     }
   } catch (err) {
     console.error('Failed to load client data:', err);
-    showToast('ไม่สามารถดึงข้อมูลได้', '⚠️');
+    if (!clientData.activeDebt && !clientData.debtor) {
+      showToast('ไม่สามารถดึงข้อมูลได้', '⚠️');
+    }
   }
 }
 
@@ -458,7 +488,7 @@ function renderDashboard() {
 }
 
 /**
- * 9. เรนเดอร์ประวัติการชำระเงิน
+ * 9. เรนเดอร์ประวัติการชำระเงิน (Next-Gen Minimalist Cards)
  */
 function renderHistory() {
   const payments = clientData.payments || [];
@@ -469,34 +499,29 @@ function renderHistory() {
   if (payments.length === 0) {
     historyListContainer.innerHTML = `
       <div class="state-box">
-        <div style="font-size: 36px; margin-bottom: 8px;">📭</div>
-        <div>ยังไม่มีประวัติการส่งสลิปชำระเงิน</div>
+        <div style="font-size: 32px; opacity: 0.8;">📭</div>
+        <div style="color: var(--text-dim);">ยังไม่มีประวัติการส่งสลิปชำระเงิน</div>
       </div>
     `;
     return;
   }
 
   historyListContainer.innerHTML = payments.map(p => {
-    let statusClass = 'pending';
+    const status = (p.verificationStatus || 'PENDING').toUpperCase();
     let statusText = 'รอตรวจสอบ';
-    if (p.verificationStatus === 'VERIFIED') {
-      statusClass = 'verified';
-      statusText = 'อนุมัติแล้ว';
-    } else if (p.verificationStatus === 'REJECTED') {
-      statusClass = 'rejected';
-      statusText = 'ไม่ผ่าน';
-    }
+    if (status === 'VERIFIED') statusText = 'อนุมัติแล้ว';
+    if (status === 'REJECTED') statusText = 'ไม่ผ่าน';
 
     return `
       <div class="history-card">
-        <div class="history-left">
-          <h4>฿${Number(p.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h4>
-          <div class="history-date">📅 ${p.uploadedAt || '-'}</div>
-          <div class="history-id">รหัส: ${p.paymentId}</div>
+        <div class="history-card-left">
+          <span class="history-amount">฿${Number(p.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+          <span class="history-card-date">📅 ${p.uploadedAt || '-'}</span>
+          <span class="history-card-id">${p.paymentId}</span>
         </div>
-        <div class="history-right">
-          <span class="status-pill ${statusClass}">${statusText}</span>
-          ${p.slipViewUrl ? `<div><a href="${p.slipViewUrl}" target="_blank" class="btn-view-slip">🔍 ดูสลิป</a></div>` : ''}
+        <div class="history-card-right">
+          <span class="history-badge ${status}">${statusText}</span>
+          ${p.slipViewUrl ? `<a href="${p.slipViewUrl}" target="_blank" style="font-size: 11px; color: var(--primary); text-decoration: none; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">🔍 ดูสลิป</a>` : ''}
         </div>
       </div>
     `;
@@ -546,6 +571,9 @@ if (btnSubmitSlip) {
       const json = await res.json();
       if (json.success) {
         showToast('ส่งสลิปชำระเงินเรียบร้อยแล้ว!', '✅');
+        try {
+          localStorage.removeItem(`client_cache_${currentUser.userId}`);
+        } catch (e) {}
         resetSlipUpload();
         await loadClientData();
         switchView('view-history');

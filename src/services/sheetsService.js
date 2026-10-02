@@ -1,5 +1,6 @@
 const { sheets, sheetId } = require('../config/google');
 const { isGasConfigured, callGas } = require('./gasService');
+const cache = require('../utils/cache');
 const dayjs = require('dayjs');
 
 const SHEET_NAMES = {
@@ -17,6 +18,33 @@ const HEADERS = {
   [SHEET_NAMES.REMINDER_LOGS]: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
   [SHEET_NAMES.ADMINS]: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status']
 };
+
+/**
+ * RFC4180-compliant CSV row parser that handles quotes, escaped quotes, and commas
+ */
+function parseCsvLine(line) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      result.push(cur.trim());
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
 
 /**
  * ตรวจสอบและสร้างแท็บใน Google Sheets พร้อมหัวตารางอัตโนมัติ
@@ -79,8 +107,12 @@ async function initializeSheets() {
  * ลงทะเบียนหรืออัปเดตข้อมูลลูกหนี้
  */
 async function registerDebtor({ userId, displayName, fullName, phone, idCardNumber }) {
+  cache.delByPattern(/^debtors_/);
+
   if (isGasConfigured()) {
-    return await callGas('registerDebtor', { userId, displayName, fullName, phone, idCardNumber });
+    const res = await callGas('registerDebtor', { userId, displayName, fullName, phone, idCardNumber });
+    cache.delByPattern(/^debtors_/);
+    return res;
   }
 
   if (!sheets || !sheetId) throw new Error('Google Sheets is not configured');
@@ -112,6 +144,7 @@ async function registerDebtor({ userId, displayName, fullName, phone, idCardNumb
         ]]
       }
     });
+    cache.delByPattern(/^debtors_/);
     return { status: 'UPDATED', userId };
   } else {
     await sheets.spreadsheets.values.append({
@@ -130,6 +163,7 @@ async function registerDebtor({ userId, displayName, fullName, phone, idCardNumb
         ]]
       }
     });
+    cache.delByPattern(/^debtors_/);
     return { status: 'CREATED', userId };
   }
 }
@@ -138,8 +172,12 @@ async function registerDebtor({ userId, displayName, fullName, phone, idCardNumb
  * สร้างสัญญาหนี้ใหม่
  */
 async function createDebt({ userId, totalAmount, installmentAmount, dueDate, cycleDays = 30 }) {
+  cache.delByPattern(/^debts_/);
+
   if (isGasConfigured()) {
-    return await callGas('createDebt', { userId, totalAmount, installmentAmount, dueDate, cycleDays });
+    const res = await callGas('createDebt', { userId, totalAmount, installmentAmount, dueDate, cycleDays });
+    cache.delByPattern(/^debts_/);
+    return res;
   }
 
   if (!sheets || !sheetId) throw new Error('Google Sheets is not configured');
@@ -167,42 +205,19 @@ async function createDebt({ userId, totalAmount, installmentAmount, dueDate, cyc
     }
   });
 
+  cache.delByPattern(/^debts_/);
   return { debtId, userId, totalAmount, installmentAmount, dueDate };
 }
 
 /**
- * ดึงข้อมูลสัญญาหนี้ที่กำลังเปิดใช้งาน
+ * ดึงข้อมูลสัญญาหนี้ที่กำลังเปิดใช้งาน (ผ่าน Cache / GViz Fast Stream)
  */
 async function getActiveDebtByUserId(userId) {
-  if (isGasConfigured()) {
-    return await callGas('getActiveDebt', { userId });
-  }
-
-  if (!sheets || !sheetId) return null;
-
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `${SHEET_NAMES.DEBTS}!A2:J`
-    });
-
-    const rows = res.data.values || [];
-    const matched = rows.filter(r => r[1] === userId && (r[7] === 'ACTIVE' || r[7] === 'OVERDUE'));
+    const debts = await getAllDebts();
+    const matched = debts.filter(r => r.userId === userId && (r.debtStatus === 'ACTIVE' || r.debtStatus === 'OVERDUE'));
     if (matched.length === 0) return null;
-
-    const row = matched[matched.length - 1];
-    return {
-      debtId: row[0],
-      userId: row[1],
-      totalAmount: Number(row[2]) || 0,
-      installmentAmount: Number(row[3]) || 0,
-      remainingBalance: Number(row[4]) || 0,
-      dueDate: row[5] || '',
-      cycleDays: Number(row[6]) || 30,
-      debtStatus: row[7] || 'ACTIVE',
-      createdAt: row[8] || '',
-      updatedAt: row[9] || ''
-    };
+    return matched[matched.length - 1];
   } catch (error) {
     console.error('Error fetching debt by userId:', error.message);
     return null;
@@ -210,34 +225,12 @@ async function getActiveDebtByUserId(userId) {
 }
 
 /**
- * ดึงข้อมูลลูกหนี้
+ * ดึงข้อมูลลูกหนี้ (ผ่าน Cache / GViz Fast Stream)
  */
 async function getDebtorByUserId(userId) {
-  if (isGasConfigured()) {
-    return await callGas('getDebtor', { userId });
-  }
-
-  if (!sheets || !sheetId) return null;
-
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `${SHEET_NAMES.DEBTORS}!A2:G`
-    });
-
-    const rows = res.data.values || [];
-    const row = rows.find(r => r[0] === userId);
-    if (!row) return null;
-
-    return {
-      userId: row[0],
-      displayName: row[1],
-      fullName: row[2],
-      phone: row[3],
-      idCardNumber: row[4],
-      registeredAt: row[5],
-      status: row[6]
-    };
+    const debtors = await getAllDebtors();
+    return debtors.find(r => r.userId === userId) || null;
   } catch (error) {
     console.error('Error fetching debtor:', error.message);
     return null;
@@ -245,10 +238,14 @@ async function getDebtorByUserId(userId) {
 }
 
 /**
- * ดึงรายชื่อลูกหนี้ทั้งหมด (Debtors)
+ * ดึงรายชื่อลูกหนี้ทั้งหมด (Debtors) - High-Speed GViz Stream + Memory Cache
  */
 async function getAllDebtors() {
-  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก ~300ms และเป็นข้อมูล real-time เสมอ)
+  const cacheKey = 'debtors_all';
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก ~150-300ms)
   if (sheetId) {
     try {
       const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAMES.DEBTORS}`;
@@ -259,8 +256,7 @@ async function getAllDebtors() {
         if (lines.length > 1) {
           const debtors = [];
           for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+            const clean = parseCsvLine(lines[i]);
             if (clean[0] && clean[0].startsWith('U')) {
               debtors.push({
                 userId: clean[0],
@@ -273,7 +269,10 @@ async function getAllDebtors() {
               });
             }
           }
-          return debtors;
+          if (debtors.length > 0) {
+            cache.set(cacheKey, debtors, 30);
+            return debtors;
+          }
         }
       }
     } catch (csvErr) {
@@ -285,7 +284,10 @@ async function getAllDebtors() {
   if (isGasConfigured()) {
     try {
       const res = await callGas('getAllDebtors', {}, 0);
-      if (Array.isArray(res)) return res;
+      if (Array.isArray(res) && res.length > 0) {
+        cache.set(cacheKey, res, 30);
+        return res;
+      }
     } catch (e) {
       console.warn('callGas getAllDebtors note:', e.message);
     }
@@ -299,7 +301,7 @@ async function getAllDebtors() {
         range: `${SHEET_NAMES.DEBTORS}!A2:G`
       });
       const rows = res.data.values || [];
-      return rows
+      const debtors = rows
         .filter(r => r[0] && r[0].startsWith('U'))
         .map(r => ({
           userId: r[0],
@@ -310,6 +312,10 @@ async function getAllDebtors() {
           registeredAt: r[5] || '',
           status: r[6] || 'ACTIVE'
         }));
+      if (debtors.length > 0) {
+        cache.set(cacheKey, debtors, 30);
+      }
+      return debtors;
     } catch (error) {
       console.error('Error fetching debtors via API:', error.message);
     }
@@ -322,9 +328,12 @@ async function getAllDebtors() {
  * บันทึกการส่งสลิปชำระเงิน
  */
 async function recordPayment({ debtId, userId, amount = 0, driveFileId, slipViewUrl, adminNote = '' }) {
+  cache.delByPattern(/^(payments_|debts_)/);
+
   if (isGasConfigured()) {
-    // กรณีใช้ GAS บันทึกผ่าน uploadSlip โดยตรง หรือใช้ fallback
-    return await callGas('recordPayment', { debtId, userId, amount, driveFileId, slipViewUrl, adminNote });
+    const res = await callGas('recordPayment', { debtId, userId, amount, driveFileId, slipViewUrl, adminNote });
+    cache.delByPattern(/^(payments_|debts_)/);
+    return res;
   }
 
   if (!sheets || !sheetId) throw new Error('Google Sheets is not configured');
@@ -351,40 +360,17 @@ async function recordPayment({ debtId, userId, amount = 0, driveFileId, slipView
     }
   });
 
+  cache.delByPattern(/^(payments_|debts_)/);
   return { paymentId, debtId, userId, slipViewUrl, uploadedAt: now, amount };
 }
 
 /**
- * ดึงประวัติการชำระเงินทั้งหมดของ userId
+ * ดึงประวัติการชำระเงินทั้งหมดของ userId (ดึงผ่าน getAllPayments ที่มี Cache)
  */
 async function getPaymentsByUserId(userId) {
-  if (isGasConfigured()) {
-    return await callGas('getPayments', { userId });
-  }
-
-  if (!sheets || !sheetId) return [];
-
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `${SHEET_NAMES.PAYMENTS}!A2:I`
-    });
-
-    const rows = res.data.values || [];
-    return rows
-      .filter(r => r[2] === userId)
-      .map(r => ({
-        paymentId: r[0],
-        debtId: r[1],
-        userId: r[2],
-        amount: Number(r[3]) || 0,
-        driveFileId: r[4],
-        slipViewUrl: r[5],
-        uploadedAt: r[6],
-        verificationStatus: r[7] || 'PENDING',
-        adminNote: r[8] || ''
-      }))
-      .reverse();
+    const payments = await getAllPayments();
+    return payments.filter(p => p.userId === userId);
   } catch (error) {
     console.error('Error getting payments by userId:', error.message);
     return [];
@@ -392,10 +378,14 @@ async function getPaymentsByUserId(userId) {
 }
 
 /**
- * [Admin] ดึงรายการสลิปและประวัติชำระทั้งหมด (รองรับ CSV Fast Read & GAS)
+ * [Admin] ดึงรายการสลิปและประวัติชำระทั้งหมด (รองรับ GViz Fast Read & Memory Cache)
  */
 async function getAllPayments() {
-  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก ~300ms และเป็นข้อมูล real-time เสมอ)
+  const cacheKey = 'payments_all';
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก ~150-250ms)
   if (sheetId) {
     try {
       const [paymentsCsvRes, debtors] = await Promise.all([
@@ -413,8 +403,7 @@ async function getAllPayments() {
 
           const slips = [];
           for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+            const clean = parseCsvLine(lines[i]);
 
             if (clean[0] && clean[0].startsWith('PAY-')) {
               const uId = clean[2] || '';
@@ -437,7 +426,9 @@ async function getAllPayments() {
             }
           }
           if (slips.length > 0) {
-            return slips.reverse();
+            const result = slips.reverse();
+            cache.set(cacheKey, result, 30);
+            return result;
           }
         }
       }
@@ -450,7 +441,10 @@ async function getAllPayments() {
   if (isGasConfigured()) {
     try {
       const res = await callGas('getAllPayments');
-      if (Array.isArray(res)) return res;
+      if (Array.isArray(res) && res.length > 0) {
+        cache.set(cacheKey, res, 30);
+        return res;
+      }
     } catch (gasErr) {
       console.warn('callGas getAllPayments warning:', gasErr.message);
     }
@@ -469,7 +463,7 @@ async function getAllPayments() {
       const debtorMap = new Map();
       dRows.forEach(r => debtorMap.set(r[0], { name: r[2] || r[1] || 'ไม่ระบุชื่อ', phone: r[3] || '' }));
 
-      return pRows.map((r, idx) => ({
+      const result = pRows.map((r, idx) => ({
         rowIndex: idx + 2,
         paymentId: r[0],
         debtId: r[1],
@@ -483,6 +477,11 @@ async function getAllPayments() {
         verificationStatus: r[7] || 'PENDING',
         adminNote: r[8] || ''
       })).reverse();
+
+      if (result.length > 0) {
+        cache.set(cacheKey, result, 30);
+      }
+      return result;
     } catch (error) {
       console.error('Error getting all payments:', error.message);
       return [];
@@ -497,7 +496,9 @@ async function getAllPayments() {
  */
 async function syncDriveSlips() {
   if (isGasConfigured()) {
-    return await callGas('syncDriveSlips');
+    const res = await callGas('syncDriveSlips');
+    cache.delByPattern(/^payments_/);
+    return res;
   }
   return { success: false, message: 'Google Apps Script not configured' };
 }
@@ -536,20 +537,81 @@ function deduplicateDebts(debts) {
 }
 
 /**
- * [Admin] ดึงรายการสัญญาทั้งหมด (พร้อมตัดสัญญาที่สร้างซ้ำอัตโนมัติ)
+ * [Admin] ดึงรายการสัญญาทั้งหมด (พร้อมตัดสัญญาที่สร้างซ้ำอัตโนมัติ และ High-Speed GViz Stream + Cache)
  */
 async function getAllDebts() {
+  const cacheKey = 'debts_all';
+  const cached = cache.get(cacheKey);
+  if (cached) return deduplicateDebts(cached);
+
   let list = [];
+
+  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก ~150-200ms)
+  if (sheetId) {
+    try {
+      const [debtsCsvRes, debtors] = await Promise.all([
+        fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAMES.DEBTS}`),
+        getAllDebtors()
+      ]);
+
+      if (debtsCsvRes.ok) {
+        const csvText = await debtsCsvRes.text();
+        const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+
+        if (lines.length > 1) {
+          const debtorMap = new Map();
+          debtors.forEach(d => debtorMap.set(d.userId, { name: d.fullName || d.displayName || 'ลูกค้า', phone: d.phone || '' }));
+
+          for (let i = 1; i < lines.length; i++) {
+            const clean = parseCsvLine(lines[i]);
+            if (clean[0] && clean[0].startsWith('DB-')) {
+              const uId = clean[1] || '';
+              const debtor = debtorMap.get(uId) || { name: 'ไม่ระบุชื่อ', phone: '' };
+
+              list.push({
+                rowIndex: i + 1,
+                debtId: clean[0],
+                userId: uId,
+                debtorName: debtor.name,
+                debtorPhone: debtor.phone,
+                totalAmount: Number(clean[2]) || 0,
+                installmentAmount: Number(clean[3]) || 0,
+                remainingBalance: Number(clean[4]) || 0,
+                dueDate: clean[5] || '',
+                cycleDays: Number(clean[6]) || 30,
+                debtStatus: clean[7] || 'ACTIVE',
+                createdAt: clean[8] || '',
+                updatedAt: clean[9] || ''
+              });
+            }
+          }
+          if (list.length > 0) {
+            cache.set(cacheKey, list, 30);
+            return deduplicateDebts(list);
+          }
+        }
+      }
+    } catch (csvErr) {
+      console.warn('Error reading Debts via CSV:', csvErr.message);
+    }
+  }
+
+  // 2. เรียกผ่าน GAS
   if (isGasConfigured()) {
     try {
       const gasDebts = await callGas('getAllDebts');
-      if (Array.isArray(gasDebts)) list = gasDebts;
+      if (Array.isArray(gasDebts) && gasDebts.length > 0) {
+        list = gasDebts;
+        cache.set(cacheKey, list, 30);
+        return deduplicateDebts(list);
+      }
     } catch (err) {
       console.warn('callGas getAllDebts error:', err.message);
     }
   }
 
-  if (list.length === 0 && sheets && sheetId) {
+  // 3. Fallback ผ่าน Service Account
+  if (sheets && sheetId) {
     try {
       const [debtsRes, debtorsRes] = await Promise.all([
         sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTS}!A2:J` }),
@@ -576,6 +638,10 @@ async function getAllDebts() {
         createdAt: r[8] || '',
         updatedAt: r[9] || ''
       }));
+
+      if (list.length > 0) {
+        cache.set(cacheKey, list, 30);
+      }
     } catch (error) {
       console.error('Error getting all debts:', error.message);
       list = [];
@@ -593,12 +659,16 @@ async function deleteDebt(debtId) {
   if (!cleanId) throw new Error('debtId is required');
 
   deletedDebtIds.add(cleanId);
+  cache.delByPattern(/^debts_/);
 
   if (isGasConfigured()) {
     try {
-      return await callGas('deleteDebt', { debtId: cleanId });
+      const res = await callGas('deleteDebt', { debtId: cleanId });
+      cache.delByPattern(/^debts_/);
+      return res;
     } catch (gasErr) {
       console.warn('callGas deleteDebt note:', gasErr.message);
+      cache.delByPattern(/^debts_/);
       return { deleted: true, debtId: cleanId, note: 'Marked deleted locally' };
     }
   }
@@ -630,6 +700,7 @@ async function deleteDebt(debtId) {
                 }]
               }
             });
+            cache.delByPattern(/^debts_/);
             return { deleted: true, debtId: cleanId };
           }
         }
@@ -639,6 +710,7 @@ async function deleteDebt(debtId) {
     }
   }
 
+  cache.delByPattern(/^debts_/);
   return { deleted: true, debtId: cleanId };
 }
 
@@ -646,8 +718,12 @@ async function deleteDebt(debtId) {
  * [Admin] อนุมัติสลิป และหักลดยอดหนี้คงเหลือ
  */
 async function approvePayment({ paymentId, confirmedAmount, note = 'อนุมัติเรียบร้อย' }) {
+  cache.delByPattern(/^(payments_|debts_)/);
+
   if (isGasConfigured()) {
-    return await callGas('approvePayment', { paymentId, confirmedAmount, note });
+    const res = await callGas('approvePayment', { paymentId, confirmedAmount, note });
+    cache.delByPattern(/^(payments_|debts_)/);
+    return res;
   }
 
   if (!sheets || !sheetId) throw new Error('Sheets not configured');
@@ -722,6 +798,7 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
     }
   }
 
+  cache.delByPattern(/^(payments_|debts_)/);
   return { paymentId, debtId, userId, paidAmount, status: 'VERIFIED', updatedDebt };
 }
 
@@ -729,8 +806,12 @@ async function approvePayment({ paymentId, confirmedAmount, note = 'อนุม
  * [Admin] ปฏิเสธสลิป
  */
 async function rejectPayment({ paymentId, reason = 'ยอดเงินหรือสลิปไม่ถูกต้อง' }) {
+  cache.delByPattern(/^payments_/);
+
   if (isGasConfigured()) {
-    return await callGas('rejectPayment', { paymentId, reason });
+    const res = await callGas('rejectPayment', { paymentId, reason });
+    cache.delByPattern(/^payments_/);
+    return res;
   }
 
   if (!sheets || !sheetId) throw new Error('Sheets not configured');
@@ -757,6 +838,7 @@ async function rejectPayment({ paymentId, reason = 'ยอดเงินหร�
     }
   });
 
+  cache.delByPattern(/^payments_/);
   return { paymentId, debtId, userId, status: 'REJECTED', reason };
 }
 
@@ -964,6 +1046,10 @@ async function getRecentReminderLogs(limit = 15) {
  * ดึงรายชื่อผู้ดูแลระบบทั้งหมด (Google Sheet 'admin')
  */
 async function getAllAdmins() {
+  const cacheKey = 'admins_all';
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
   // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก Real-time)
   if (sheetId) {
     try {
@@ -975,8 +1061,7 @@ async function getAllAdmins() {
         if (lines.length > 1) {
           const admins = [];
           for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+            const clean = parseCsvLine(lines[i]);
             if (clean[0] && clean[0].startsWith('U')) {
               admins.push({
                 userId: clean[0],
@@ -989,7 +1074,10 @@ async function getAllAdmins() {
               });
             }
           }
-          if (admins.length > 0) return admins;
+          if (admins.length > 0) {
+            cache.set(cacheKey, admins, 30);
+            return admins;
+          }
         }
       }
     } catch (csvErr) {
@@ -1001,7 +1089,10 @@ async function getAllAdmins() {
   if (isGasConfigured()) {
     try {
       const res = await callGas('getAllAdmins', {}, 0);
-      if (Array.isArray(res)) return res;
+      if (Array.isArray(res) && res.length > 0) {
+        cache.set(cacheKey, res, 30);
+        return res;
+      }
     } catch (e) {
       console.warn('callGas getAllAdmins note:', e.message);
     }
@@ -1015,7 +1106,7 @@ async function getAllAdmins() {
         range: `${SHEET_NAMES.ADMINS}!A2:G`
       });
       const rows = res.data.values || [];
-      return rows
+      const admins = rows
         .filter(r => r[0] && r[0].startsWith('U'))
         .map(r => ({
           userId: r[0],
@@ -1026,6 +1117,10 @@ async function getAllAdmins() {
           createdAt: r[5] || '',
           status: (r[6] || 'ACTIVE').toUpperCase()
         }));
+      if (admins.length > 0) {
+        cache.set(cacheKey, admins, 30);
+      }
+      return admins;
     } catch (err) {
       console.warn('Sheets API getAllAdmins note:', err.message);
     }
@@ -1038,8 +1133,12 @@ async function getAllAdmins() {
  * บันทึกหรืออัปเดตผู้ดูแลระบบ
  */
 async function saveAdmin(adminData) {
+  cache.delByPattern(/^admins_/);
+
   if (isGasConfigured()) {
-    return await callGas('saveAdmin', adminData);
+    const res = await callGas('saveAdmin', adminData);
+    cache.delByPattern(/^admins_/);
+    return res;
   }
 
   if (!sheets || !sheetId) {
@@ -1073,6 +1172,7 @@ async function saveAdmin(adminData) {
         values: [[displayName, role, phone, note, rows[foundIndex - 1][5] || now, status]]
       }
     });
+    cache.delByPattern(/^admins_/);
     return { action: 'updated', userId, displayName, role, status };
   } else {
     await sheets.spreadsheets.values.append({
@@ -1083,6 +1183,7 @@ async function saveAdmin(adminData) {
         values: [[userId, displayName, role, phone, note, now, status]]
       }
     });
+    cache.delByPattern(/^admins_/);
     return { action: 'created', userId, displayName, role, status };
   }
 }
@@ -1091,8 +1192,12 @@ async function saveAdmin(adminData) {
  * ลบผู้ดูแลระบบ
  */
 async function deleteAdmin(userId) {
+  cache.delByPattern(/^admins_/);
+
   if (isGasConfigured()) {
-    return await callGas('deleteAdmin', { userId });
+    const res = await callGas('deleteAdmin', { userId });
+    cache.delByPattern(/^admins_/);
+    return res;
   }
 
   if (!sheets || !sheetId) {
@@ -1132,10 +1237,12 @@ async function deleteAdmin(userId) {
           }]
         }
       });
+      cache.delByPattern(/^admins_/);
       return { deleted: true, userId };
     }
   }
 
+  cache.delByPattern(/^admins_/);
   return { deleted: false, message: 'Admin not found' };
 }
 

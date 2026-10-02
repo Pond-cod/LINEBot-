@@ -6,8 +6,8 @@
   <title>ระบบลูกหนี้และชำระเงิน - Client Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/client.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/client.css?v=5.0">
   <!-- LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -37,19 +37,30 @@
       <!-- ========================================== -->
       <section id="view-dashboard" class="sub-view active">
         <!-- Login Banner (shown when not logged in with LINE) -->
-        <div class="action-banner" id="loginNoticeBanner" style="display: none; background: linear-gradient(135deg, #06C755 0%, #059669 100%); margin-bottom: 14px; cursor: pointer; border: none;">
+        <div class="action-banner" id="loginNoticeBanner" style="display: none;">
           <div class="banner-text">
-            <h4 style="color: #FFFFFF;">💬 เข้าสู่ระบบด้วย LINE</h4>
-            <p style="color: rgba(255,255,255,0.9); font-size: 11px;">กดเพื่อเชื่อมต่อบัญชีจริง และดูยอดหนี้ของคุณ</p>
+            <h4>💬 เข้าสู่ระบบด้วย LINE</h4>
+            <p>กดเพื่อเชื่อมต่อบัญชีจริง และดูยอดหนี้ของคุณ</p>
           </div>
-          <button class="banner-btn" id="btnBannerLogin" style="background: #FFFFFF; color: #059669; font-weight: 700; white-space: nowrap;">เข้าสู่ระบบ</button>
+          <button class="banner-btn" id="btnBannerLogin">เข้าสู่ระบบ</button>
         </div>
 
-        <!-- Balance Card -->
+        <!-- Virtual Glass Credit Card (Apple Wallet Minimalist) -->
         <div class="balance-hero-card">
-          <div class="hero-tag">
-            <span id="heroDebtId">สัญญาเลขที่: -</span>
+          <div class="card-top-row">
+            <div class="card-chip">
+              <div class="emv-chip"></div>
+              <svg class="contactless-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8.5 16.5a5 5 0 0 1 0-9"></path>
+                <path d="M12 19a9 9 0 0 0 0-14"></path>
+                <path d="M15.5 21.5a13 13 0 0 0 0-19"></path>
+              </svg>
+            </div>
+            <div class="hero-tag">
+              <span id="heroDebtId">สัญญาเลขที่: -</span>
+            </div>
           </div>
+
           <div class="hero-label">ยอดหนี้คงเหลือปัจจุบัน</div>
           <div class="hero-amount" id="heroRemaining">฿0.00</div>
 
@@ -87,10 +98,10 @@
           <button class="banner-btn" id="btnGoToPay">ชำระเงินเลย</button>
         </div>
 
-        <!-- Notice Card -->
-        <div class="metric-card" style="margin-top: 12px;">
-          <div style="font-size: 13px; font-weight: 600; color: #1E293B; margin-bottom: 4px;">💡 คำแนะนำ</div>
-          <div style="font-size: 12px; color: #64748B; line-height: 1.6;">
+        <!-- Notice / Tips -->
+        <div class="tip-box">
+          <div class="tip-title">💡 คำแนะนำการชำระ</div>
+          <div class="tip-desc">
             • ระบบจะส่งแจ้งเตือนยอดชำระล่วงหน้าเวลา 08:00 น.<br>
             • คุณสามารถส่งรูปสลิปในแชท LINE หรือแนบผ่านหน้านี้ได้ตลอด 24 ชม.
           </div>
@@ -104,15 +115,15 @@
         <!-- Bank Account Card -->
         <div class="bank-info-card">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 14px; font-weight: 600; color: #0F172A;">ช่องทางการโอนเงิน</div>
-            <span style="font-size: 11px; background: #DCFCE7; color: #15803D; padding: 2px 8px; border-radius: 10px; font-weight: 600;">พร้อมเพย์ / ธนาคาร</span>
+            <div class="section-title">ช่องทางการโอนเงิน</div>
+            <span style="font-size: 11px; background: rgba(0, 229, 153, 0.12); color: var(--primary); padding: 2px 10px; border-radius: 12px; font-weight: 600;">พร้อมเพย์ / ธนาคาร</span>
           </div>
 
           <div class="bank-row">
             <div>
-              <div style="font-size: 11px; color: #64748B;">ธนาคารกสิกรไทย (KBANK)</div>
+              <div style="font-size: 11px; color: var(--text-dim);">ธนาคารกสิกรไทย (KBANK)</div>
               <div class="account-num" id="bankAccNo">123-4-56789-0</div>
-              <div style="font-size: 11px; color: #64748B; margin-top: 2px;">ชื่อบัญชี: บจก. จัดการหนี้สิน</div>
+              <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">ชื่อบัญชี: บจก. จัดการหนี้สิน</div>
             </div>
             <button class="btn-copy" id="btnCopyAcc">
               <span>📋</span> คัดลอก
@@ -122,20 +133,20 @@
 
         <!-- Upload Slip Card -->
         <div class="upload-card">
-          <div style="font-size: 14px; font-weight: 600; color: #0F172A; margin-bottom: 4px;">แนบหลักฐานการโอนเงิน (สลิป)</div>
-          <p style="font-size: 12px; color: #64748B; margin-bottom: 14px;">รูปภาพจะถูกบันทึกเข้า Google Drive และส่งให้เจ้าหน้าที่ตรวจสอบ</p>
+          <div class="section-title">แนบหลักฐานการโอนเงิน (สลิป)</div>
+          <p class="section-subtitle">รูปภาพจะถูกบีบอัดและส่งเข้า Google Drive อัตโนมัติ</p>
 
           <input type="file" id="slipFileInput" accept="image/*" style="display: none;">
           
           <div class="dropzone" id="dropzoneArea">
             <div class="dropzone-icon">📸</div>
             <div class="dropzone-title">แตะเพื่อถ่ายรูป หรือเลือกไฟล์สลิป</div>
-            <div class="dropzone-hint">รองรับไฟล์ JPG, PNG (สูงสุด 10MB)</div>
+            <div class="dropzone-hint">รองรับไฟล์ JPG, PNG, WebP (สูงสุด 10MB)</div>
           </div>
 
           <div class="preview-container" id="previewContainer">
             <img id="slipPreviewImg" src="" alt="Preview" class="preview-img">
-            <button class="btn-remove-preview" id="btnRemovePreview">✕</button>
+            <button class="btn-remove-preview" id="btnRemovePreview" title="ลบรูป">✕</button>
           </div>
 
           <div class="form-field">
@@ -154,8 +165,8 @@
       <!-- ========================================== -->
       <section id="view-history" class="sub-view">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-          <h3 style="font-size: 16px; font-weight: 600; color: #0F172A;">ประวัติการส่งสลิป & ชำระเงิน</h3>
-          <span id="historyCountBadge" style="font-size: 11px; color: #64748B;">0 รายการ</span>
+          <h3 class="section-title">ประวัติการส่งสลิป & ชำระเงิน</h3>
+          <span id="historyCountBadge" style="font-size: 11px; color: var(--text-dim);">0 รายการ</span>
         </div>
 
         <div class="history-list" id="historyListContainer">
@@ -171,17 +182,17 @@
       <!-- ========================================== -->
       <section id="view-profile" class="sub-view">
         <div class="profile-card">
-          <div style="font-size: 15px; font-weight: 600; color: #0F172A; margin-bottom: 14px;">ข้อมูลบัญชีผู้กู้</div>
+          <div class="section-title" style="margin-bottom: 14px;">ข้อมูลบัญชีผู้กู้</div>
 
           <div class="profile-field-row">
             <span class="field-label">สถานะเชื่อมต่อ</span>
-            <span class="field-val" id="profileLoginStatus" style="font-weight: 600; color: #F59E0B;">กำลังตรวจสอบ</span>
+            <span class="field-val" id="profileLoginStatus" style="font-weight: 600; color: var(--warning);">กำลังตรวจสอบ</span>
           </div>
           <div class="profile-field-row">
             <span class="field-label">LINE User ID</span>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
               <span class="field-val" id="profileUserId" style="font-size: 11px; font-family: monospace;">-</span>
-              <button id="btnCopyUserId" title="คัดลอก LINE ID" style="background: none; border: none; cursor: pointer; font-size: 13px; color: #64748B;">📋</button>
+              <button id="btnCopyUserId" title="คัดลอก LINE ID" style="background: none; border: none; cursor: pointer; font-size: 13px; color: var(--text-dim);">📋</button>
             </div>
           </div>
           <div class="profile-field-row">
@@ -208,25 +219,25 @@
 
         <!-- Auth Action Buttons -->
         <div style="margin-top: 14px;">
-          <button id="btnLoginLine" class="btn-primary" style="display: none; background: #06C755; width: 100%;">
+          <button id="btnLoginLine" class="btn-primary" style="display: none; background: #06C755; color: #FFFFFF; width: 100%;">
             <span>💬 เข้าสู่ระบบด้วย LINE (LINE Login)</span>
           </button>
-          <button id="btnLogoutLine" style="display: none; width: 100%; padding: 12px; border: 1.5px solid #EF4444; color: #EF4444; border-radius: 14px; font-weight: 600; cursor: pointer; background: transparent; font-family: inherit; font-size: 14px;">
+          <button id="btnLogoutLine" style="display: none; width: 100%; padding: 12px; border: 1.5px solid var(--danger); color: var(--danger); border-radius: var(--radius-md); font-weight: 600; cursor: pointer; background: transparent; font-family: inherit; font-size: 14px;">
             <span>🚪 ออกจากระบบ LINE</span>
           </button>
         </div>
 
-        <div class="profile-card" style="margin-top: 14px;">
-          <div style="font-size: 15px; font-weight: 600; color: #0F172A; margin-bottom: 14px;">ศูนย์ช่วยเหลือและติดต่อ</div>
-          <p style="font-size: 12px; color: #64748B; line-height: 1.6;">
+        <div class="tip-box" style="margin-top: 14px;">
+          <div class="tip-title">📞 ศูนย์ช่วยเหลือและติดต่อ</div>
+          <div class="tip-desc">
             หากมีข้อสงสัยเกี่ยวกับยอดเงิน หรือต้องการปรับโครงสร้างหนี้ สามารถพิมพ์ข้อความในแชท LINE เพื่อพูดคุยกับเจ้าหน้าที่ได้ตลอดเวลาครับ
-          </p>
+          </div>
         </div>
       </section>
 
     </main>
 
-    <!-- Floating Bottom Navigation Bar -->
+    <!-- Floating Bottom Navigation Bar (Minimalist Frosted Capsule) -->
     <nav class="bottom-nav">
       <button class="nav-item active" data-target="view-dashboard">
         <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -257,6 +268,6 @@
 
   </div>
 
-  <script src="js/client.js?v=4.0"></script>
+  <script src="js/client.js?v=5.0"></script>
 </body>
 </html>

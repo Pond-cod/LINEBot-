@@ -409,16 +409,19 @@ async function loadStats() {
 
     if (data.success && data.stats) {
       const s = data.stats;
-      if (statRemaining) statRemaining.textContent = formatMoney(s.totalRemaining);
-      if (statPendingSlips) statPendingSlips.textContent = `${s.pendingSlipsCount} ใบ`;
-      if (statDueToday) statDueToday.textContent = `${s.dueTodayCount} ราย`;
-      if (statTotalContracts) statTotalContracts.textContent = `${s.activeDebtsCount} สัญญา`;
-      if (statTotalDebtors) statTotalDebtors.textContent = `${s.debtorsCount} คน`;
+      const totalContractsNum = s.activeCount ?? s.totalContracts ?? s.activeDebtsCount ?? 0;
+      const totalDebtorsNum = s.totalDebtors ?? s.debtorsCount ?? 0;
 
-      if (sidebarContractsBadge) sidebarContractsBadge.textContent = s.activeDebtsCount;
+      if (statRemaining) statRemaining.textContent = formatMoney(s.totalRemaining);
+      if (statPendingSlips) statPendingSlips.textContent = `${s.pendingSlipsCount || 0} ใบ`;
+      if (statDueToday) statDueToday.textContent = `${s.dueTodayCount || 0} ราย`;
+      if (statTotalContracts) statTotalContracts.textContent = `${totalContractsNum} สัญญา`;
+      if (statTotalDebtors) statTotalDebtors.textContent = `${totalDebtorsNum} คน`;
+
+      if (sidebarContractsBadge) sidebarContractsBadge.textContent = totalContractsNum;
       if (sidebarSlipsBadge) {
-        sidebarSlipsBadge.textContent = `${s.pendingSlipsCount} ใบ`;
-        sidebarSlipsBadge.style.display = s.pendingSlipsCount > 0 ? 'inline-block' : 'none';
+        sidebarSlipsBadge.textContent = `${s.pendingSlipsCount || 0} ใบ`;
+        sidebarSlipsBadge.style.display = (s.pendingSlipsCount > 0) ? 'inline-block' : 'none';
       }
     }
   } catch (err) {
@@ -731,18 +734,23 @@ if (btnRefreshContracts) btnRefreshContracts.addEventListener('click', loadContr
 window.deleteContract = async function(debtId) {
   if (!confirm(`ต้องการลบสัญญา ${debtId} ใช่หรือไม่? ข้อมูลในระบบจะถูกนำออก`)) return;
 
+  // Optimistic UI update: Remove row immediately from local table
+  allContracts = allContracts.filter(c => c.debtId !== debtId);
+  renderContractsTable();
+
   try {
     const res = await adminFetch(`/api/admin/contracts/${debtId}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
       showToast('ลบสัญญาสำเร็จ', '✅');
-      loadContracts();
       loadStats();
     } else {
       showToast(data.message || 'ลบสัญญาไม่สำเร็จ', '❌');
+      loadContracts();
     }
   } catch (err) {
     showToast('เกิดข้อผิดพลาดในการลบสัญญา', '❌');
+    loadContracts();
   }
 };
 
@@ -1020,7 +1028,16 @@ window.approveSlip = async function(paymentId, amount) {
     return;
   }
 
-  showToast('กำลังอนุมัติสลิปและปรับยอดหนี้...', '⏳');
+  // Optimistic UI update: instantly mark slip as VERIFIED in local array
+  const slip = allSlips.find(s => s.paymentId === paymentId);
+  if (slip) {
+    slip.verificationStatus = 'VERIFIED';
+    slip.amount = numAmount;
+    updateSlipBadgeCounts();
+    renderSlips();
+  }
+
+  showToast('อนุมัติสลิปและปรับยอดหนี้เรียบร้อย...', '✅');
   try {
     const res = await adminFetch('/api/admin/slips/approve', {
       method: 'POST',
@@ -1029,15 +1046,15 @@ window.approveSlip = async function(paymentId, amount) {
     });
     const data = await res.json();
     if (data.success) {
-      showToast('อนุมัติสลิปและส่งข้อความแจ้งลูกหนี้สำเร็จ!', '✅');
-      loadSlips();
       loadStats();
       loadContracts();
     } else {
       showToast(data.message || 'อนุมัติไม่สำเร็จ', '❌');
+      loadSlips();
     }
   } catch (err) {
     showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    loadSlips();
   }
 };
 
@@ -1045,7 +1062,16 @@ window.rejectSlip = async function(paymentId) {
   const reason = prompt('กรุณาระบุเหตุผลในการปฏิเสธสลิป (จะส่งแจ้งลูกหนี้ทาง LINE):', 'สลิปไม่ถูกต้อง หรือยอดเงินไม่ตรง');
   if (reason === null) return;
 
-  showToast('กำลังปฏิเสธสลิป...', '⏳');
+  // Optimistic UI update: instantly mark slip as REJECTED in local array
+  const slip = allSlips.find(s => s.paymentId === paymentId);
+  if (slip) {
+    slip.verificationStatus = 'REJECTED';
+    slip.adminNote = reason;
+    updateSlipBadgeCounts();
+    renderSlips();
+  }
+
+  showToast('ปฏิเสธสลิปและส่งข้อความแจ้งเตือนแล้ว...', 'ℹ️');
   try {
     const res = await adminFetch('/api/admin/slips/reject', {
       method: 'POST',
@@ -1053,14 +1079,13 @@ window.rejectSlip = async function(paymentId) {
       body: JSON.stringify({ paymentId, reason })
     });
     const data = await res.json();
-    if (data.success) {
-      showToast('ปฏิเสธสลิปและส่งข้อความแจ้งเตือนแล้ว', '✅');
-      loadSlips();
-    } else {
+    if (!data.success) {
       showToast(data.message || 'ปฏิเสธไม่สำเร็จ', '❌');
+      loadSlips();
     }
   } catch (err) {
     showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+    loadSlips();
   }
 };
 
