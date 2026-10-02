@@ -9,6 +9,7 @@ const {
   getSlips,
   approveSlip,
   rejectSlip,
+  syncSlips,
   remindSingleDebt,
   getDebtors,
   getAdmins,
@@ -60,6 +61,7 @@ router.delete('/admin/contracts/:debtId', requireAdminAuth, deleteContract);
 router.get('/admin/slips', requireAdminAuth, getSlips);
 router.post('/admin/slips/approve', requireAdminAuth, approveSlip);
 router.post('/admin/slips/reject', requireAdminAuth, rejectSlip);
+router.post('/admin/slips/sync', requireAdminAuth, syncSlips);
 router.post('/admin/remind/:debtId', requireAdminAuth, remindSingleDebt);
 
 // Admin Management (เก็บใน Google Sheet 'admin' และแก้ไขผ่านหน้าเว็บ)

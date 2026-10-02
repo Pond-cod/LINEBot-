@@ -392,44 +392,114 @@ async function getPaymentsByUserId(userId) {
 }
 
 /**
- * [Admin] ดึงรายการสลิปและประวัติชำระทั้งหมด
+ * [Admin] ดึงรายการสลิปและประวัติชำระทั้งหมด (รองรับ CSV Fast Read & GAS)
  */
 async function getAllPayments() {
+  // 1. อ่านผ่าน Google Sheets Visualization CSV API (เร็วมาก ~300ms และเป็นข้อมูล real-time เสมอ)
+  if (sheetId) {
+    try {
+      const [paymentsCsvRes, debtors] = await Promise.all([
+        fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAMES.PAYMENTS}`),
+        getAllDebtors()
+      ]);
+
+      if (paymentsCsvRes.ok) {
+        const csvText = await paymentsCsvRes.text();
+        const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+
+        if (lines.length > 1) {
+          const debtorMap = new Map();
+          debtors.forEach(d => debtorMap.set(d.userId, { name: d.fullName || d.displayName || 'ลูกค้า', phone: d.phone || '' }));
+
+          const slips = [];
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+
+            if (clean[0] && clean[0].startsWith('PAY-')) {
+              const uId = clean[2] || '';
+              const debtor = debtorMap.get(uId) || { name: 'ลูกค้า', phone: '' };
+
+              slips.push({
+                rowIndex: i + 1,
+                paymentId: clean[0],
+                debtId: clean[1] || '',
+                userId: uId,
+                debtorName: debtor.name,
+                debtorPhone: debtor.phone,
+                amount: Number(clean[3]) || 0,
+                driveFileId: clean[4] || '',
+                slipViewUrl: clean[5] || (clean[4] ? `https://lh3.googleusercontent.com/d/${clean[4]}` : ''),
+                uploadedAt: clean[6] || '',
+                verificationStatus: clean[7] || 'PENDING',
+                adminNote: clean[8] || ''
+              });
+            }
+          }
+          if (slips.length > 0) {
+            return slips.reverse();
+          }
+        }
+      }
+    } catch (csvErr) {
+      console.warn('Error reading Payments via CSV:', csvErr.message);
+    }
+  }
+
+  // 2. เรียกผ่าน GAS
   if (isGasConfigured()) {
-    return await callGas('getAllPayments');
+    try {
+      const res = await callGas('getAllPayments');
+      if (Array.isArray(res)) return res;
+    } catch (gasErr) {
+      console.warn('callGas getAllPayments warning:', gasErr.message);
+    }
   }
 
-  if (!sheets || !sheetId) return [];
+  // 3. Fallback ผ่าน Service Account Sheets API
+  if (sheets && sheetId) {
+    try {
+      const [paymentsRes, debtorsRes] = await Promise.all([
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.PAYMENTS}!A2:I` }),
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:G` })
+      ]);
 
-  try {
-    const [paymentsRes, debtorsRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.PAYMENTS}!A2:I` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:G` })
-    ]);
+      const pRows = paymentsRes.data.values || [];
+      const dRows = debtorsRes.data.values || [];
+      const debtorMap = new Map();
+      dRows.forEach(r => debtorMap.set(r[0], { name: r[2] || r[1] || 'ไม่ระบุชื่อ', phone: r[3] || '' }));
 
-    const pRows = paymentsRes.data.values || [];
-    const dRows = debtorsRes.data.values || [];
-    const debtorMap = new Map();
-    dRows.forEach(r => debtorMap.set(r[0], { name: r[2] || r[1] || 'ไม่ระบุชื่อ', phone: r[3] || '' }));
-
-    return pRows.map((r, idx) => ({
-      rowIndex: idx + 2,
-      paymentId: r[0],
-      debtId: r[1],
-      userId: r[2],
-      debtorName: debtorMap.get(r[2])?.name || 'ลูกค้า',
-      debtorPhone: debtorMap.get(r[2])?.phone || '',
-      amount: Number(r[3]) || 0,
-      driveFileId: r[4],
-      slipViewUrl: r[5],
-      uploadedAt: r[6],
-      verificationStatus: r[7] || 'PENDING',
-      adminNote: r[8] || ''
-    })).reverse();
-  } catch (error) {
-    console.error('Error getting all payments:', error.message);
-    return [];
+      return pRows.map((r, idx) => ({
+        rowIndex: idx + 2,
+        paymentId: r[0],
+        debtId: r[1],
+        userId: r[2],
+        debtorName: debtorMap.get(r[2])?.name || 'ลูกค้า',
+        debtorPhone: debtorMap.get(r[2])?.phone || '',
+        amount: Number(r[3]) || 0,
+        driveFileId: r[4],
+        slipViewUrl: r[5] || (r[4] ? `https://lh3.googleusercontent.com/d/${r[4]}` : ''),
+        uploadedAt: r[6],
+        verificationStatus: r[7] || 'PENDING',
+        adminNote: r[8] || ''
+      })).reverse();
+    } catch (error) {
+      console.error('Error getting all payments:', error.message);
+      return [];
+    }
   }
+
+  return [];
+}
+
+/**
+ * ซิงค์ไฟล์สลิปจาก Google Drive เข้าสู่ Sheet Payments
+ */
+async function syncDriveSlips() {
+  if (isGasConfigured()) {
+    return await callGas('syncDriveSlips');
+  }
+  return { success: false, message: 'Google Apps Script not configured' };
 }
 
 const deletedDebtIds = new Set();
@@ -1090,5 +1160,6 @@ module.exports = {
   getAllAdmins,
   saveAdmin,
   deleteAdmin,
-  deleteDebt
+  deleteDebt,
+  syncDriveSlips
 };

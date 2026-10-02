@@ -357,6 +357,13 @@ body {
   background: #0369A1;
 }
 
+.topbar-btn.active {
+  background: rgba(14, 165, 233, 0.2) !important;
+  border-color: #0EA5E9 !important;
+  color: #38BDF8 !important;
+  font-weight: 600;
+}
+
 /* Views Viewport */
 .views-viewport {
   flex: 1;
@@ -1099,5 +1106,58 @@ body {
   }
   .form-row, .form-row-3 {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ==============================================================================
+   Modal Overlay & Slip Lightbox
+   ============================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(3, 7, 18, 0.88);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-container {
+  background: #131D33;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  animation: slideUp 0.2s ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--surface-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .slip-modal-container .modal-body {
+    grid-template-columns: 1fr !important;
   }
 }

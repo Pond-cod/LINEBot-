@@ -765,8 +765,34 @@ window.sendSingleReminder = async function(debtId) {
 };
 
 // ==============================================================================
-// 8. Slip Verification Hub
+// 8. Slip Verification Hub (Enhanced with Filters & Lightbox Modal)
 // ==============================================================================
+let currentSlipFilter = 'PENDING';
+const btnSyncDriveSlips = document.getElementById('btnSyncDriveSlips');
+const slipSearchInput = document.getElementById('slipSearchInput');
+const slipFilterTabs = document.getElementById('slipFilterTabs');
+const badgePendingCount = document.getElementById('badgePendingCount');
+const badgeAllCount = document.getElementById('badgeAllCount');
+const badgeVerifiedCount = document.getElementById('badgeVerifiedCount');
+const badgeRejectedCount = document.getElementById('badgeRejectedCount');
+
+// Modal Elements
+const slipLightboxModal = document.getElementById('slipLightboxModal');
+const btnCloseSlipModal = document.getElementById('btnCloseSlipModal');
+const lightboxImg = document.getElementById('lightboxImg');
+const btnOpenSlipFull = document.getElementById('btnOpenSlipFull');
+const modalSlipDebtorName = document.getElementById('modalSlipDebtorName');
+const modalSlipMeta = document.getElementById('modalSlipMeta');
+const modalSlipAmount = document.getElementById('modalSlipAmount');
+const modalSlipDate = document.getElementById('modalSlipDate');
+const modalSlipDebtId = document.getElementById('modalSlipDebtId');
+const modalSlipDebtor = document.getElementById('modalSlipDebtor');
+const modalSlipPhone = document.getElementById('modalSlipPhone');
+const modalSlipStatusBadge = document.getElementById('modalSlipStatusBadge');
+const btnModalApprove = document.getElementById('btnModalApprove');
+const btnModalReject = document.getElementById('btnModalReject');
+let activeModalSlip = null;
+
 async function loadSlips() {
   if (!slipsContainer) return;
   slipsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">กำลังโหลดรายการสลิป...</div>';
@@ -777,6 +803,7 @@ async function loadSlips() {
 
     if (data.success && data.slips) {
       allSlips = data.slips;
+      updateSlipBadgeCounts();
       renderSlips();
     }
   } catch (err) {
@@ -785,19 +812,59 @@ async function loadSlips() {
   }
 }
 
+function updateSlipBadgeCounts() {
+  const pending = allSlips.filter(s => !s.verificationStatus || s.verificationStatus === 'PENDING').length;
+  const verified = allSlips.filter(s => s.verificationStatus === 'VERIFIED' || s.verificationStatus === 'APPROVED').length;
+  const rejected = allSlips.filter(s => s.verificationStatus === 'REJECTED').length;
+
+  if (badgePendingCount) badgePendingCount.textContent = pending;
+  if (badgeAllCount) badgeAllCount.textContent = allSlips.length;
+  if (badgeVerifiedCount) badgeVerifiedCount.textContent = verified;
+  if (badgeRejectedCount) badgeRejectedCount.textContent = rejected;
+
+  // อัปเดตตัวเลขในการ์ดสถิติตรวจสอบสลิปด้วย
+  if (statPendingSlips) statPendingSlips.textContent = `${pending} ใบ`;
+}
+
 function renderSlips() {
   if (!slipsContainer) return;
 
-  if (allSlips.length === 0) {
-    slipsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">ไม่มีสลิปรอตรวจสอบในขณะนี้</div>';
+  const query = (slipSearchInput?.value || '').toLowerCase().trim();
+
+  const filtered = allSlips.filter(s => {
+    const status = s.verificationStatus || 'PENDING';
+    const matchFilter = currentSlipFilter === 'ALL' ||
+      (currentSlipFilter === 'PENDING' && status === 'PENDING') ||
+      (currentSlipFilter === 'VERIFIED' && (status === 'VERIFIED' || status === 'APPROVED')) ||
+      (currentSlipFilter === 'REJECTED' && status === 'REJECTED');
+
+    const matchQuery = !query ||
+      (s.debtorName || '').toLowerCase().includes(query) ||
+      (s.debtId || '').toLowerCase().includes(query) ||
+      (s.paymentId || '').toLowerCase().includes(query) ||
+      (s.userId || '').toLowerCase().includes(query);
+
+    return matchFilter && matchQuery;
+  });
+
+  if (filtered.length === 0) {
+    const emptyMsg = currentSlipFilter === 'PENDING'
+      ? '🎉 ไม่มีสลิปรอตรวจสอบในขณะนี้'
+      : 'ไม่พบรายการสลิปตามเงื่อนไขที่เลือก';
+    slipsContainer.innerHTML = `<div style="text-align: center; padding: 50px 20px; color: var(--text-muted); grid-column: 1 / -1;">${emptyMsg}</div>`;
     return;
   }
 
-  slipsContainer.innerHTML = allSlips.map(s => {
+  slipsContainer.innerHTML = filtered.map(s => {
     const isPending = !s.verificationStatus || s.verificationStatus === 'PENDING';
-    const statusPill = isPending
-      ? `<span class="badge-status due-today">รอตรวจสอบ</span>`
-      : (s.verificationStatus === 'APPROVED' ? `<span class="badge-status active">อนุมัติแล้ว</span>` : `<span class="badge-status overdue">ปฏิเสธ</span>`);
+    let statusPill = `<span class="badge-status due-today">รอตรวจสอบ</span>`;
+    if (s.verificationStatus === 'VERIFIED' || s.verificationStatus === 'APPROVED') {
+      statusPill = `<span class="badge-status active">อนุมัติแล้ว</span>`;
+    } else if (s.verificationStatus === 'REJECTED') {
+      statusPill = `<span class="badge-status overdue">ปฏิเสธ</span>`;
+    }
+
+    const previewUrl = s.slipViewUrl || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="%231E293B"/><text x="50%" y="50%" fill="%2394A3B8" font-size="14" text-anchor="middle" dominant-baseline="middle">🧾 สลิปโอนเงิน</text></svg>';
 
     return `
       <div class="slip-card">
@@ -805,27 +872,28 @@ function renderSlips() {
           <div>
             <div class="slip-debtor-name">${s.debtorName || 'คุณลูกค้า'}</div>
             <div class="slip-meta">สัญญา: <strong>${s.debtId || '-'}</strong> | รหัส: ${s.paymentId}</div>
-            <div class="slip-meta">ส่งเมื่อ: ${s.uploadedAt || '-'}</div>
+            <div class="slip-meta">📅 ส่งเมื่อ: ${s.uploadedAt || '-'}</div>
           </div>
           <div>${statusPill}</div>
         </div>
 
-        <div class="slip-preview-box" onclick="window.open('${s.slipViewUrl}', '_blank')">
-          <img src="${s.slipViewUrl}" class="slip-preview-img" alt="สลิปโอนเงิน" onerror="this.src='https://via.placeholder.com/300x200?text=Slip+Image'">
+        <div class="slip-preview-box" onclick="openSlipLightbox('${s.paymentId}')" title="คลิกเพื่อซูมดูรูปสลิปขนาดใหญ่">
+          <img src="${previewUrl}" class="slip-preview-img" alt="สลิปโอนเงิน" onerror="this.src='https://via.placeholder.com/300x200?text=Slip+Image'">
+          <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 6px; font-size: 11px; color: #FFF;">🔍 คลิกซูม</div>
         </div>
 
-        <div style="font-size: 13px; margin-bottom: 12px; display: flex; justify-content: space-between;">
+        <div style="font-size: 13px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px;">
           <span style="color: var(--text-muted);">ยอดเงินที่ระบุ:</span>
-          <strong style="color: #10B981; font-size: 15px;">${formatMoney(s.amount)}</strong>
+          <strong style="color: #10B981; font-size: 17px;">${formatMoney(s.amount)}</strong>
         </div>
 
         ${isPending ? `
           <div class="slip-actions">
             <button class="btn-slip-approve" onclick="approveSlip('${s.paymentId}', ${s.amount})">
-              ✅ อนุมัติ & หักลดยอด
+              ✅ อนุมัติ & ตัดยอด
             </button>
             <button class="btn-slip-reject" onclick="rejectSlip('${s.paymentId}')">
-              ❌ ปฏิเสธสลิป
+              ❌ ปฏิเสธ
             </button>
           </div>
         ` : `
@@ -838,10 +906,112 @@ function renderSlips() {
   }).join('');
 }
 
+// Lightbox Modal Functions
+window.openSlipLightbox = function(paymentId) {
+  const slip = allSlips.find(s => s.paymentId === paymentId);
+  if (!slip) return;
+
+  activeModalSlip = slip;
+  if (modalSlipDebtorName) modalSlipDebtorName.textContent = slip.debtorName || 'คุณลูกค้า';
+  if (modalSlipMeta) modalSlipMeta.textContent = `สัญญา: ${slip.debtId || '-'} | รหัส: ${slip.paymentId}`;
+  if (modalSlipAmount) modalSlipAmount.textContent = formatMoney(slip.amount);
+  if (modalSlipDate) modalSlipDate.textContent = slip.uploadedAt || '-';
+  if (modalSlipDebtId) modalSlipDebtId.textContent = slip.debtId || '-';
+  if (modalSlipDebtor) modalSlipDebtor.textContent = slip.debtorName || 'คุณลูกค้า';
+  if (modalSlipPhone) modalSlipPhone.textContent = slip.debtorPhone || '-';
+
+  const isPending = !slip.verificationStatus || slip.verificationStatus === 'PENDING';
+  if (modalSlipStatusBadge) {
+    modalSlipStatusBadge.textContent = isPending ? 'รอตรวจสอบ' : (slip.verificationStatus === 'VERIFIED' ? 'อนุมัติแล้ว' : 'ปฏิเสธ');
+    modalSlipStatusBadge.className = isPending ? 'badge-status due-today' : (slip.verificationStatus === 'VERIFIED' ? 'badge-status active' : 'badge-status overdue');
+  }
+
+  const previewUrl = slip.slipViewUrl || 'https://via.placeholder.com/600x800?text=Slip+Image';
+  if (lightboxImg) lightboxImg.src = previewUrl;
+  if (btnOpenSlipFull) btnOpenSlipFull.href = previewUrl;
+
+  const modalActions = document.getElementById('modalSlipActions');
+  if (modalActions) modalActions.style.display = isPending ? 'flex' : 'none';
+
+  if (slipLightboxModal) slipLightboxModal.style.display = 'flex';
+};
+
+function closeSlipLightbox() {
+  if (slipLightboxModal) slipLightboxModal.style.display = 'none';
+  activeModalSlip = null;
+}
+
+if (btnCloseSlipModal) btnCloseSlipModal.addEventListener('click', closeSlipLightbox);
+if (slipLightboxModal) {
+  slipLightboxModal.addEventListener('click', (e) => {
+    if (e.target === slipLightboxModal) closeSlipLightbox();
+  });
+}
+
+if (btnModalApprove) {
+  btnModalApprove.addEventListener('click', () => {
+    if (activeModalSlip) {
+      const pId = activeModalSlip.paymentId;
+      const amt = activeModalSlip.amount;
+      closeSlipLightbox();
+      approveSlip(pId, amt);
+    }
+  });
+}
+
+if (btnModalReject) {
+  btnModalReject.addEventListener('click', () => {
+    if (activeModalSlip) {
+      const pId = activeModalSlip.paymentId;
+      closeSlipLightbox();
+      rejectSlip(pId);
+    }
+  });
+}
+
+// Slip Filters & Tabs
+if (slipFilterTabs) {
+  slipFilterTabs.querySelectorAll('button[data-slip-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      slipFilterTabs.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentSlipFilter = btn.getAttribute('data-slip-filter');
+      renderSlips();
+    });
+  });
+}
+
+if (slipSearchInput) slipSearchInput.addEventListener('input', renderSlips);
 if (btnRefreshSlips) btnRefreshSlips.addEventListener('click', loadSlips);
 
+// Sync Drive Slips Button
+if (btnSyncDriveSlips) {
+  btnSyncDriveSlips.addEventListener('click', async () => {
+    btnSyncDriveSlips.disabled = true;
+    const oldText = btnSyncDriveSlips.innerHTML;
+    btnSyncDriveSlips.innerHTML = '<span>⏳ กำลังซิงค์จาก Drive...</span>';
+    showToast('กำลังค้นหาไฟล์สลิปใน Google Drive...', '⏳');
+
+    try {
+      const res = await adminFetch('/api/admin/slips/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'ซิงค์สลิปสำเร็จ!', '✅');
+        await loadSlips();
+      } else {
+        showToast(data.message || 'ซิงค์ไม่สำเร็จ', '⚠️');
+      }
+    } catch (err) {
+      showToast('เกิดข้อผิดพลาดในการซิงค์: ' + err.message, '❌');
+    } finally {
+      btnSyncDriveSlips.disabled = false;
+      btnSyncDriveSlips.innerHTML = oldText;
+    }
+  });
+}
+
 window.approveSlip = async function(paymentId, amount) {
-  const confirmed = prompt(`กรุณายืนยันยอดเงินที่อนุมัติ (บาท):`, amount || '');
+  const confirmed = prompt(`กรุณายืนยันยอดเงินที่อนุมัติ (บาท):\n(ระบบจะตัดลดยอดหนี้คงเหลือให้อัตโนมัติ)`, amount || '');
   if (confirmed === null) return;
 
   const numAmount = parseFloat(confirmed);
@@ -862,6 +1032,7 @@ window.approveSlip = async function(paymentId, amount) {
       showToast('อนุมัติสลิปและส่งข้อความแจ้งลูกหนี้สำเร็จ!', '✅');
       loadSlips();
       loadStats();
+      loadContracts();
     } else {
       showToast(data.message || 'อนุมัติไม่สำเร็จ', '❌');
     }

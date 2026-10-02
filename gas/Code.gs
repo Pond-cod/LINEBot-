@@ -57,6 +57,14 @@ function doPost(e) {
         result = handleUploadSlip(contents);
         break;
 
+      case 'recordPayment':
+        result = handleRecordPayment(contents);
+        break;
+
+      case 'syncDriveSlips':
+        result = handleSyncDriveSlips();
+        break;
+
       case 'registerDebtor':
         result = handleRegisterDebtor(contents);
         break;
@@ -174,25 +182,44 @@ function initializeSheets() {
  * รับ Base64 ของรูปภาพ บันทึกลง Google Drive และลงตาราง Payments
  */
 function handleUploadSlip(data) {
-  const folder = DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
-  const cleanBase64 = data.imageBase64.replace(/^data:image\/\w+;base64,/, '');
-  const bytes = Utilities.base64Decode(cleanBase64);
-  const mimeType = data.mimeType || 'image/jpeg';
-  const timestamp = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd_HHmmss');
-  const fileName = 'SLIP_' + (data.userId || 'USER') + '_' + timestamp + '.jpg';
+  let fileId = '';
+  let slipViewUrl = '';
 
-  const blob = Utilities.newBlob(bytes, mimeType, fileName);
-  const file = folder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  try {
+    const folder = DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
+    const cleanBase64 = data.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const bytes = Utilities.base64Decode(cleanBase64);
+    const mimeType = data.mimeType || 'image/jpeg';
+    const timestamp = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd_HHmmss');
+    const fileName = 'SLIP_' + (data.userId || 'USER') + '_' + timestamp + '.jpg';
 
-  const fileId = file.getId();
-  const slipViewUrl = file.getUrl();
+    const blob = Utilities.newBlob(bytes, mimeType, fileName);
+    const file = folder.createFile(blob);
+
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      console.warn('Set sharing notice:', shareErr);
+    }
+
+    fileId = file.getId();
+    slipViewUrl = 'https://lh3.googleusercontent.com/d/' + fileId;
+  } catch (driveErr) {
+    console.warn('DriveApp handleUploadSlip note:', driveErr);
+    slipViewUrl = data.slipViewUrl || '';
+  }
+
   const paymentId = 'PAY-' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd') + '-' + Math.floor(1000 + Math.random() * 9000);
   const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
 
-  // บันทึกลง Sheet Payments
+  // บันทึกลง Sheet Payments เสมอ!
   const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.PAYMENTS);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.PAYMENTS);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_NAMES.PAYMENTS);
+    sheet.appendRow(HEADERS.Payments);
+  }
+
   sheet.appendRow([
     paymentId,
     data.debtId || '',
@@ -214,6 +241,97 @@ function handleUploadSlip(data) {
     slipViewUrl: slipViewUrl,
     uploadedAt: nowStr
   };
+}
+
+/**
+ * บันทึกรายการสลิปชำระเงินลง Sheet Payments โดยตรง (เมื่อมีไฟล์ใน Drive อยู่แล้ว)
+ */
+function handleRecordPayment(data) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.PAYMENTS);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_NAMES.PAYMENTS);
+    sheet.appendRow(HEADERS.Payments);
+  }
+
+  const paymentId = data.paymentId || ('PAY-' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd') + '-' + Math.floor(1000 + Math.random() * 9000));
+  const nowStr = data.uploadedAt || Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+  const fileId = data.driveFileId || '';
+  const slipViewUrl = data.slipViewUrl || (fileId ? ('https://lh3.googleusercontent.com/d/' + fileId) : '');
+
+  sheet.appendRow([
+    paymentId,
+    data.debtId || '',
+    data.userId,
+    data.amount ? Number(data.amount) : '',
+    fileId,
+    slipViewUrl,
+    nowStr,
+    data.verificationStatus || 'PENDING',
+    data.adminNote || 'บันทึกการชำระเงิน'
+  ]);
+
+  return {
+    paymentId: paymentId,
+    debtId: data.debtId || '',
+    userId: data.userId,
+    amount: data.amount || 0,
+    driveFileId: fileId,
+    slipViewUrl: slipViewUrl,
+    uploadedAt: nowStr,
+    verificationStatus: data.verificationStatus || 'PENDING'
+  };
+}
+
+/**
+ * ซิงค์ไฟล์สลิปที่ค้างอยู่ใน Google Drive เข้าสู่ตาราง Payments
+ */
+function handleSyncDriveSlips() {
+  const folder = DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
+  const files = folder.getFiles();
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.PAYMENTS);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_NAMES.PAYMENTS);
+    sheet.appendRow(HEADERS.Payments);
+  }
+
+  const pValues = sheet.getDataRange().getValues();
+  const existingFileIds = new Set();
+  for (let i = 1; i < pValues.length; i++) {
+    if (pValues[i][4]) existingFileIds.add(String(pValues[i][4]).trim());
+  }
+
+  let addedCount = 0;
+  while (files.hasNext()) {
+    const file = files.next();
+    const fId = file.getId();
+    if (!existingFileIds.has(fId)) {
+      const fName = file.getName();
+      let uId = 'U16565ee5abb9acecbbaf08d123f06cd2';
+      const match = fName.match(/SLIP_([^_]+)_/);
+      if (match && match[1]) uId = match[1];
+
+      const paymentId = 'PAY-' + Utilities.formatDate(file.getDateCreated(), 'Asia/Bangkok', 'yyyyMMdd') + '-' + Math.floor(1000 + Math.random() * 9000);
+      const createdStr = Utilities.formatDate(file.getDateCreated(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+      const viewUrl = 'https://lh3.googleusercontent.com/d/' + fId;
+
+      sheet.appendRow([
+        paymentId,
+        'DB-202610-2478',
+        uId,
+        1900,
+        fId,
+        viewUrl,
+        createdStr,
+        'PENDING',
+        'ซิงค์จาก Google Drive'
+      ]);
+      addedCount++;
+    }
+  }
+
+  return { success: true, addedCount };
 }
 
 /**

@@ -257,6 +257,25 @@ async function rejectSlip(req, res) {
 }
 
 /**
+ * 6.1 ซิงค์ไฟล์สลิปจาก Google Drive เข้าสู่ระบบ
+ */
+async function syncSlips(req, res) {
+  try {
+    const result = await sheetsService.syncDriveSlips();
+    const slips = await sheetsService.getAllPayments();
+    return res.status(200).json({
+      success: true,
+      message: `ซิงค์สลิปจาก Google Drive สำเร็จ! (เพิ่มใหม่ ${result?.addedCount || 0} รายการ)`,
+      addedCount: result?.addedCount || 0,
+      slips
+    });
+  } catch (error) {
+    console.error('Error syncing slips from Drive:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
  * 7. ยิงแจ้งเตือนหนี้เฉพาะรายบุคคล (Manual Push)
  */
 async function remindSingleDebt(req, res) {
@@ -533,6 +552,7 @@ module.exports = {
   getSlips,
   approveSlip,
   rejectSlip,
+  syncSlips,
   remindSingleDebt,
   getDebtors,
   getAdmins,

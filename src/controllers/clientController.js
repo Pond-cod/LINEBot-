@@ -75,21 +75,27 @@ async function uploadSlipWeb(req, res) {
       targetDebtId = activeDebt?.debtId || '';
     }
 
-    // อัปโหลดเข้า Google Drive
+    // อัปโหลดเข้า Google Drive (พร้อม Fallback หาก DriveApp มีข้อจำกัดสิทธิ์)
     const timestamp = dayjs().format('YYYYMMDD_HHmmss');
     const fileName = `SLIP_WEB_${userId}_${timestamp}.jpg`;
-    const driveResult = await driveService.uploadSlipBuffer(buffer, fileName, mimeType, userId, targetDebtId, amount);
+    let driveResult = { fileId: '', webViewLink: '', paymentId: null };
 
-    // บันทึกลง Google Sheets (หากยังไม่ได้บันทึกโดย GAS)
+    try {
+      driveResult = await driveService.uploadSlipBuffer(buffer, fileName, mimeType, userId, targetDebtId, amount);
+    } catch (driveErr) {
+      console.warn('Google Drive upload warning (continuing to record payment):', driveErr.message);
+    }
+
+    // บันทึกลง Google Sheets
     let paymentRecord = null;
-    if (driveResult.paymentId) {
+    if (driveResult && driveResult.paymentId) {
       paymentRecord = {
         paymentId: driveResult.paymentId,
         debtId: targetDebtId,
         userId,
         amount: Number(amount) || 0,
-        driveFileId: driveResult.fileId,
-        slipViewUrl: driveResult.webViewLink,
+        driveFileId: driveResult.fileId || '',
+        slipViewUrl: driveResult.webViewLink || (driveResult.fileId ? `https://lh3.googleusercontent.com/d/${driveResult.fileId}` : ''),
         uploadedAt: dayjs().format('YYYY-MM-DD HH:mm:ss')
       };
     } else {
@@ -97,8 +103,8 @@ async function uploadSlipWeb(req, res) {
         debtId: targetDebtId,
         userId,
         amount: amount ? Number(amount) : 0,
-        driveFileId: driveResult.fileId,
-        slipViewUrl: driveResult.webViewLink,
+        driveFileId: driveResult?.fileId || '',
+        slipViewUrl: driveResult?.webViewLink || (driveResult?.fileId ? `https://lh3.googleusercontent.com/d/${driveResult.fileId}` : ''),
         adminNote: 'อัปโหลดผ่านเว็บ LIFF'
       });
     }
