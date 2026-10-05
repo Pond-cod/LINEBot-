@@ -122,10 +122,12 @@ function isLegalDebtCollectionTime(dateObj = null) {
 
 /**
  * ตรวจสอบว่าเวลาไทยปัจจุบันตรงกับเวลาเป้าหมาย (HH:mm) หรือไม่
- * โดยให้ความยืดหยุ่นภายในช่วงเวลา ±windowMinutes (ค่าเริ่มต้น 20 นาที)
+ * โดยมีหลักการสำคัญ:
+ * 1. จะไม่มีการแจ้งเตือน "ก่อนเวลา" เด็ดขาด (ต้องถึงเวลาเป้าหมายแล้วเท่านั้น: currentMinutesTotal >= targetMinutesTotal)
+ * 2. อยู่ภายในกรอบเวลาที่ยอมรับได้หลังถึงเวลาเป้าหมาย (0 <= diffMinutes <= windowMinutes)
  * 
  * @param {string} targetTimeStr เวลาเป้าหมาย เช่น '08:30'
- * @param {number} [windowMinutes=20] กรอบเวลาที่ยอมรับได้ (นาที)
+ * @param {number} [windowMinutes=20] กรอบเวลาที่ยอมรับได้หลังถึงเวลา (นาที)
  * @param {dayjs.Dayjs} [refDate=null] ออบเจ็กต์ dayjs อ้างอิง (ค่าเริ่มต้นคือเวลาไทยปัจจุบัน)
  * @returns {{ matched: boolean, diffMinutes: number, targetSlot: string, currentBangkokTime: string }}
  */
@@ -143,9 +145,12 @@ function isCurrentTimeMatching(targetTimeStr, windowMinutes = 20, refDate = null
 
   const currentMinutesTotal = now.hour() * 60 + now.minute();
   const targetMinutesTotal = targetHour * 60 + targetMin;
-  const diffMinutes = Math.abs(currentMinutesTotal - targetMinutesTotal);
 
-  const matched = diffMinutes <= windowMinutes;
+  // ระยะเวลาที่ผ่านไปจากเวลาเป้าหมาย (บวก = ถึงเวลาแล้ว, ลบ = ยังไม่ถึงเวลา)
+  const diffMinutes = currentMinutesTotal - targetMinutesTotal;
+
+  // เงื่อนไข: ต้องถึงเวลาแล้ว (diffMinutes >= 0) และยังไม่เกินกรอบเวลา (diffMinutes <= windowMinutes)
+  const matched = diffMinutes >= 0 && diffMinutes <= windowMinutes;
   const formattedSlot = `${String(targetHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`;
 
   return {

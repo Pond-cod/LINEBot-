@@ -27,6 +27,13 @@ const { getAdminUserIds } = require('../middleware/adminAuth');
  * - ป้องกันส่งซ้ำแยกตาม Time Slot
  * - รองรับกำหนดเวลารายสัญญาเฉพาะเจาะจง (customReminderTimes)
  */
+// In-memory cache ป้องกันการส่งซ้ำภายในวันเดียวกันระดับ Process (Key: YYYY-MM-DD:debtId:slot)
+const inMemorySentCache = new Set();
+
+function getSentKey(todayStr, debtId, slot) {
+  return `${todayStr}:${debtId}:${slot || '08:00'}`;
+}
+
 async function runDailyReminderCheck(options = {}) {
   const globalSettings = options.customSettings || await reminderSettingsService.getSettings();
   const triggerType = options.triggerType || 'อัตโนมัติ (Schedule)';
@@ -271,9 +278,19 @@ async function runDailyReminderCheck(options = {}) {
   for (const candidate of candidates) {
     try {
       // ตรวจสอบการส่งซ้ำในวันเดียวกัน แยกตาม Slot
+      const todayStr = todayDateObj.format('YYYY-MM-DD');
+      const memoryKey = getSentKey(todayStr, candidate.debtId, candidate.matchedSlot);
+
+      if (!options.ignoreDuplicate && inMemorySentCache.has(memoryKey)) {
+        console.log(`⏭️ Skipped debt ${candidate.debtId} for ${candidate.userId} (in-memory deduplication: already sent today for slot ${candidate.matchedSlot})`);
+        skippedCount++;
+        continue;
+      }
+
       const alreadySent = await sheetsService.hasBeenRemindedToday(candidate.debtId, candidate.reminderType, candidate.matchedSlot);
       if (alreadySent && !options.ignoreDuplicate) {
         console.log(`⏭️ Skipped debt ${candidate.debtId} for ${candidate.userId} (already sent today for slot ${candidate.matchedSlot})`);
+        inMemorySentCache.add(memoryKey);
         skippedCount++;
         continue;
       }
@@ -312,6 +329,7 @@ async function runDailyReminderCheck(options = {}) {
 
       // ส่งข้อความผ่าน LINE Messaging API
       await lineService.pushMessage(candidate.userId, flexMsg);
+      inMemorySentCache.add(memoryKey);
 
       // บันทึก Log ลงชีต ReminderLogs พร้อมระบุ Time Slot เพื่อแยกการส่งหลายรอบต่อวัน
       await sheetsService.logReminder({

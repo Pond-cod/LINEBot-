@@ -865,9 +865,33 @@ function handleHasBeenRemindedToday(debtId, reminderType, timeSlot) {
     const rDebtId = values[i][1];
     const rawType = String(values[i][3] || '').trim();
     const cleanType = rawType.split(' [')[0].trim();
-    const rSentAt = values[i][4] ? String(values[i][4]) : '';
+    
+    // จัดการคอลัมน์วันเวลา sentAt ซึ่ง Google Sheets อาจส่งกลับมาเป็น Date object หรือ String
+    const rawSent = values[i][4];
+    let sentDateStr = '';
+    if (rawSent instanceof Date) {
+      sentDateStr = Utilities.formatDate(rawSent, 'Asia/Bangkok', 'yyyy-MM-dd');
+    } else if (rawSent) {
+      const strVal = String(rawSent);
+      if (strVal.indexOf(todayStr) !== -1) {
+        sentDateStr = todayStr;
+      } else {
+        try {
+          const parsed = new Date(strVal);
+          if (!isNaN(parsed.getTime())) {
+            sentDateStr = Utilities.formatDate(parsed, 'Asia/Bangkok', 'yyyy-MM-dd');
+          } else {
+            sentDateStr = strVal;
+          }
+        } catch (e) {
+          sentDateStr = strVal;
+        }
+      }
+    }
 
-    if (rDebtId === debtId && (cleanType === reminderType || rawType === reminderType || rawType.startsWith(reminderType)) && rSentAt.indexOf(todayStr) !== -1) {
+    const isToday = sentDateStr === todayStr || sentDateStr.indexOf(todayStr) !== -1;
+
+    if (rDebtId === debtId && (cleanType === reminderType || rawType === reminderType || rawType.startsWith(reminderType)) && isToday) {
       if (timeSlot) {
         if (rawType.indexOf('[' + timeSlot + ']') !== -1) return true;
         if (!rawType.match(/\[\d{2}:\d{2}\]/)) return true;
