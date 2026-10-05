@@ -177,6 +177,14 @@ function doPost(e) {
         result = handleGetAuditLogs(contents);
         break;
 
+      case 'setupAutoReminderTrigger':
+        result = setupAutoReminderTrigger();
+        break;
+
+      case 'triggerVercelReminderCheck':
+        result = triggerVercelReminderCheck();
+        break;
+
       default:
         throw new Error('Unknown action: ' + action);
     }
