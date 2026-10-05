@@ -634,12 +634,20 @@ window.openEditContractModal = function(debtId) {
     };
   }
 
-  if (modal) modal.classList.add('open');
+  if (modal) {
+    modal.classList.add('open');
+    modal.classList.remove('hidden');
+  }
 };
+
+window.editContract = window.openEditContractModal;
 
 window.closeEditContractModal = function() {
   const modal = document.getElementById('modalEditContract');
-  if (modal) modal.classList.remove('open');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.classList.add('hidden');
+  }
 };
 
 window.selectContractDebtor = function(userId) {
