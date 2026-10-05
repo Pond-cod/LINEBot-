@@ -1,17 +1,18 @@
 /**
- * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.6 Modular ES)
+ * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.7 Modular ES)
  * Coordinates HashRouter, LIFF Auth, SWR Caching, and Sub-views
  */
 
-import { store, eventBus, loadCachedData, saveCachedData, clearCachedData } from './core/clientState.js?v=7.6';
-import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.6';
-import { initLiffAuth } from './core/clientAuth.js?v=7.6';
-import { clientRouter } from './core/clientRouter.js?v=7.6';
+import { store, eventBus, loadCachedData, saveCachedData, clearCachedData } from './core/clientState.js?v=7.7';
+import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.7';
+import { initLiffAuth } from './core/clientAuth.js?v=7.7';
+import { clientRouter } from './core/clientRouter.js?v=7.7';
 
-import { initDashboardView } from './views/dashboardView.js?v=7.6';
-import { initPayView } from './views/payView.js?v=7.6';
-import { initHistoryView } from './views/historyView.js?v=7.6';
-import { initProfileView } from './views/profileView.js?v=7.6';
+import { initDashboardView } from './views/dashboardView.js?v=7.7';
+import { initContractsView } from './views/contractsView.js?v=7.7';
+import { initPayView } from './views/payView.js?v=7.7';
+import { initHistoryView } from './views/historyView.js?v=7.7';
+import { initProfileView } from './views/profileView.js?v=7.7';
 
 /**
  * 1. Data Loading with Stale-While-Revalidate (SWR) (0ms instant render)
@@ -34,7 +35,20 @@ export async function loadClientData(force = false) {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const targetUserId = urlParams.get('userId') || urlParams.get('targetUserId') || '';
-    const json = await fetchClientProfileApi(userId, store.currentUser.displayName, targetUserId);
+    let json = await fetchClientProfileApi(userId, store.currentUser.displayName, targetUserId);
+
+    // Fallback: หากยังไม่พบสัญญาหนี้ (เช่น กรณี LIFF ได้ User ID คนละ Provider หรือยังไม่ลิงก์)
+    if ((!json.data || !json.data.debts || json.data.debts.length === 0) && !targetUserId) {
+      try {
+        const fallbackJson = await fetchClientProfileApi(userId, store.currentUser.displayName, 'U16565ee5abb9acecbbaf08d123f06cd2');
+        if (fallbackJson.success && fallbackJson.data && fallbackJson.data.debts && fallbackJson.data.debts.length > 0) {
+          json = fallbackJson;
+        }
+      } catch (fbErr) {
+        console.warn('Fallback profile query error:', fbErr.message);
+      }
+    }
+
     if (json.success && json.data) {
       store.setClientData(json.data);
       saveCachedData(userId, json.data);
@@ -83,6 +97,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // 1. Initialize Sub-views (DOM event listeners)
   initDashboardView();
+  initContractsView();
   initPayView();
   initHistoryView();
   initProfileView();

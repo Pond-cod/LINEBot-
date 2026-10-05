@@ -7,6 +7,7 @@ import { eventBus } from './clientState.js';
 
 export const ROUTE_MAP = {
   '#/dashboard': 'view-dashboard',
+  '#/contracts': 'view-contracts',
   '#/pay': 'view-pay',
   '#/history': 'view-history',
   '#/profile': 'view-profile'
@@ -14,6 +15,7 @@ export const ROUTE_MAP = {
 
 const REVERSE_ROUTE_MAP = {
   'view-dashboard': '#/dashboard',
+  'view-contracts': '#/contracts',
   'view-pay': '#/pay',
   'view-history': '#/history',
   'view-profile': '#/profile'

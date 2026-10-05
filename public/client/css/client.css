@@ -1348,6 +1348,358 @@ body {
 }
 
 /* ==========================================================================
+   SUB-VIEW 1.5: All Contracts (หนี้ทั้งหมด)
+   ========================================================================== */
+.contracts-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.contracts-header-title h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+  margin-bottom: 2px;
+}
+
+.contracts-header-title p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-refresh-contracts {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-glass-bright);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.btn-refresh-contracts:active {
+  transform: scale(0.95);
+}
+
+/* 3-Stat Summary Cards Grid (ตรงกับหน้าแอดมิน) */
+.contracts-stats-overview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.contract-stat-pill {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px 6px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.contract-stat-pill.highlight {
+  border-color: var(--primary-border);
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--primary-light) 100%);
+}
+
+.stat-pill-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stat-pill-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-pill-val.count {
+  color: var(--text-main);
+}
+
+.stat-pill-val.principal {
+  color: var(--accent-indigo);
+}
+
+.stat-pill-val.remaining {
+  color: var(--primary);
+  font-size: 13.5px;
+}
+
+/* Search & Filter Bar */
+.contracts-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrapper .search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 13px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.contracts-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px 0 34px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-glass);
+  border-radius: var(--radius-full);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.contracts-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.filter-select-wrapper {
+  width: 110px;
+}
+
+.contracts-status-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 8px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-glass);
+  border-radius: var(--radius-full);
+  color: var(--text-main);
+  font-size: 11.5px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+}
+
+.contracts-list-header-meta {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.contracts-list-header-meta .count-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Contracts Cards Container */
+.contracts-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debt-contract-card-full {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.debt-contract-card-full:hover {
+  border-color: var(--primary-border);
+}
+
+.contract-card-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.contract-id-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.contract-id-pill .card-icon {
+  font-size: 16px;
+}
+
+.contract-id-pill .card-id-text {
+  font-family: monospace;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: 0.3px;
+}
+
+.contract-main-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.contract-stat-box {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contract-stat-box.highlight {
+  background: linear-gradient(135deg, var(--bg-surface-elevated) 0%, var(--primary-light) 100%);
+  border-color: var(--primary-border);
+}
+
+.stat-box-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.stat-box-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.stat-box-val.remaining {
+  color: var(--primary);
+  font-size: 14.5px;
+}
+
+.stat-box-val.installment {
+  color: var(--accent-indigo);
+}
+
+.stat-box-val.total {
+  color: var(--text-muted);
+}
+
+.stat-box-val.due {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.contract-progress-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.contract-action-bar {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-glass);
+}
+
+.btn-contract-action {
+  height: 36px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-contract-action.view {
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border-glass-bright);
+  color: var(--text-main);
+}
+
+.btn-contract-action.view:active {
+  transform: scale(0.96);
+}
+
+.btn-contract-action.pay {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  border: none;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.btn-contract-action.pay:active {
+  transform: scale(0.96);
+}
+
+/* Contracts Empty State */
+.contracts-empty-box {
+  background: var(--bg-surface);
+  border: 1.5px dashed var(--border-glass-bright);
+  border-radius: var(--radius-lg);
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.contracts-empty-box .empty-icon {
+  font-size: 36px;
+}
+
+.contracts-empty-box h4 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.contracts-empty-box p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* ==========================================================================
    SUB-VIEW 3: Payment History
    ========================================================================== */
 .history-list {
@@ -1499,8 +1851,8 @@ body {
 .bottom-nav {
   position: absolute;
   bottom: max(16px, var(--safe-bottom));
-  left: 16px;
-  right: 16px;
+  left: 12px;
+  right: 12px;
   height: 60px;
   background: var(--bg-glass);
   backdrop-filter: blur(24px);
@@ -1510,7 +1862,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 0 8px;
+  padding: 0 4px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
   z-index: 50;
   transition: background-color 0.25s ease, border-color 0.25s ease;
@@ -1523,16 +1875,17 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   cursor: pointer;
-  padding: 6px 14px;
+  padding: 5px 6px;
   border-radius: var(--radius-full);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 48px;
 }
 
 .nav-item svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   stroke: currentColor;
   stroke-width: 2.2;
   stroke-linecap: round;
@@ -1542,9 +1895,10 @@ body {
 }
 
 .nav-item span {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
 }
 
 .nav-item.active {

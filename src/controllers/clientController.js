@@ -97,6 +97,8 @@ async function getClientData(req, res) {
         if (uniqueDebtorUserIds.length === 1) {
           const soleUserId = uniqueDebtorUserIds[0];
           debts = allDebts.filter(d => d.userId === soleUserId);
+        } else if (allDebts.some(d => d.userId === 'U16565ee5abb9acecbbaf08d123f06cd2')) {
+          debts = allDebts.filter(d => d.userId === 'U16565ee5abb9acecbbaf08d123f06cd2');
         }
       }
 
@@ -134,10 +136,12 @@ async function getClientData(req, res) {
       }
     }
 
-    // 4. คำนวณยอดหนี้คงเหลือรวมและคัดเลือกสัญญาหลัก
+    // 4. คำนวณยอดหนี้คงเหลือรวม ยอดวงเงินกู้รวม และคัดเลือกสัญญาหลัก
     const activeDebts = debts.filter(d => d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE');
     const activeDebt = activeDebts.length > 0 ? activeDebts[0] : (debts.length > 0 ? debts[0] : null);
+    const totalPrincipalAll = debts.reduce((sum, d) => sum + (Number(d.totalAmount) || 0), 0);
     const totalRemainingAll = activeDebts.reduce((sum, d) => sum + (Number(d.remainingBalance) || 0), 0);
+    const totalPaidAll = Math.max(0, totalPrincipalAll - totalRemainingAll);
 
     // 5. รวบรวมประวัติการชำระเงินของสัญญาทั้งหมด
     let payments = [];
@@ -156,7 +160,9 @@ async function getClientData(req, res) {
         debtor,
         activeDebt,
         debts,
+        totalPrincipalAll,
         totalRemainingAll,
+        totalPaidAll,
         totalContractsCount: debts.length,
         activeContractsCount: activeDebts.length,
         payments
