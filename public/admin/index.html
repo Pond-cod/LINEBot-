@@ -1138,126 +1138,7 @@
     </div>
   </div>
 
-  <!-- Modal 1: Create / Edit Reminder Profile -->
-  <div id="modalReminderProfile" class="admin-modal">
-    <div class="modal-dialog" style="max-width: 620px;">
-      <div class="modal-header">
-        <h3 id="modalProfileTitle" style="font-size: 16px; font-weight: 700; color: var(--text-main);">➕ สร้างรูปแบบการแจ้งเตือนใหม่</h3>
-        <button type="button" class="modal-close-btn" onclick="closeProfileModal()">&times;</button>
-      </div>
-      <form id="formReminderProfile">
-        <input type="hidden" id="profFormId">
-        <div class="modal-body" style="max-height: 72vh; overflow-y: auto; padding-right: 8px;">
-          <!-- Basic Info -->
-          <div class="form-group">
-            <label class="form-label">ชื่อรูปแบบการแจ้งเตือน <span style="color: var(--danger);">*</span></label>
-            <input type="text" id="profFormName" class="form-control" placeholder="เช่น เตือนทุกสิ้นเดือน เวลา 08:00" required>
-          </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">ประเภทความถี่ (Frequency) <span style="color: var(--danger);">*</span></label>
-              <select id="profFormFrequency" class="form-control" onchange="onProfileFrequencyChange(this.value)">
-                <option value="DAILY">📅 รายวัน (Daily)</option>
-                <option value="END_OF_MONTH">📆 ทุกๆ วันสิ้นเดือน (End of Month)</option>
-                <option value="SPECIFIC_DAYS">🎯 วันที่ระบุของเดือน (Specific Days)</option>
-                <option value="MONTHLY">🗓️ รายเดือน (Monthly Day)</option>
-                <option value="DUE_DATE_RELATIVE">⏳ อิงวันครบกำหนดสัญญา (Due-date Relative)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">เวลาส่งรอบเช้า (เวลาหลัก) <span style="color: var(--danger);">*</span></label>
-              <input type="time" id="profFormPrimaryTime" class="form-control" value="08:00" required>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">เวลาส่งรอบค่ำ (ถ้ามี)</label>
-              <input type="time" id="profFormSecondaryTime" class="form-control" value="">
-            </div>
-            <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                <input type="checkbox" id="profFormIsDefault" style="width: 18px; height: 18px;">
-                <span style="font-size: 13px; color: var(--primary); font-weight: 600;">ตั้งเป็นรูปแบบเริ่มต้น (Default)</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Frequency Specific Settings -->
-          <div id="profDailySettings" class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px;">
-            <label class="form-label">ช่วงห่างการส่ง (วัน)</label>
-            <select id="profDailyInterval" class="form-control">
-              <option value="1">ทุกวัน (Every 1 Day)</option>
-              <option value="2">ทุก 2 วัน</option>
-              <option value="3">ทุก 3 วัน</option>
-              <option value="7">ทุก 7 วัน (รายสัปดาห์)</option>
-            </select>
-          </div>
-
-          <div id="profSpecificDaysSettings" class="form-group" style="display: none; background: var(--surface-raised); border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px;">
-            <label class="form-label">เลือกวันที่ของเดือนที่ต้องการให้แจ้งเตือน</label>
-            <div id="modalDaysChipsGrid" class="days-checkbox-grid" style="margin-bottom: 10px;"></div>
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
-              <input type="checkbox" id="profSpecificLastDay">
-              <span>📌 รวมวันสิ้นเดือนด้วยเสมอ</span>
-            </label>
-          </div>
-
-          <!-- Due-date Relative Rules -->
-          <div style="background: var(--surface-raised); border: 1px solid var(--surface-border); padding: 12px; border-radius: 8px; margin-bottom: 14px;">
-            <div style="font-size: 12.5px; font-weight: 600; color: var(--primary); margin-bottom: 10px;">🎯 เงื่อนไขอิงวันครบกำหนดชำระ</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
-                <input type="checkbox" id="profRemindDueToday" checked>
-                <span>เตือนตรงวันครบกำหนด</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
-                <input type="checkbox" id="profRemindOverdue" checked>
-                <span>เตือนเมื่อเลยกำหนด (Overdue)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer;">
-                <input type="checkbox" id="profRemindBefore">
-                <span>เตือนล่วงหน้า (Pre-due)</span>
-              </label>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 11px; color: var(--text-muted);">ล่วงหน้า:</span>
-                <select id="profRemindBeforeDays" class="form-control" style="padding: 2px 6px; font-size: 11px; width: auto;">
-                  <option value="1">1 วัน</option>
-                  <option value="2">2 วัน</option>
-                  <option value="3">3 วัน</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Template Customization -->
-          <div class="form-group">
-            <label class="form-label">ระดับน้ำเสียง (Tone)</label>
-            <select id="profTone" class="form-control">
-              <option value="POLITE">🟢 สุภาพเป็นมิตร (Polite)</option>
-              <option value="FORMAL">🔵 กึ่งทางการ (Formal)</option>
-              <option value="URGENT">🔴 เร่งรัด (Urgent)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">หัวข้อแจ้งเตือนเฉพาะรูปแบบนี้ (Custom Header)</label>
-            <input type="text" id="profCustomHeader" class="form-control" placeholder="เช่น แจ้งยอดรอบชำระรายวัน">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">ข้อความหมายเหตุด้านล่าง (Custom Footer)</label>
-            <textarea id="profCustomFooter" class="form-control" rows="2" placeholder="เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ"></textarea>
-          </div>
-        </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button type="button" class="topbar-btn" onclick="closeProfileModal()">ยกเลิก</button>
-          <button type="submit" class="btn-primary-admin" id="btnSaveProfile">💾 บันทึกรูปแบบ</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <!-- Modal 2: Assign Reminder to Debtor or Contract -->
   <div id="modalAssignReminder" class="admin-modal">
@@ -1432,39 +1313,74 @@
           <!-- ชื่อโปรไฟล์ & ความถี่หลัก -->
           <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; margin-bottom: 14px;">
             <div class="form-group">
-              <label class="form-label" style="font-weight: 600;">🏷️ ชื่อรูปแบบการแจ้งเตือน:</label>
-              <input type="text" id="profName" class="form-control" required placeholder="เช่น เตือนรายวันรอบเช้า-ค่ำ">
+              <label class="form-label" style="font-weight: 600;">🏷️ ชื่อรูปแบบการแจ้งเตือน: <span style="color: var(--danger);">*</span></label>
+              <input type="text" id="profName" class="form-control" required placeholder="เช่น เตือนรายวันรอบเช้า, สิ้นเดือน, วันเงินออก">
             </div>
             <div class="form-group">
-              <label class="form-label" style="font-weight: 600;">📅 รูปแบบความถี่ (Frequency):</label>
+              <label class="form-label" style="font-weight: 600;">📅 รูปแบบความถี่ (Frequency): <span style="color: var(--danger);">*</span></label>
               <select id="profFrequencyType" class="form-control">
-                <option value="DAILY">เตือนรายวัน (Daily)</option>
-                <option value="DUE_DATE_RELATIVE">อิงวันครบกำหนด (Due Date Relative)</option>
-                <option value="END_OF_MONTH">วันสิ้นเดือน (End of Month)</option>
-                <option value="SPECIFIC_DAYS">ระบุวันที่ในเดือน (Specific Days)</option>
+                <option value="DAILY">📅 เตือนรายวัน (Daily)</option>
+                <option value="END_OF_MONTH">📆 ทุกๆ วันสิ้นเดือน (End of Month)</option>
+                <option value="SPECIFIC_DAYS">🎯 วันที่ระบุของเดือน (Specific Days)</option>
+                <option value="DUE_DATE_RELATIVE">⏳ อิงวันครบกำหนดสัญญา (Due Date Relative)</option>
               </select>
             </div>
+          </div>
+
+          <!-- Specific Days Panel (แสดงเมื่อเลือก SPECIFIC_DAYS) -->
+          <div id="profSpecificDaysBox" class="form-group" style="display: none; background: var(--surface-raised); border: 1.5px solid var(--primary-light, #dbeafe); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label class="form-label" style="font-weight: 600; margin: 0; color: var(--primary);">🎯 เลือกวันที่ของเดือนที่ต้องการให้แจ้งเตือน:</label>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="topbar-btn" id="btnQuickSelectDays1_25" style="padding: 2px 7px; font-size: 10.5px;">1 & 25</button>
+                <button type="button" class="topbar-btn" id="btnQuickSelectDays15_End" style="padding: 2px 7px; font-size: 10.5px;">15 & สิ้นเดือน</button>
+                <button type="button" class="topbar-btn" id="btnClearDaysChips" style="padding: 2px 7px; font-size: 10.5px; color: var(--danger);">ล้าง</button>
+              </div>
+            </div>
+            <div id="profSpecificDaysChipsGrid" class="monthly-days-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 8px 0 10px 0;"></div>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-body); cursor: pointer; border-top: 1px solid var(--surface-border); padding-top: 8px;">
+              <input type="checkbox" id="profSpecificLastDay" style="width: 16px; height: 16px;">
+              <span>📌 <strong>รวมวันสิ้นเดือนด้วยเสมอ</strong> (เช่น 28, 29, 30 หรือ 31 ตามจริงของแต่ละเดือน)</span>
+            </label>
+          </div>
+
+          <!-- Daily Interval Panel (แสดงเมื่อเลือก DAILY) -->
+          <div id="profDailyBox" class="form-group" style="display: none; background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+            <label class="form-label" style="font-weight: 600;">ช่วงห่างการส่ง (วัน):</label>
+            <select id="profDailyInterval" class="form-control">
+              <option value="1">ทุกวัน (Every 1 Day)</option>
+              <option value="2">ทุก 2 วัน</option>
+              <option value="3">ทุก 3 วัน</option>
+              <option value="7">ทุก 7 วัน (รายสัปดาห์)</option>
+            </select>
           </div>
 
           <!-- รอบเวลาส่ง (Multi-Time Slots) -->
           <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
             <label class="form-label" style="font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
               <span>🕒 รอบเวลาส่งแจ้งเตือน (Time Slots - เวลาไทย UTC+7):</span>
-              <span style="font-size: 11px; color: var(--primary); font-weight: normal;">*ส่งหลายรอบต่อวันได้</span>
+              <span style="font-size: 11px; color: var(--primary); font-weight: normal;">*ส่งหลายรอบต่อวันได้ ระบุคั่นด้วยจุลภาค</span>
             </label>
-            <input type="text" id="profTimeSlots" class="form-control" placeholder="เช่น 08:00, 13:00, 18:00" value="08:00">
+            <input type="text" id="profTimeSlots" class="form-control" placeholder="เช่น 08:00, 18:00" value="08:00">
             <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
               <span style="font-size: 11px; color: var(--text-muted); align-self: center;">กดเพิ่มเร็ว:</span>
               <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('08:00')">+ 08:00 (เช้า)</button>
+              <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('10:00')">+ 10:00 (สาย)</button>
               <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('12:00')">+ 12:00 (เที่ยง)</button>
               <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('17:00')">+ 17:00 (เย็น)</button>
-              <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('19:00')">+ 19:00 (ค่ำ)</button>
+              <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('20:00')">+ 20:00 (ค่ำ)</button>
             </div>
           </div>
 
           <!-- วันในสัปดาห์ (Days of Week) -->
           <div class="form-group" style="margin-bottom: 14px;">
-            <label class="form-label" style="font-weight: 600;">📆 วันที่อนุญาตให้ส่งแจ้งเตือน (Days of Week):</label>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" style="font-weight: 600; margin: 0;">📆 วันที่อนุญาตให้ส่งแจ้งเตือน (Days of Week):</label>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="topbar-btn" id="btnSelectAllDow" style="padding: 2px 7px; font-size: 10.5px;">ทุกวัน</button>
+                <button type="button" class="topbar-btn" id="btnSelectWeekdaysDow" style="padding: 2px 7px; font-size: 10.5px;">จ-ศ</button>
+              </div>
+            </div>
             <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;" id="profDowContainer">
               <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="1" checked> จันทร์</label>
               <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="2" checked> อังคาร</label>
@@ -1579,6 +1495,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/admin.js?v=7.4"></script>
+  <script type="module" src="js/admin.js?v=7.5"></script>
 </body>
 </html>

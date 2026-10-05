@@ -4,21 +4,51 @@
     "name": "เตือนวันสิ้นเดือน (End of Month)",
     "frequencyType": "END_OF_MONTH",
     "scheduleConfig": {
-      "dailyInterval": 1,
-      "daysOfMonth": [],
-      "lastDayOfMonth": false,
-      "timeSlots": ["10:00", "20:00"],
-      "daysOfWeek": [1, 2, 3, 4, 5, 6, 0]
+      "timeSlots": [
+        "10:00",
+        "20:00"
+      ],
+      "daysOfWeek": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        0
+      ]
     },
     "primaryTime": "10:00",
     "secondaryTime": "20:00",
     "rulesConfig": {
+      "remindBeforeEnabled": false,
+      "remindBeforeDays": 1,
+      "remindPreDueSteps": [
+        1
+      ],
       "remindDueTodayEnabled": true,
       "remindOverdueEnabled": true,
       "overdueFrequency": "DAILY",
-      "remindBeforeEnabled": false,
-      "remindBeforeDays": 1,
-      "remindPreDueSteps": [1]
+      "overdueTiers": [
+        {
+          "minDays": 1,
+          "maxDays": 3,
+          "tone": "POLITE",
+          "label": "เตือนปกติ"
+        },
+        {
+          "minDays": 4,
+          "maxDays": 7,
+          "tone": "FORMAL",
+          "label": "ติดตามยอด"
+        },
+        {
+          "minDays": 8,
+          "maxDays": 999,
+          "tone": "URGENT",
+          "label": "เตือนเร่งด่วน"
+        }
+      ]
     },
     "templateConfig": {
       "tone": "FORMAL",
@@ -28,6 +58,132 @@
     "isDefault": false,
     "status": "ACTIVE",
     "createdAt": "2026-10-02 8:35:24",
-    "updatedAt": "2026-10-02 15:35:25"
+    "updatedAt": "2026-10-05 10:50:41"
+  },
+  {
+    "profileId": "PRF-MUUPPUQL",
+    "name": "กำหนดวัน (วันที่ 25 และสิ้นเดือน)",
+    "frequencyType": "SPECIFIC_DAYS",
+    "scheduleConfig": {
+      "daysOfMonth": [
+        25
+      ],
+      "lastDayOfMonth": true,
+      "timeSlots": [
+        "10:00"
+      ],
+      "daysOfWeek": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        0
+      ]
+    },
+    "primaryTime": "10:00",
+    "secondaryTime": "",
+    "rulesConfig": {
+      "remindBeforeEnabled": false,
+      "remindBeforeDays": 3,
+      "remindPreDueSteps": [
+        3,
+        1
+      ],
+      "remindDueTodayEnabled": true,
+      "remindOverdueEnabled": true,
+      "overdueFrequency": "DAILY",
+      "overdueTiers": [
+        {
+          "minDays": 1,
+          "maxDays": 3,
+          "tone": "POLITE",
+          "label": "เตือนปกติ"
+        },
+        {
+          "minDays": 4,
+          "maxDays": 7,
+          "tone": "FORMAL",
+          "label": "ติดตามยอด"
+        },
+        {
+          "minDays": 8,
+          "maxDays": 999,
+          "tone": "URGENT",
+          "label": "เตือนเร่งด่วน"
+        }
+      ]
+    },
+    "templateConfig": {
+      "tone": "POLITE",
+      "customHeader": "แจ้งยอดรอบชำระประจำสิ้นเดือน",
+      "customFooter": ""
+    },
+    "isDefault": false,
+    "status": "ACTIVE",
+    "createdAt": "2026-10-05 3:51:02",
+    "updatedAt": "2026-10-05 11:13:01"
+  },
+  {
+    "profileId": "PRF-MUUPQI4J",
+    "name": "เตือนวันสิ้นเดือน (End of Month)",
+    "frequencyType": "END_OF_MONTH",
+    "scheduleConfig": {
+      "timeSlots": [
+        "08:00"
+      ],
+      "daysOfWeek": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        0
+      ]
+    },
+    "primaryTime": "8:00",
+    "secondaryTime": "",
+    "rulesConfig": {
+      "remindBeforeEnabled": false,
+      "remindBeforeDays": 3,
+      "remindPreDueSteps": [
+        3,
+        1
+      ],
+      "remindDueTodayEnabled": true,
+      "remindOverdueEnabled": true,
+      "overdueFrequency": "DAILY",
+      "overdueTiers": [
+        {
+          "minDays": 1,
+          "maxDays": 3,
+          "tone": "POLITE",
+          "label": "เตือนปกติ"
+        },
+        {
+          "minDays": 4,
+          "maxDays": 7,
+          "tone": "FORMAL",
+          "label": "ติดตามยอด"
+        },
+        {
+          "minDays": 8,
+          "maxDays": 999,
+          "tone": "URGENT",
+          "label": "เตือนเร่งด่วน"
+        }
+      ]
+    },
+    "templateConfig": {
+      "tone": "POLITE",
+      "customHeader": "แจ้งยอดรอบชำระประจำสิ้นเดือน",
+      "customFooter": ""
+    },
+    "isDefault": false,
+    "status": "ACTIVE",
+    "createdAt": "2026-10-05 3:51:32",
+    "updatedAt": "2026-10-05 10:51:33"
   }
 ]

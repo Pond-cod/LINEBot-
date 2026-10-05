@@ -7,6 +7,7 @@ import { adminFetch, showToast } from '../core/api.js';
 import { store, eventBus } from '../core/state.js';
 
 let selectedMonthlyDays = [];
+let selectedProfileMonthlyDays = [];
 let isInitialized = false;
 
 function initDomElements() {
@@ -101,6 +102,37 @@ export function initMonthlyDaysChips() {
     });
     monthlyDaysGrid.appendChild(chip);
   }
+}
+
+export function renderProfileDaysChips() {
+  const grid = document.getElementById('profSpecificDaysChipsGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  for (let i = 1; i <= 31; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'day-chip' + (selectedProfileMonthlyDays.includes(i) ? ' selected' : '');
+    chip.textContent = i;
+    chip.addEventListener('click', () => {
+      if (selectedProfileMonthlyDays.includes(i)) {
+        selectedProfileMonthlyDays = selectedProfileMonthlyDays.filter(d => d !== i);
+        chip.classList.remove('selected');
+      } else {
+        selectedProfileMonthlyDays.push(i);
+        selectedProfileMonthlyDays.sort((a, b) => a - b);
+        chip.classList.add('selected');
+      }
+    });
+    grid.appendChild(chip);
+  }
+}
+
+export function updateProfileFrequencyVisibility(freq) {
+  const specificBox = document.getElementById('profSpecificDaysBox');
+  const dailyBox = document.getElementById('profDailyBox');
+
+  if (specificBox) specificBox.style.display = freq === 'SPECIFIC_DAYS' ? 'block' : 'none';
+  if (dailyBox) dailyBox.style.display = freq === 'DAILY' ? 'block' : 'none';
 }
 
 export async function loadReminderSettings() {
@@ -287,6 +319,7 @@ export async function loadReminderProfiles() {
 export function updateProfileDropdowns() {
   const wizardProf = document.getElementById('wizardReminderProfile');
   const assignProf = document.getElementById('assignProfileSelect');
+  const editContractProf = document.getElementById('editContractReminderProfile');
 
   const optionsHtml = '<option value="">⚙️ รูปแบบเริ่มต้น (Default Profile)</option>' +
     store.reminderProfiles.map(p => `<option value="${p.profileId}">${p.name}${p.isDefault ? ' [เริ่มต้น]' : ''} (${p.frequencyType})</option>`).join('');
@@ -297,6 +330,11 @@ export function updateProfileDropdowns() {
     if (cur) wizardProf.value = cur;
   }
   if (assignProf) assignProf.innerHTML = optionsHtml;
+  if (editContractProf) {
+    const cur = editContractProf.value;
+    editContractProf.innerHTML = optionsHtml;
+    if (cur) editContractProf.value = cur;
+  }
 }
 
 export function renderReminderProfilesGrid() {
@@ -320,7 +358,15 @@ export function renderReminderProfilesGrid() {
   grid.innerHTML = store.reminderProfiles.map(p => {
     const isActive = p.status === 'ACTIVE';
     const isDefault = Boolean(p.isDefault);
-    const freqName = freqLabels[p.frequencyType] || p.frequencyType;
+    let freqName = freqLabels[p.frequencyType] || p.frequencyType;
+
+    if (p.frequencyType === 'SPECIFIC_DAYS') {
+      const days = (p.scheduleConfig?.daysOfMonth || []).join(', ');
+      const hasLastDay = p.scheduleConfig?.lastDayOfMonth;
+      freqName += `: ${days ? 'วันที่ ' + days : ''}${hasLastDay ? (days ? ' + ' : '') + 'สิ้นเดือน' : ''}`;
+    } else if (p.frequencyType === 'DAILY' && p.scheduleConfig?.dailyInterval > 1) {
+      freqName += ` (ทุก ${p.scheduleConfig.dailyInterval} วัน)`;
+    }
 
     const timeSlots = p.scheduleConfig?.timeSlots?.length > 0
       ? p.scheduleConfig.timeSlots
@@ -386,6 +432,56 @@ function initProfileModalListeners() {
   const modalProfile = document.getElementById('modalReminderProfile');
   const btnCloseProfileModal = document.getElementById('btnCloseProfileModal');
   const formProfile = document.getElementById('formReminderProfile');
+  const profFrequencyType = document.getElementById('profFrequencyType');
+
+  if (profFrequencyType) {
+    profFrequencyType.addEventListener('change', () => {
+      updateProfileFrequencyVisibility(profFrequencyType.value);
+    });
+  }
+
+  const btnQuickSelectDays1_25 = document.getElementById('btnQuickSelectDays1_25');
+  if (btnQuickSelectDays1_25) {
+    btnQuickSelectDays1_25.addEventListener('click', () => {
+      selectedProfileMonthlyDays = [1, 25];
+      renderProfileDaysChips();
+    });
+  }
+
+  const btnQuickSelectDays15_End = document.getElementById('btnQuickSelectDays15_End');
+  if (btnQuickSelectDays15_End) {
+    btnQuickSelectDays15_End.addEventListener('click', () => {
+      selectedProfileMonthlyDays = [15];
+      const lastDayCb = document.getElementById('profSpecificLastDay');
+      if (lastDayCb) lastDayCb.checked = true;
+      renderProfileDaysChips();
+    });
+  }
+
+  const btnClearDaysChips = document.getElementById('btnClearDaysChips');
+  if (btnClearDaysChips) {
+    btnClearDaysChips.addEventListener('click', () => {
+      selectedProfileMonthlyDays = [];
+      renderProfileDaysChips();
+    });
+  }
+
+  const btnSelectAllDow = document.getElementById('btnSelectAllDow');
+  if (btnSelectAllDow) {
+    btnSelectAllDow.addEventListener('click', () => {
+      document.querySelectorAll('input[name="profDow"]').forEach(cb => { cb.checked = true; });
+    });
+  }
+
+  const btnSelectWeekdaysDow = document.getElementById('btnSelectWeekdaysDow');
+  if (btnSelectWeekdaysDow) {
+    btnSelectWeekdaysDow.addEventListener('click', () => {
+      document.querySelectorAll('input[name="profDow"]').forEach(cb => {
+        const val = Number(cb.value);
+        cb.checked = val >= 1 && val <= 5;
+      });
+    });
+  }
 
   if (btnOpenCreateProfileModal && modalProfile) {
     btnOpenCreateProfileModal.addEventListener('click', () => {
@@ -393,15 +489,30 @@ function initProfileModalListeners() {
       const elTitle = document.getElementById('modalProfileTitle');
       const elMode = document.getElementById('profileFormMode');
       const elId = document.getElementById('profileInputId');
-      if (elTitle) elTitle.textContent = 'สร้างรูปแบบการแจ้งเตือนใหม่';
+      if (elTitle) elTitle.textContent = '➕ สร้างรูปแบบการแจ้งเตือนใหม่';
       if (elMode) elMode.value = 'CREATE';
       if (elId) elId.value = '';
+
+      if (profFrequencyType) profFrequencyType.value = 'DAILY';
+      selectedProfileMonthlyDays = [25];
+      renderProfileDaysChips();
+      updateProfileFrequencyVisibility('DAILY');
+
+      const lastDayCb = document.getElementById('profSpecificLastDay');
+      if (lastDayCb) lastDayCb.checked = true;
+      const dailyInt = document.getElementById('profDailyInterval');
+      if (dailyInt) dailyInt.value = '1';
 
       const timeInput = document.getElementById('profTimeSlots');
       if (timeInput) timeInput.value = '08:00';
       const stepsInput = document.getElementById('profPreDueSteps');
       if (stepsInput) stepsInput.value = '3, 1';
       document.querySelectorAll('input[name="profDow"]').forEach(cb => { cb.checked = true; });
+
+      const headerInput = document.getElementById('profHeader');
+      if (headerInput) headerInput.value = 'แจ้งยอดรอบชำระ';
+      const footerInput = document.getElementById('profFooter');
+      if (footerInput) footerInput.value = 'เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ';
 
       modalProfile.classList.add('open');
       modalProfile.classList.remove('hidden');
@@ -432,13 +543,20 @@ async function handleProfileSubmit(e) {
   const rawSteps = document.getElementById('profPreDueSteps')?.value || '1';
   const remindPreDueSteps = rawSteps.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
 
+  const frequencyType = document.getElementById('profFrequencyType')?.value || 'DAILY';
+  const dailyInterval = parseInt(document.getElementById('profDailyInterval')?.value || '1', 10);
+  const lastDayOfMonth = Boolean(document.getElementById('profSpecificLastDay')?.checked);
+
   const payload = {
     profileId,
     name: document.getElementById('profName')?.value?.trim(),
-    frequencyType: document.getElementById('profFrequencyType')?.value,
+    frequencyType,
     primaryTime: timeSlots[0] || '08:00',
     secondaryTime: timeSlots[1] || '',
     scheduleConfig: {
+      dailyInterval: frequencyType === 'DAILY' ? dailyInterval : 1,
+      daysOfMonth: frequencyType === 'SPECIFIC_DAYS' ? selectedProfileMonthlyDays : [],
+      lastDayOfMonth: frequencyType === 'END_OF_MONTH' ? true : (frequencyType === 'SPECIFIC_DAYS' ? lastDayOfMonth : false),
       timeSlots: timeSlots.length > 0 ? timeSlots : ['08:00'],
       daysOfWeek: checkedDows.length > 0 ? checkedDows : [1, 2, 3, 4, 5, 6, 0]
     },
@@ -479,7 +597,7 @@ async function handleProfileSubmit(e) {
     if (data.success) {
       showToast('บันทึกรูปแบบการแจ้งเตือนสำเร็จ!', '✅');
       window.closeProfileModal();
-      loadReminderProfiles();
+      await loadReminderProfiles();
     } else {
       showToast(data.message || 'บันทึกไม่สำเร็จ', '❌');
     }
@@ -519,7 +637,7 @@ window.openEditProfileModal = function(profileId) {
   const elMode = document.getElementById('profileFormMode');
   const elId = document.getElementById('profileInputId');
 
-  if (elTitle) elTitle.textContent = `แก้ไขรูปแบบการแจ้งเตือน (${p.profileId})`;
+  if (elTitle) elTitle.textContent = `✏️ แก้ไขรูปแบบการแจ้งเตือน (${p.profileId})`;
   if (elMode) elMode.value = 'EDIT';
   if (elId) elId.value = p.profileId;
 
@@ -527,7 +645,17 @@ window.openEditProfileModal = function(profileId) {
   const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = Boolean(val); };
 
   setVal('profName', p.name);
-  setVal('profFrequencyType', p.frequencyType || 'DAILY');
+  const freq = p.frequencyType || 'DAILY';
+  setVal('profFrequencyType', freq);
+
+  // Setup specific days and daily interval
+  selectedProfileMonthlyDays = Array.isArray(p.scheduleConfig?.daysOfMonth)
+    ? [...p.scheduleConfig.daysOfMonth]
+    : [];
+  renderProfileDaysChips();
+  setCheck('profSpecificLastDay', p.scheduleConfig?.lastDayOfMonth);
+  setVal('profDailyInterval', p.scheduleConfig?.dailyInterval || 1);
+  updateProfileFrequencyVisibility(freq);
 
   const timeSlots = p.scheduleConfig?.timeSlots?.length > 0
     ? p.scheduleConfig.timeSlots
