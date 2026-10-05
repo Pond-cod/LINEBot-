@@ -23,7 +23,8 @@ function createReminderFlex({
   tone = 'POLITE',
   customHeader = '',
   customFooter = '',
-  overdueDays = 0
+  overdueDays = 0,
+  liffUrl = ''
 }) {
   let badgeText = 'แจ้งเตือนครบกำหนดชำระ';
   let badgeColor = '#06C755';
@@ -225,14 +226,14 @@ function createReminderFlex({
             color: '#06C755',
             height: 'sm',
             action: {
-              type: 'message',
-              label: '📸 ส่งสลิปชำระเงิน',
-              text: 'ฉันต้องการส่งสลิปชำระเงิน'
+              type: 'uri',
+              label: '📱 เปิดหน้าลูกหนี้',
+              uri: liffUrl || (process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/')
             }
           },
           {
             type: 'text',
-            text: customFooter || '💡 เมื่อโอนเงินแล้ว กรุณาส่งรูปสลิปเข้ามาในแชทนี้ได้ทันที',
+            text: customFooter || '💡 แตะปุ่มด้านบนเพื่อเปิดดูรายละเอียดสัญญาและแนบสลิปชำระเงิน',
             size: 'xxs',
             color: '#94A3B8',
             align: 'center',
@@ -467,9 +468,9 @@ function createDebtSummaryFlex({
             color: '#06C755',
             height: 'sm',
             action: {
-              type: 'message',
-              label: '📸 แนบสลิปชำระเงิน',
-              text: 'ฉันต้องการส่งสลิปชำระเงิน'
+              type: 'uri',
+              label: '📱 เปิดหน้าลูกหนี้',
+              uri: liffUrl || (process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/')
             }
           }
         ]

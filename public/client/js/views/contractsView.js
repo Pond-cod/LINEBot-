@@ -113,7 +113,13 @@ export function filterAndRenderContracts() {
   const contractsCountBadge = document.getElementById('contractsCountBadge');
   if (!allContractsCardsList) return;
 
-  const debts = store.clientData?.debts || [];
+  // กรองเฉพาะสัญญาที่ยังต้องผ่อนชำระ (ตัดสัญญาที่ชำระครบแล้วออก)
+  const allDebts = store.clientData?.debts || [];
+  const debts = allDebts.filter(d => {
+    const remain = Number(d.remainingBalance) || 0;
+    const status = String(d.debtStatus || '').toUpperCase();
+    return status !== 'PAID' && status !== 'COMPLETED' && remain > 0;
+  });
 
   // Filter
   const filtered = debts.filter(d => {
@@ -129,15 +135,13 @@ export function filterAndRenderContracts() {
       matchesStatus = status === 'ACTIVE';
     } else if (currentStatusFilter === 'OVERDUE') {
       matchesStatus = status === 'OVERDUE';
-    } else if (currentStatusFilter === 'PAID') {
-      matchesStatus = status === 'PAID' || status === 'COMPLETED';
     }
 
     return matchesSearch && matchesStatus;
   });
 
   if (contractsCountBadge) {
-    contractsCountBadge.textContent = `${filtered.length} จาก ${debts.length} รายการ`;
+    contractsCountBadge.textContent = `${filtered.length} รายการที่ต้องชำระ`;
   }
 
   if (filtered.length === 0) {
@@ -213,9 +217,13 @@ export function filterAndRenderContracts() {
           <button type="button" class="btn-contract-action view" data-debt-id="${d.debtId}">
             🔍 ดูรายละเอียดสัญญา
           </button>
-          <button type="button" class="btn-contract-action pay" data-debt-id="${d.debtId}" data-installment="${install}">
-            💳 ชำระสัญญานี้ (฿${install.toLocaleString('th-TH')})
-          </button>
+          ${remain > 0 ? `
+            <button type="button" class="btn-contract-action pay" data-debt-id="${d.debtId}" data-installment="${install}">
+              💳 ชำระสัญญานี้ (฿${install.toLocaleString('th-TH')})
+            </button>
+          ` : `
+            <span class="badge-status active" style="padding: 6px 14px; font-size: 12px; font-weight: 700;">✅ ชำระครบถ้วนแล้ว</span>
+          `}
         </div>
       </div>
     `;

@@ -129,14 +129,27 @@ async function getClientData(req, res) {
       }
     }
 
-    // 4. คำนวณยอดหนี้คงเหลือรวม ยอดวงเงินกู้รวม และคัดเลือกสัญญาหลัก
-    const activeDebts = debts.filter(d => d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE');
-    const activeDebt = activeDebts.length > 0 ? activeDebts[0] : (debts.length > 0 ? debts[0] : null);
-    const totalPrincipalAll = debts.reduce((sum, d) => sum + (Number(d.totalAmount) || 0), 0);
-    const totalRemainingAll = activeDebts.reduce((sum, d) => sum + (Number(d.remainingBalance) || 0), 0);
+    // 4. คัดแยกสัญญาที่ยังต้องผ่อนชำระ (ACTIVE หรือ OVERDUE ที่ remainingBalance > 0)
+    // สัญญาที่ชำระครบแล้ว (PAID หรือ remainingBalance <= 0) จะถูกตัดออกจากหน้าลูกหนี้ และเก็บไว้ในระบบประวัติหน้าแอดมิน (LINE Debt Admin)
+    const unpaidDebts = debts.filter(d => {
+      const remain = Number(d.remainingBalance) || 0;
+      const status = String(d.debtStatus || '').toUpperCase();
+      return status !== 'PAID' && status !== 'COMPLETED' && remain > 0;
+    });
+
+    const paidDebts = debts.filter(d => {
+      const remain = Number(d.remainingBalance) || 0;
+      const status = String(d.debtStatus || '').toUpperCase();
+      return status === 'PAID' || status === 'COMPLETED' || remain <= 0;
+    });
+
+    const activeDebts = unpaidDebts;
+    const activeDebt = activeDebts.length > 0 ? activeDebts[0] : null;
+    const totalPrincipalAll = unpaidDebts.reduce((sum, d) => sum + (Number(d.totalAmount) || 0), 0);
+    const totalRemainingAll = unpaidDebts.reduce((sum, d) => sum + (Number(d.remainingBalance) || 0), 0);
     const totalPaidAll = Math.max(0, totalPrincipalAll - totalRemainingAll);
 
-    // 5. รวบรวมประวัติการชำระเงินของสัญญาทั้งหมด
+    // 5. รวบรวมประวัติการชำระเงินของสัญญาทั้งหมด (รวมทั้งสัญญาที่ปิดยอดแล้ว)
     let payments = [];
     if (debts.length > 0) {
       const debtIds = new Set(debts.map(d => d.debtId));
@@ -159,12 +172,14 @@ async function getClientData(req, res) {
       data: {
         debtor: safeDebtor,
         activeDebt,
-        debts,
+        debts: unpaidDebts,
+        paidDebts,
         totalPrincipalAll,
         totalRemainingAll,
         totalPaidAll,
-        totalContractsCount: debts.length,
-        activeContractsCount: activeDebts.length,
+        totalContractsCount: unpaidDebts.length,
+        activeContractsCount: unpaidDebts.length,
+        allContractsCount: debts.length,
         payments
       }
     });

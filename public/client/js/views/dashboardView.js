@@ -114,7 +114,14 @@ export function renderDashboard(data) {
   const debtsListCount = document.getElementById('debtsListCount');
   const debtsCardsList = document.getElementById('debtsCardsList');
 
-  const debts = sortDebtsByDueDate(data?.debts || []);
+  // เฉพาะสัญญาที่ยังมียอดค้างชำระ (ตัดสัญญาที่ชำระครบแล้วออก)
+  const rawDebts = data?.debts || [];
+  const unpaidDebts = rawDebts.filter(d => {
+    const remain = Number(d.remainingBalance) || 0;
+    const status = String(d.debtStatus || '').toUpperCase();
+    return status !== 'PAID' && status !== 'COMPLETED' && remain > 0;
+  });
+  const debts = sortDebtsByDueDate(unpaidDebts);
   const selectedDebt = store.getSelectedDebt();
   const isViewingAll = store.isViewingAllDebts();
   const isLoggedIn = store.currentUser && store.currentUser.userId && !store.currentUser.userId.startsWith('U_');
