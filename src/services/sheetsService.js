@@ -619,7 +619,8 @@ async function getAllDebts() {
                 createdAt: clean[8] || '',
                 updatedAt: clean[9] || '',
                 reminderProfileId: clean[10] || '',
-                reminderEnabled: isRemindEnabled
+                reminderEnabled: isRemindEnabled,
+                customReminderTimes: clean[12] || ''
               });
             }
           }
@@ -655,7 +656,7 @@ async function getAllDebts() {
   if (sheets && sheetId) {
     try {
       const [debtsRes, debtorsRes] = await Promise.all([
-        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTS}!A2:L` }),
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTS}!A2:M` }),
         sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:I` })
       ]);
 
@@ -679,7 +680,8 @@ async function getAllDebts() {
         createdAt: r[8] || '',
         updatedAt: r[9] || '',
         reminderProfileId: r[10] || '',
-        reminderEnabled: r[11] === undefined || r[11] === '' || r[11] === 'TRUE' || r[11] === 'true' || r[11] === true
+        reminderEnabled: r[11] === undefined || r[11] === '' || r[11] === 'TRUE' || r[11] === 'true' || r[11] === true,
+        customReminderTimes: r[12] || ''
       }));
 
       if (list.length > 0) {
@@ -1008,11 +1010,11 @@ async function getDueDebtsForReminder() {
 }
 
 /**
- * ตรวจสอบการส่งแจ้งเตือนซ้ำในวันเดียวกัน
+ * ตรวจสอบการส่งแจ้งเตือนซ้ำในวันเดียวกัน (รองรับแยก Time Slot)
  */
-async function hasBeenRemindedToday(debtId, reminderType) {
+async function hasBeenRemindedToday(debtId, reminderType, timeSlot = null) {
   if (isGasConfigured()) {
-    return await callGas('hasBeenRemindedToday', { debtId, reminderType });
+    return await callGas('hasBeenRemindedToday', { debtId, reminderType, timeSlot });
   }
 
   if (!sheets || !sheetId) return false;
@@ -1029,9 +1031,27 @@ async function hasBeenRemindedToday(debtId, reminderType) {
     return rows.some(r => {
       const rDebtId = r[1];
       const rawType = String(r[3] || '').trim();
-      const cleanType = rawType.split(' [')[0].trim();
       const rSentAt = String(r[4] || '');
-      return rDebtId === debtId && (cleanType === reminderType || rawType === reminderType) && rSentAt.startsWith(todayStr);
+      if (rDebtId !== debtId || !rSentAt.startsWith(todayStr)) return false;
+
+      const cleanType = rawType.split(' [')[0].trim();
+      const typeMatches = (cleanType === reminderType || rawType.startsWith(reminderType));
+      if (!typeMatches) return false;
+
+      // หากมีการระบุรอบเวลา (timeSlot) เช่น '08:00' หรือ '18:00'
+      if (timeSlot) {
+        // หากใน log มี tag [08:00] ให้ตรวจสอบว่าตรงกันหรือไม่
+        if (rawType.includes(`[${timeSlot}]`)) {
+          return true;
+        }
+        // หากใน log เก่าไม่มี tag slot (เช่น [PRF-...]) ถือว่าส่งรอบวันนี้ไปแล้ว
+        if (!rawType.match(/\[\d{2}:\d{2}\]/)) {
+          return true;
+        }
+        return false;
+      }
+
+      return true;
     });
   } catch (error) {
     console.error('Error checking reminder logs:', error.message);
@@ -1459,7 +1479,7 @@ async function updateDebt(debtId, updateData = {}) {
     try {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${SHEET_NAMES.DEBTS}!A:L`
+        range: `${SHEET_NAMES.DEBTS}!A:M`
       });
 
       const rows = res.data.values || [];
@@ -1486,6 +1506,7 @@ async function updateDebt(debtId, updateData = {}) {
           const updatedAt = now;
           const newReminderProfileId = updateData.reminderProfileId !== undefined ? updateData.reminderProfileId : (currentRow[10] || '');
           const newReminderEnabled = updateData.reminderEnabled !== undefined ? (updateData.reminderEnabled ? 'TRUE' : 'FALSE') : (currentRow[11] || 'TRUE');
+          const newCustomReminderTimes = updateData.customReminderTimes !== undefined ? String(updateData.customReminderTimes).trim() : (currentRow[12] || '');
 
           const updatedValues = [
             newUserId,
@@ -1498,12 +1519,13 @@ async function updateDebt(debtId, updateData = {}) {
             createdAt,
             updatedAt,
             newReminderProfileId,
-            newReminderEnabled
+            newReminderEnabled,
+            newCustomReminderTimes
           ];
 
           await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
-            range: `${SHEET_NAMES.DEBTS}!B${rowNum}:L${rowNum}`,
+            range: `${SHEET_NAMES.DEBTS}!B${rowNum}:M${rowNum}`,
             valueInputOption: 'USER_ENTERED',
             requestBody: {
               values: [updatedValues]
@@ -1523,7 +1545,8 @@ async function updateDebt(debtId, updateData = {}) {
             debtStatus: newDebtStatus,
             updatedAt,
             reminderProfileId: newReminderProfileId,
-            reminderEnabled: newReminderEnabled === 'TRUE'
+            reminderEnabled: newReminderEnabled === 'TRUE',
+            customReminderTimes: newCustomReminderTimes
           };
         }
       }

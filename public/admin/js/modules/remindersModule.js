@@ -14,11 +14,36 @@ function initDomElements() {
   const btnSaveReminderSettingsTop = document.getElementById('btnSaveReminderSettingsTop');
   const btnTestPushToAdmin = document.getElementById('btnTestPushToAdmin');
   const btnRefreshLogs = document.getElementById('btnRefreshLogs');
+  const btnTestTriggerReminderNow = document.getElementById('btnTestTriggerReminderNow');
 
   if (btnSaveReminderSettings) btnSaveReminderSettings.addEventListener('click', saveReminderSettings);
   if (btnSaveReminderSettingsTop) btnSaveReminderSettingsTop.addEventListener('click', saveReminderSettings);
   if (btnTestPushToAdmin) btnTestPushToAdmin.addEventListener('click', sendTestPush);
   if (btnRefreshLogs) btnRefreshLogs.addEventListener('click', loadReminderLogs);
+
+  if (btnTestTriggerReminderNow) {
+    btnTestTriggerReminderNow.addEventListener('click', async () => {
+      if (!confirm('ต้องการสแกนและส่งข้อความแจ้งเตือนทันที (Bypass เวลาส่ง) ใช่หรือไม่?')) return;
+      showToast('กำลังตรวจสอบและส่งแจ้งเตือน...', '⏳');
+      try {
+        const res = await adminFetch('/api/reminder/trigger-now', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ forceRun: true, triggerType: 'ทดสอบส่งทันที (Admin Manual Trigger)' })
+        });
+        const data = await res.json();
+        if (data.success && data.summary) {
+          const s = data.summary;
+          showToast(`ส่งสำเร็จ ${s.sent} สัญญา, ข้าม ${s.skipped}, ผิดพลาด ${s.failed}`, '✅');
+          loadReminderLogs();
+        } else {
+          showToast(data.message || 'ส่งไม่สำเร็จ', '⚠️');
+        }
+      } catch (e) {
+        showToast('เกิดข้อผิดพลาด: ' + e.message, '❌');
+      }
+    });
+  }
 
   const cfgScheduleMode = document.getElementById('cfgScheduleMode');
   if (cfgScheduleMode) {
@@ -297,6 +322,21 @@ export function renderReminderProfilesGrid() {
     const isDefault = Boolean(p.isDefault);
     const freqName = freqLabels[p.frequencyType] || p.frequencyType;
 
+    const timeSlots = p.scheduleConfig?.timeSlots?.length > 0
+      ? p.scheduleConfig.timeSlots
+      : [p.primaryTime, p.secondaryTime].filter(Boolean);
+    const timeStr = timeSlots.length > 0 ? timeSlots.join(', ') : (p.primaryTime || '08:00');
+
+    const dowMap = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+    const dows = p.scheduleConfig?.daysOfWeek;
+    const dowStr = Array.isArray(dows) && dows.length < 7
+      ? dows.map(d => dowMap[d] || d).join(', ')
+      : 'ทุกวัน';
+
+    const preDueSteps = p.rulesConfig?.remindPreDueSteps?.length > 0
+      ? p.rulesConfig.remindPreDueSteps.join(', ')
+      : (p.rulesConfig?.remindBeforeDays || 1);
+
     return `
       <div class="panel-card" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid ${isDefault ? 'var(--primary)' : 'var(--surface-border)'};">
         <div>
@@ -312,8 +352,10 @@ export function renderReminderProfilesGrid() {
           <div style="font-size: 11px; color: var(--primary); font-weight: 600; margin-bottom: 6px;">
             📅 ความถี่: ${freqName}
           </div>
-          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-            🕒 เวลาส่ง: <strong>${p.primaryTime || '08:00'}</strong> ${p.secondaryTime ? `และรอบค่ำ <strong>${p.secondaryTime}</strong>` : ''}<br>
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.6;">
+            🕒 รอบเวลาส่ง: <strong style="color: var(--text-main);">${timeStr}</strong> <span style="font-size: 10px; color: var(--text-muted);">(เวลาไทย)</span><br>
+            📆 วันที่ส่ง: <strong>${dowStr}</strong><br>
+            ${p.rulesConfig?.remindBeforeEnabled ? `⚡ เตือนล่วงหน้า: <strong>${preDueSteps} วัน</strong><br>` : ''}
             💬 โทนภาษา: <strong>${p.templateConfig?.tone || 'POLITE'}</strong>
           </div>
         </div>
@@ -348,17 +390,27 @@ function initProfileModalListeners() {
   if (btnOpenCreateProfileModal && modalProfile) {
     btnOpenCreateProfileModal.addEventListener('click', () => {
       if (formProfile) formProfile.reset();
+      const elTitle = document.getElementById('modalProfileTitle');
       const elMode = document.getElementById('profileFormMode');
       const elId = document.getElementById('profileInputId');
+      if (elTitle) elTitle.textContent = 'สร้างรูปแบบการแจ้งเตือนใหม่';
       if (elMode) elMode.value = 'CREATE';
       if (elId) elId.value = '';
+
+      const timeInput = document.getElementById('profTimeSlots');
+      if (timeInput) timeInput.value = '08:00';
+      const stepsInput = document.getElementById('profPreDueSteps');
+      if (stepsInput) stepsInput.value = '3, 1';
+      document.querySelectorAll('input[name="profDow"]').forEach(cb => { cb.checked = true; });
+
+      modalProfile.classList.add('open');
       modalProfile.classList.remove('hidden');
     });
   }
 
   if (btnCloseProfileModal && modalProfile) {
     btnCloseProfileModal.addEventListener('click', () => {
-      modalProfile.classList.add('hidden');
+      window.closeProfileModal();
     });
   }
 
@@ -372,18 +424,32 @@ async function handleProfileSubmit(e) {
   const mode = document.getElementById('profileFormMode')?.value || 'CREATE';
   const profileId = document.getElementById('profileInputId')?.value;
 
+  const rawSlots = document.getElementById('profTimeSlots')?.value || '08:00';
+  const timeSlots = rawSlots.split(',').map(s => s.trim()).filter(Boolean);
+
+  const checkedDows = Array.from(document.querySelectorAll('input[name="profDow"]:checked')).map(cb => Number(cb.value));
+
+  const rawSteps = document.getElementById('profPreDueSteps')?.value || '1';
+  const remindPreDueSteps = rawSteps.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+
   const payload = {
     profileId,
     name: document.getElementById('profName')?.value?.trim(),
     frequencyType: document.getElementById('profFrequencyType')?.value,
-    primaryTime: document.getElementById('profPrimaryTime')?.value || '08:00',
-    secondaryTime: document.getElementById('profSecondaryTime')?.value || '',
+    primaryTime: timeSlots[0] || '08:00',
+    secondaryTime: timeSlots[1] || '',
+    scheduleConfig: {
+      timeSlots: timeSlots.length > 0 ? timeSlots : ['08:00'],
+      daysOfWeek: checkedDows.length > 0 ? checkedDows : [1, 2, 3, 4, 5, 6, 0]
+    },
     isDefault: document.getElementById('profIsDefault')?.checked || false,
     rulesConfig: {
       remindDueTodayEnabled: document.getElementById('profRuleDueToday')?.checked || false,
       remindOverdueEnabled: document.getElementById('profRuleOverdue')?.checked || false,
+      overdueFrequency: document.getElementById('profOverdueFrequency')?.value || 'DAILY',
       remindBeforeEnabled: document.getElementById('profRuleBefore')?.checked || false,
-      remindBeforeDays: parseInt(document.getElementById('profBeforeDays')?.value, 10) || 1
+      remindBeforeDays: remindPreDueSteps[0] || 1,
+      remindPreDueSteps: remindPreDueSteps.length > 0 ? remindPreDueSteps : [1]
     },
     templateConfig: {
       tone: document.getElementById('profTone')?.value || 'POLITE',
@@ -412,8 +478,7 @@ async function handleProfileSubmit(e) {
 
     if (data.success) {
       showToast('บันทึกรูปแบบการแจ้งเตือนสำเร็จ!', '✅');
-      const modalProfile = document.getElementById('modalReminderProfile');
-      if (modalProfile) modalProfile.classList.add('hidden');
+      window.closeProfileModal();
       loadReminderProfiles();
     } else {
       showToast(data.message || 'บันทึกไม่สำเร็จ', '❌');
@@ -424,6 +489,77 @@ async function handleProfileSubmit(e) {
 }
 
 // Global hooks for inline HTML handlers
+window.closeProfileModal = function() {
+  const modalProfile = document.getElementById('modalReminderProfile');
+  if (modalProfile) {
+    modalProfile.classList.remove('open');
+    modalProfile.classList.add('hidden');
+  }
+};
+
+window.addProfileTimeSlot = function(slotTime) {
+  const input = document.getElementById('profTimeSlots');
+  if (!input) return;
+  const current = input.value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!current.includes(slotTime)) {
+    current.push(slotTime);
+    input.value = current.join(', ');
+  }
+};
+
+window.openEditProfileModal = function(profileId) {
+  const p = (store.reminderProfiles || []).find(item => item.profileId === profileId);
+  if (!p) {
+    showToast('ไม่พบข้อมูลโปรไฟล์ ' + profileId, '⚠️');
+    return;
+  }
+
+  const modalProfile = document.getElementById('modalReminderProfile');
+  const elTitle = document.getElementById('modalProfileTitle');
+  const elMode = document.getElementById('profileFormMode');
+  const elId = document.getElementById('profileInputId');
+
+  if (elTitle) elTitle.textContent = `แก้ไขรูปแบบการแจ้งเตือน (${p.profileId})`;
+  if (elMode) elMode.value = 'EDIT';
+  if (elId) elId.value = p.profileId;
+
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+  const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = Boolean(val); };
+
+  setVal('profName', p.name);
+  setVal('profFrequencyType', p.frequencyType || 'DAILY');
+
+  const timeSlots = p.scheduleConfig?.timeSlots?.length > 0
+    ? p.scheduleConfig.timeSlots
+    : [p.primaryTime, p.secondaryTime].filter(Boolean);
+  setVal('profTimeSlots', timeSlots.length > 0 ? timeSlots.join(', ') : '08:00');
+
+  const dows = p.scheduleConfig?.daysOfWeek || [1, 2, 3, 4, 5, 6, 0];
+  document.querySelectorAll('input[name="profDow"]').forEach(cb => {
+    cb.checked = dows.includes(Number(cb.value));
+  });
+
+  setCheck('profRuleDueToday', p.rulesConfig?.remindDueTodayEnabled !== false);
+  setCheck('profRuleBefore', p.rulesConfig?.remindBeforeEnabled !== false);
+  const steps = p.rulesConfig?.remindPreDueSteps?.length > 0
+    ? p.rulesConfig.remindPreDueSteps.join(', ')
+    : String(p.rulesConfig?.remindBeforeDays || 1);
+  setVal('profPreDueSteps', steps);
+
+  setCheck('profRuleOverdue', p.rulesConfig?.remindOverdueEnabled !== false);
+  setVal('profOverdueFrequency', p.rulesConfig?.overdueFrequency || 'DAILY');
+
+  setVal('profTone', p.templateConfig?.tone || 'POLITE');
+  setVal('profHeader', p.templateConfig?.customHeader || '');
+  setVal('profFooter', p.templateConfig?.customFooter || '');
+  setCheck('profIsDefault', p.isDefault);
+
+  if (modalProfile) {
+    modalProfile.classList.add('open');
+    modalProfile.classList.remove('hidden');
+  }
+};
+
 window.toggleReminderProfile = async function(profileId) {
   try {
     const res = await adminFetch(`/api/admin/reminder/profiles/${profileId}/toggle`, { method: 'PATCH' });

@@ -22,7 +22,8 @@ function createReminderFlex({
   promptPayNumber = '',
   tone = 'POLITE',
   customHeader = '',
-  customFooter = ''
+  customFooter = '',
+  overdueDays = 0
 }) {
   let badgeText = 'แจ้งเตือนครบกำหนดชำระ';
   let badgeColor = '#06C755';
@@ -30,15 +31,17 @@ function createReminderFlex({
   let subText = `ถึงกำหนดชำระวันที่ ${dueDate}`;
 
   if (reminderType && reminderType.startsWith('DUE_BEFORE')) {
-    badgeText = 'เตือนล่วงหน้า';
+    const daysMatch = reminderType.match(/\d+/);
+    const days = daysMatch ? daysMatch[0] : '';
+    badgeText = days ? `เตือนล่วงหน้า ${days} วัน` : 'เตือนล่วงหน้า';
     badgeColor = '#F59E0B';
-    headerTitle = customHeader || 'แจ้งเตือนชำระล่วงหน้า';
+    headerTitle = customHeader || (days ? `แจ้งเตือนชำระล่วงหน้า (${days} วัน)` : 'แจ้งเตือนชำระล่วงหน้า');
     subText = `ครบกำหนดชำระวันที่ ${dueDate}`;
   } else if (reminderType === 'OVERDUE') {
-    badgeText = 'เกินกำหนดชำระ!';
-    badgeColor = '#EF4444';
-    headerTitle = customHeader || 'แจ้งเตือนเกินกำหนดชำระ';
-    subText = `เกินกำหนดชำระตั้งแต่วันที่ ${dueDate} กรุณาดำเนินการ`;
+    badgeText = overdueDays > 0 ? `เกินกำหนด ${overdueDays} วัน!` : 'เกินกำหนดชำระ!';
+    badgeColor = overdueDays >= 8 ? '#DC2626' : (overdueDays >= 4 ? '#EA580C' : '#EF4444');
+    headerTitle = customHeader || (overdueDays >= 8 ? '🚨 แจ้งเตือนเกินกำหนดเร่งด่วน' : 'แจ้งเตือนเกินกำหนดชำระ');
+    subText = overdueDays > 0 ? `เกินกำหนดชำระมาแล้ว ${overdueDays} วัน (ครบกำหนด ${dueDate})` : `เกินกำหนดชำระตั้งแต่วันที่ ${dueDate} กรุณาดำเนินการ`;
   } else if (reminderType === 'MONTHLY_SCHEDULE') {
     badgeText = 'รอบชำระประจำเดือน';
     badgeColor = '#38BDF8';
@@ -54,12 +57,12 @@ function createReminderFlex({
   // ปรับตาม Tone (ระดับความเข้มงวดของข้อความ)
   if (tone === 'URGENT') {
     badgeColor = '#DC2626';
-    badgeText = '⚠️ เตือนเร่งด่วน!';
+    badgeText = overdueDays > 0 ? `🚨 เกินกำหนด ${overdueDays} วัน (เร่งด่วน)` : '⚠️ เตือนเร่งด่วน!';
     headerTitle = customHeader || 'แจ้งเตือนยอดชำระเร่งด่วน';
     subText = `กรุณาชำระเงินและส่งหลักฐานทันทีเพื่อรักษาสิทธิ์ของท่าน`;
   } else if (tone === 'FORMAL') {
     badgeColor = '#2563EB';
-    badgeText = 'แจ้งยอดชำระ';
+    badgeText = overdueDays > 0 ? `เกินกำหนด ${overdueDays} วัน (ติดตามยอด)` : 'แจ้งยอดชำระ';
     headerTitle = customHeader || 'แจ้งยอดครบกำหนดตามสัญญา';
     subText = `สัญญาเงินกู้เลขที่ ${debtId || '-'} ครบกำหนดชำระวันที่ ${dueDate}`;
   }

@@ -97,6 +97,7 @@ function initDomElements() {
       const debtStatus = document.getElementById('editContractStatus')?.value || 'ACTIVE';
       const reminderProfileId = document.getElementById('editContractReminderProfile')?.value || '';
       const reminderEnabled = Boolean(document.getElementById('editContractReminderEnabled')?.checked);
+      const customReminderTimes = document.getElementById('editContractCustomTimes')?.value?.trim() || '';
 
       const btnSave = document.getElementById('btnSaveEditContract');
       if (btnSave) {
@@ -117,7 +118,8 @@ function initDomElements() {
             cycleDays,
             debtStatus,
             reminderProfileId,
-            reminderEnabled
+            reminderEnabled,
+            customReminderTimes
           })
         });
 
@@ -142,7 +144,8 @@ function initDomElements() {
               cycleDays,
               debtStatus,
               reminderProfileId,
-              reminderEnabled
+              reminderEnabled,
+              customReminderTimes
             };
           }
 
@@ -619,6 +622,9 @@ window.openEditContractModal = function(debtId) {
   }
 
   if (elEnabled) elEnabled.checked = contract.reminderEnabled !== false;
+
+  const elCustomTimes = document.getElementById('editContractCustomTimes');
+  if (elCustomTimes) elCustomTimes.value = contract.customReminderTimes || '';
 
   // Delete button inside modal
   if (btnDelete) {

@@ -19,12 +19,17 @@ const DEFAULT_PRESETS = [
     profileId: 'PRF-DAILY',
     name: 'เตือนรายวัน (Daily 08:00)',
     frequencyType: 'DAILY',
-    scheduleConfig: { dailyInterval: 1 },
+    scheduleConfig: {
+      dailyInterval: 1,
+      timeSlots: ['08:00'],
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 0]
+    },
     primaryTime: '08:00',
     secondaryTime: '',
     rulesConfig: {
       remindBeforeEnabled: false,
       remindBeforeDays: 1,
+      remindPreDueSteps: [1],
       remindDueTodayEnabled: true,
       remindOverdueEnabled: true,
       overdueFrequency: 'DAILY'
@@ -43,12 +48,17 @@ const DEFAULT_PRESETS = [
     profileId: 'PRF-ENDMONTH',
     name: 'เตือนวันสิ้นเดือน (End of Month)',
     frequencyType: 'END_OF_MONTH',
-    scheduleConfig: { lastDayOfMonth: true },
+    scheduleConfig: {
+      lastDayOfMonth: true,
+      timeSlots: ['08:00'],
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 0]
+    },
     primaryTime: '08:00',
     secondaryTime: '',
     rulesConfig: {
       remindBeforeEnabled: true,
       remindBeforeDays: 1,
+      remindPreDueSteps: [3, 1],
       remindDueTodayEnabled: true,
       remindOverdueEnabled: true,
       overdueFrequency: 'DAILY'
@@ -67,12 +77,18 @@ const DEFAULT_PRESETS = [
     profileId: 'PRF-PAYDAY-25',
     name: 'เตือนวันเงินออก (วันที่ 25 และ สิ้นเดือน)',
     frequencyType: 'SPECIFIC_DAYS',
-    scheduleConfig: { daysOfMonth: [25], lastDayOfMonth: true },
+    scheduleConfig: {
+      daysOfMonth: [25],
+      lastDayOfMonth: true,
+      timeSlots: ['08:00', '18:00'],
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 0]
+    },
     primaryTime: '08:00',
     secondaryTime: '18:00',
     rulesConfig: {
       remindBeforeEnabled: true,
       remindBeforeDays: 1,
+      remindPreDueSteps: [2, 1],
       remindDueTodayEnabled: true,
       remindOverdueEnabled: true,
       overdueFrequency: 'EVERY_2_DAYS'
@@ -91,12 +107,16 @@ const DEFAULT_PRESETS = [
     profileId: 'PRF-DUE-RELATIVE',
     name: 'เตือนอิงวันครบกำหนดสัญญา (Due Date Relative)',
     frequencyType: 'DUE_DATE_RELATIVE',
-    scheduleConfig: {},
+    scheduleConfig: {
+      timeSlots: ['08:00'],
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 0]
+    },
     primaryTime: '08:00',
     secondaryTime: '',
     rulesConfig: {
       remindBeforeEnabled: true,
       remindBeforeDays: 2,
+      remindPreDueSteps: [3, 1],
       remindDueTodayEnabled: true,
       remindOverdueEnabled: true,
       overdueFrequency: 'DAILY'
@@ -308,20 +328,62 @@ async function saveProfile(data) {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss');
   const profileId = data.profileId || `PRF-${dayjs().format('YYYYMM')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  const sched = data.scheduleConfig || {};
+  let timeSlots = [];
+  if (Array.isArray(sched.timeSlots)) {
+    timeSlots = sched.timeSlots.map(s => String(s || '').trim()).filter(Boolean);
+  } else if (typeof sched.timeSlots === 'string' && sched.timeSlots.trim()) {
+    timeSlots = sched.timeSlots.split(',').map(s => s.trim()).filter(Boolean);
+  } else if (data.timeSlots) {
+    timeSlots = Array.isArray(data.timeSlots) ? data.timeSlots : String(data.timeSlots).split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (timeSlots.length === 0) {
+    if (data.primaryTime) timeSlots.push(data.primaryTime);
+    if (data.secondaryTime) timeSlots.push(data.secondaryTime);
+  }
+  if (timeSlots.length === 0) timeSlots = ['08:00'];
+
+  const primaryTime = timeSlots[0] || data.primaryTime || '08:00';
+  const secondaryTime = timeSlots[1] || data.secondaryTime || '';
+
+  const scheduleConfig = {
+    ...sched,
+    timeSlots,
+    daysOfWeek: Array.isArray(sched.daysOfWeek) ? sched.daysOfWeek.map(Number) : (Array.isArray(data.daysOfWeek) ? data.daysOfWeek.map(Number) : [1, 2, 3, 4, 5, 6, 0])
+  };
+
+  const rawRules = data.rulesConfig || {};
+  let remindPreDueSteps = [1];
+  if (Array.isArray(rawRules.remindPreDueSteps) && rawRules.remindPreDueSteps.length > 0) {
+    remindPreDueSteps = rawRules.remindPreDueSteps.map(Number).filter(n => !isNaN(n) && n > 0);
+  } else if (typeof rawRules.remindPreDueSteps === 'string' && rawRules.remindPreDueSteps.trim()) {
+    remindPreDueSteps = rawRules.remindPreDueSteps.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+  } else if (rawRules.remindBeforeDays) {
+    remindPreDueSteps = [parseInt(rawRules.remindBeforeDays, 10) || 1];
+  }
+
+  const rulesConfig = {
+    remindBeforeEnabled: rawRules.remindBeforeEnabled !== undefined ? Boolean(rawRules.remindBeforeEnabled) : true,
+    remindBeforeDays: remindPreDueSteps[0] || 1,
+    remindPreDueSteps,
+    remindDueTodayEnabled: rawRules.remindDueTodayEnabled !== undefined ? Boolean(rawRules.remindDueTodayEnabled) : true,
+    remindOverdueEnabled: rawRules.remindOverdueEnabled !== undefined ? Boolean(rawRules.remindOverdueEnabled) : true,
+    overdueFrequency: rawRules.overdueFrequency || 'DAILY',
+    overdueTiers: rawRules.overdueTiers || [
+      { minDays: 1, maxDays: 3, tone: 'POLITE', label: 'เตือนปกติ' },
+      { minDays: 4, maxDays: 7, tone: 'FORMAL', label: 'ติดตามยอด' },
+      { minDays: 8, maxDays: 999, tone: 'URGENT', label: 'เตือนเร่งด่วน' }
+    ]
+  };
+
   const profile = {
     profileId,
     name: data.name || 'รูปแบบแจ้งเตือนใหม่',
     frequencyType: data.frequencyType || 'DAILY',
-    scheduleConfig: data.scheduleConfig || {},
-    primaryTime: data.primaryTime || '08:00',
-    secondaryTime: data.secondaryTime || '',
-    rulesConfig: data.rulesConfig || {
-      remindBeforeEnabled: true,
-      remindBeforeDays: 1,
-      remindDueTodayEnabled: true,
-      remindOverdueEnabled: true,
-      overdueFrequency: 'DAILY'
-    },
+    scheduleConfig,
+    primaryTime,
+    secondaryTime,
+    rulesConfig,
     templateConfig: data.templateConfig || {
       tone: 'POLITE',
       customHeader: 'แจ้งยอดรอบชำระ',

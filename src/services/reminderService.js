@@ -4,7 +4,12 @@ const timezone = require('dayjs/plugin/timezone');
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const { normalizeDate, isLegalDebtCollectionTime } = require('../utils/dateHelper');
+const {
+  normalizeDate,
+  isLegalDebtCollectionTime,
+  findMatchingTimeSlot,
+  isDayOfWeekAllowed
+} = require('../utils/dateHelper');
 const sheetsService = require('./sheetsService');
 const lineService = require('./lineService');
 const reminderSettingsService = require('./reminderSettingsService');
@@ -13,29 +18,34 @@ const { createReminderFlex, createAdminDailySummaryFlex } = require('../template
 const { getAdminUserIds } = require('../middleware/adminAuth');
 
 /**
- * สแกนและส่งข้อความแจ้งเตือนหนี้ครบกำหนดชำระตามระบบ Reminder Engine v5.0
- * รองรับ 3-Tier Hierarchy:
- * 1. Contract-level override (highest)
- * 2. Debtor-level default
- * 3. System Global Default Profile
+ * สแกนและส่งข้อความแจ้งเตือนหนี้ครบกำหนดชำระตามระบบ Reminder Engine v6.0 (Flexible Precision Engine)
+ * - รองรับเวลาไทยแม่นยำ (Asia/Bangkok UTC+7)
+ * - รองรับส่งหลายรอบต่อวัน (Multi-Time Slots e.g. 08:00, 18:00) และ Time-Window Matching
+ * - รองรับกรองวันในสัปดาห์ (Days of Week e.g. จันทร์-ศุกร์)
+ * - รองรับเตือนล่วงหน้าหลายขั้น (Multi-Step Pre-Due e.g. 3, 1 วัน)
+ * - รองรับเตือนเกินกำหนดแบบลำดับขั้น (Overdue Escalation Tiers 1, 2, 3)
+ * - ป้องกันส่งซ้ำแยกตาม Time Slot
+ * - รองรับกำหนดเวลารายสัญญาเฉพาะเจาะจง (customReminderTimes)
  */
 async function runDailyReminderCheck(options = {}) {
   const globalSettings = options.customSettings || await reminderSettingsService.getSettings();
   const triggerType = options.triggerType || 'อัตโนมัติ (Schedule)';
   const tz = globalSettings.timezone || 'Asia/Bangkok';
 
-  console.log(`⏰ [Reminder Engine v5.0] Starting scan (${triggerType})...`);
+  const todayDateObj = dayjs().tz(tz);
+  const currentBangkokTime = todayDateObj.format('HH:mm');
+
+  console.log(`⏰ [Reminder Engine v6.0] Starting scan (${triggerType}) at Bangkok time ${currentBangkokTime}...`);
 
   // ตรวจสอบสวิตช์หลักของระบบ
   if (!globalSettings.enabled && !options.forceRun) {
     console.log('⏸️ [Reminder Check] Automated reminders are currently disabled in global settings.');
     return {
       disabled: true,
+      currentBangkokTime,
       message: 'ระบบแจ้งเตือนหลักถูกปิดการใช้งานอยู่ในการตั้งค่า'
     };
   }
-
-  const todayDateObj = dayjs().tz(tz);
 
   // ตรวจสอบช่วงเวลาที่กฎหมายทวงถามหนี้ พ.ร.บ. 2558 อนุญาต (08:00-20:00 ในวันธรรมดา และ 08:00-18:00 ในวันหยุด)
   const legalCheck = isLegalDebtCollectionTime(todayDateObj);
@@ -44,6 +54,7 @@ async function runDailyReminderCheck(options = {}) {
     return {
       paused: true,
       legalGuard: true,
+      currentBangkokTime,
       reason: legalCheck.reason,
       message: `ระบบระงับการแจ้งเตือนชั่วคราวตาม พ.ร.บ. การทวงถามหนี้ พ.ศ. 2558: ${legalCheck.reason}`
     };
@@ -118,39 +129,84 @@ async function runDailyReminderCheck(options = {}) {
     // หากไม่มีโปรไฟล์ที่เปิดใช้งาน ให้ข้าม
     if (!effectiveProfile) continue;
 
-    // ประเมินเงื่อนไขการส่งแจ้งเตือนตาม Profile Frequency & Rules
-    let reminderType = null;
     const rules = effectiveProfile.rulesConfig || {};
     const sched = effectiveProfile.scheduleConfig || {};
     const freq = effectiveProfile.frequencyType || 'DAILY';
 
-    const beforeDays = Number(rules.remindBeforeDays) || 1;
-    const beforeTargetDate = todayDateObj.add(beforeDays, 'day').format('YYYY-MM-DD');
+    // 1. Day of Week Guard
+    const allowedDays = sched.daysOfWeek || [1, 2, 3, 4, 5, 6, 0];
+    if (!isDayOfWeekAllowed(allowedDays, todayDateObj)) {
+      continue; // ไม่อยู่ในวันที่กำหนดให้ส่ง
+    }
+
+    // 2. Time-Slot Matching
+    // ลำดับความสำคัญของ Time Slots: d.customReminderTimes > sched.timeSlots > [primaryTime, secondaryTime]
+    const targetSlots = d.customReminderTimes || sched.timeSlots || [effectiveProfile.primaryTime, effectiveProfile.secondaryTime].filter(Boolean);
+
+    let matchedSlot = '08:00';
+    if (!options.forceRun && !options.ignoreTimeCheck) {
+      const slotResult = findMatchingTimeSlot(targetSlots, options.windowMinutes || 35, todayDateObj);
+      if (!slotResult.matched) {
+        // เวลานี้ยังไม่ถึงรอบส่งของสัญญานี้
+        continue;
+      }
+      matchedSlot = slotResult.matchedSlot;
+    } else {
+      matchedSlot = Array.isArray(targetSlots) ? (targetSlots[0] || '08:00') : (String(targetSlots).split(',')[0]?.trim() || '08:00');
+    }
+
+    // 3. ประเมินเงื่อนไขการส่งแจ้งเตือนตาม Profile Frequency & Rules
+    let reminderType = null;
+    let overdueDays = 0;
+    let overdueTier = null;
+    let resolvedTone = effectiveProfile.templateConfig?.tone || globalSettings.template?.tone || 'POLITE';
+
     const normDueDate = normalizeDate(d.dueDate);
+    const diffDays = dayjs(normDueDate).diff(todayDateObj.startOf('day'), 'day');
 
     // Rule A: เตือนตรงวันครบกำหนด (Due Today)
-    if (rules.remindDueTodayEnabled && normDueDate === todayStr) {
+    if (rules.remindDueTodayEnabled && diffDays === 0) {
       reminderType = 'DUE_TODAY';
     }
-    // Rule B: เตือนล่วงหน้า (Pre-due)
-    else if (rules.remindBeforeEnabled && normDueDate === beforeTargetDate) {
-      reminderType = `DUE_BEFORE_${beforeDays}_DAYS`;
+    // Rule B: เตือนล่วงหน้า (Pre-due หลายขั้นตอน เช่น 3, 1 วัน)
+    else if (rules.remindBeforeEnabled && diffDays > 0) {
+      const steps = (Array.isArray(rules.remindPreDueSteps) && rules.remindPreDueSteps.length > 0)
+        ? rules.remindPreDueSteps.map(Number)
+        : [Number(rules.remindBeforeDays) || 1];
+      if (steps.includes(diffDays)) {
+        reminderType = `DUE_BEFORE_${diffDays}_DAYS`;
+      }
     }
-    // Rule C: เตือนเกินกำหนด (Overdue)
-    else if (rules.remindOverdueEnabled && normDueDate && dayjs(normDueDate).isBefore(todayDateObj, 'day')) {
-      const daysOverdue = todayDateObj.diff(dayjs(normDueDate), 'day');
+    // Rule C: เตือนเกินกำหนด (Overdue พร้อม Escalation Tiers)
+    else if (rules.remindOverdueEnabled && diffDays < 0) {
+      overdueDays = Math.abs(diffDays);
       const overdueFreq = rules.overdueFrequency || 'DAILY';
 
       let shouldRemind = false;
       if (overdueFreq === 'DAILY') shouldRemind = true;
-      else if (overdueFreq === 'EVERY_2_DAYS' && daysOverdue % 2 === 1) shouldRemind = true;
-      else if (overdueFreq === 'EVERY_3_DAYS' && daysOverdue % 3 === 1) shouldRemind = true;
-      else if (overdueFreq === 'WEEKLY' && daysOverdue % 7 === 1) shouldRemind = true;
+      else if (overdueFreq === 'EVERY_2_DAYS' && overdueDays % 2 === 1) shouldRemind = true;
+      else if (overdueFreq === 'EVERY_3_DAYS' && overdueDays % 3 === 1) shouldRemind = true;
+      else if (overdueFreq === 'WEEKLY' && overdueDays % 7 === 1) shouldRemind = true;
 
       if (shouldRemind) {
         reminderType = 'OVERDUE';
+        // Overdue Escalation Tiers:
+        // Tier 1: 1-3 วัน -> POLITE
+        // Tier 2: 4-7 วัน -> FORMAL
+        // Tier 3: 8+ วัน -> URGENT
+        if (overdueDays >= 8) {
+          overdueTier = 3;
+          resolvedTone = 'URGENT';
+        } else if (overdueDays >= 4) {
+          overdueTier = 2;
+          resolvedTone = 'FORMAL';
+        } else {
+          overdueTier = 1;
+          resolvedTone = 'POLITE';
+        }
       }
     }
+
     // Rule D: ความถี่ตามโปรไฟล์ (Schedule Frequency Patterns)
     if (!reminderType) {
       if (freq === 'DAILY') {
@@ -192,13 +248,17 @@ async function runDailyReminderCheck(options = {}) {
         dueDate: d.dueDate,
         debtStatus: d.debtStatus,
         reminderType,
+        matchedSlot,
+        overdueDays,
+        overdueTier,
+        resolvedTone,
         profile: effectiveProfile,
         profileSource: resolvedProfileSource
       });
     }
   }
 
-  console.log(`📋 Found ${candidates.length} candidate debt records matching reminder profiles.`);
+  console.log(`📋 Found ${candidates.length} candidate debt records matching reminder profiles for slot ${currentBangkokTime}.`);
 
   let sentCount = 0;
   let skippedCount = 0;
@@ -206,10 +266,10 @@ async function runDailyReminderCheck(options = {}) {
 
   for (const candidate of candidates) {
     try {
-      // ตรวจสอบการส่งซ้ำในวันเดียวกัน
-      const alreadySent = await sheetsService.hasBeenRemindedToday(candidate.debtId, candidate.reminderType);
+      // ตรวจสอบการส่งซ้ำในวันเดียวกัน แยกตาม Slot
+      const alreadySent = await sheetsService.hasBeenRemindedToday(candidate.debtId, candidate.reminderType, candidate.matchedSlot);
       if (alreadySent && !options.ignoreDuplicate) {
-        console.log(`⏭️ Skipped debt ${candidate.debtId} for ${candidate.userId} (already sent today)`);
+        console.log(`⏭️ Skipped debt ${candidate.debtId} for ${candidate.userId} (already sent today for slot ${candidate.matchedSlot})`);
         skippedCount++;
         continue;
       }
@@ -228,7 +288,7 @@ async function runDailyReminderCheck(options = {}) {
       const promptPayStr = tpl.promptPayNumber || globalTpl.promptPayNumber || '';
       const customHeaderStr = tpl.customHeader || prof.name || globalTpl.customHeader || '';
       const customFooterStr = tpl.customFooter || globalTpl.customFooter || '';
-      const toneStr = tpl.tone || globalTpl.tone || 'POLITE';
+      const toneStr = candidate.resolvedTone || tpl.tone || globalTpl.tone || 'POLITE';
 
       const flexMsg = createReminderFlex({
         debtorName: candidate.debtorName,
@@ -238,6 +298,7 @@ async function runDailyReminderCheck(options = {}) {
         dueDate: candidate.dueDate,
         reminderType: candidate.reminderType,
         tone: toneStr,
+        overdueDays: candidate.overdueDays,
         bankAccount: bankAccountStr,
         accountName: accountNameStr,
         promptPayNumber: promptPayStr,
@@ -248,22 +309,22 @@ async function runDailyReminderCheck(options = {}) {
       // ส่งข้อความผ่าน LINE Messaging API
       await lineService.pushMessage(candidate.userId, flexMsg);
 
-      // บันทึก Log ลงชีต ReminderLogs
+      // บันทึก Log ลงชีต ReminderLogs พร้อมระบุ Time Slot เพื่อแยกการส่งหลายรอบต่อวัน
       await sheetsService.logReminder({
         debtId: candidate.debtId,
         userId: candidate.userId,
-        reminderType: `${candidate.reminderType} [${prof.profileId}]`,
+        reminderType: `${candidate.reminderType} [${candidate.matchedSlot || '08:00'}] [${prof.profileId}]`,
         status: 'SUCCESS'
       });
 
-      console.log(`✅ Sent [${prof.profileId}] reminder to user ${candidate.userId} (Debt: ${candidate.debtId})`);
+      console.log(`✅ Sent [${prof.profileId}] reminder to user ${candidate.userId} (Debt: ${candidate.debtId}, Slot: ${candidate.matchedSlot})`);
       sentCount++;
     } catch (err) {
       console.error(`❌ Failed to send reminder for debt ${candidate.debtId}:`, err.message);
       await sheetsService.logReminder({
         debtId: candidate.debtId,
         userId: candidate.userId,
-        reminderType: candidate.reminderType,
+        reminderType: `${candidate.reminderType} [${candidate.matchedSlot || '08:00'}]`,
         status: `FAILED: ${err.message}`
       });
       failedCount++;
@@ -301,7 +362,7 @@ async function runDailyReminderCheck(options = {}) {
     }
   }
 
-  console.log(`🏁 [Reminder Engine v5.0] Finished: ${JSON.stringify(summary)}`);
+  console.log(`🏁 [Reminder Engine v6.0] Finished: ${JSON.stringify(summary)}`);
   return summary;
 }
 

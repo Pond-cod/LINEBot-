@@ -120,6 +120,87 @@ function isLegalDebtCollectionTime(dateObj = null) {
   };
 }
 
+/**
+ * ตรวจสอบว่าเวลาไทยปัจจุบันตรงกับเวลาเป้าหมาย (HH:mm) หรือไม่
+ * โดยให้ความยืดหยุ่นภายในช่วงเวลา ±windowMinutes (ค่าเริ่มต้น 20 นาที)
+ * 
+ * @param {string} targetTimeStr เวลาเป้าหมาย เช่น '08:30'
+ * @param {number} [windowMinutes=20] กรอบเวลาที่ยอมรับได้ (นาที)
+ * @param {dayjs.Dayjs} [refDate=null] ออบเจ็กต์ dayjs อ้างอิง (ค่าเริ่มต้นคือเวลาไทยปัจจุบัน)
+ * @returns {{ matched: boolean, diffMinutes: number, targetSlot: string, currentBangkokTime: string }}
+ */
+function isCurrentTimeMatching(targetTimeStr, windowMinutes = 20, refDate = null) {
+  if (!targetTimeStr || typeof targetTimeStr !== 'string' || !targetTimeStr.includes(':')) {
+    return { matched: false, diffMinutes: 999, targetSlot: '', currentBangkokTime: '' };
+  }
+
+  const now = refDate ? refDate.tz(TIMEZONE) : getNowBangkok();
+  const [targetHour, targetMin] = targetTimeStr.trim().split(':').map(n => parseInt(n, 10));
+
+  if (isNaN(targetHour) || isNaN(targetMin)) {
+    return { matched: false, diffMinutes: 999, targetSlot: targetTimeStr, currentBangkokTime: now.format('HH:mm') };
+  }
+
+  const currentMinutesTotal = now.hour() * 60 + now.minute();
+  const targetMinutesTotal = targetHour * 60 + targetMin;
+  const diffMinutes = Math.abs(currentMinutesTotal - targetMinutesTotal);
+
+  const matched = diffMinutes <= windowMinutes;
+  const formattedSlot = `${String(targetHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`;
+
+  return {
+    matched,
+    diffMinutes,
+    targetSlot: formattedSlot,
+    currentBangkokTime: now.format('HH:mm')
+  };
+}
+
+/**
+ * ค้นหา Time Slot จากรายการเวลาหลายรอบ ที่ตรงกับเวลาไทยปัจจุบันมากที่สุด
+ * รองรับทั้ง Array ['09:00', '13:30', '18:00'] และ String คั่นด้วยจุลภาค '09:00, 18:00'
+ * 
+ * @param {string[]|string} timeSlots รายการเวลา
+ * @param {number} [windowMinutes=20] กรอบเวลา
+ * @param {dayjs.Dayjs} [refDate=null] เวลาอ้างอิง
+ * @returns {{ matched: boolean, matchedSlot: string|null, allSlots: string[] }}
+ */
+function findMatchingTimeSlot(timeSlots, windowMinutes = 20, refDate = null) {
+  let slots = [];
+  if (Array.isArray(timeSlots)) {
+    slots = timeSlots.map(s => String(s || '').trim()).filter(Boolean);
+  } else if (typeof timeSlots === 'string' && timeSlots.trim()) {
+    slots = timeSlots.split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  if (slots.length === 0) {
+    return { matched: false, matchedSlot: null, allSlots: [] };
+  }
+
+  for (const slot of slots) {
+    const check = isCurrentTimeMatching(slot, windowMinutes, refDate);
+    if (check.matched) {
+      return {
+        matched: true,
+        matchedSlot: check.targetSlot,
+        allSlots: slots
+      };
+    }
+  }
+
+  return { matched: false, matchedSlot: null, allSlots: slots };
+}
+
+/**
+ * ตรวจสอบว่าวันปัจจุบัน (เวลาไทย) อยู่ในรายชื่อวันที่อนุญาตหรือไม่ (0=อาทิตย์, 1=จันทร์, ..., 6=เสาร์)
+ */
+function isDayOfWeekAllowed(allowedDays = [], refDate = null) {
+  if (!Array.isArray(allowedDays) || allowedDays.length === 0) return true;
+  const now = refDate ? refDate.tz(TIMEZONE) : getNowBangkok();
+  const currentDay = now.day();
+  return allowedDays.map(Number).includes(currentDay);
+}
+
 module.exports = {
   TIMEZONE,
   getNowBangkok,
@@ -127,5 +208,8 @@ module.exports = {
   getNowStringBangkok,
   normalizeDate,
   calculateNextDueDate,
-  isLegalDebtCollectionTime
+  isLegalDebtCollectionTime,
+  isCurrentTimeMatching,
+  findMatchingTimeSlot,
+  isDayOfWeekAllowed
 };

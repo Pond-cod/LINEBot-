@@ -1370,12 +1370,19 @@
             </div>
           </div>
 
-          <!-- รูปแบบแจ้งเตือน & เปิด/ปิด -->
+          <!-- รูปแบบแจ้งเตือน & เปิด/ปิด & เวลาเฉพาะสัญญา -->
           <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-top: 6px;">
             <label class="form-label" style="font-weight: 600;">🔔 รูปแบบการแจ้งเตือน (Reminder Profile):</label>
             <select id="editContractReminderProfile" class="form-control" style="margin-bottom: 10px;">
               <option value="">⚙️ ใช้รูปแบบเริ่มต้น (Default Profile)</option>
             </select>
+            <div style="margin-bottom: 10px;">
+              <label class="form-label" style="font-weight: 600; font-size: 12px;">🕒 เวลาส่งแจ้งเตือนเฉพาะสัญญานี้ (Custom Times):</label>
+              <input type="text" id="editContractCustomTimes" class="form-control" placeholder="เช่น 09:00, 18:00 (เว้นว่างไว้เพื่อใช้เวลาตามโปรไฟล์)" style="font-size: 12px;">
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+                ระบุเวลาไทย HH:mm คั่นด้วยจุลภาค เช่น <code>08:00, 17:30</code> (หากระบุ จะแทนที่เวลาของโปรไฟล์)
+              </div>
+            </div>
             <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--surface-border); padding-top: 10px;">
               <div>
                 <strong style="font-size: 13px; color: var(--text-main);">เปิดการแจ้งเตือนสำหรับสัญญานี้</strong>
@@ -1402,6 +1409,174 @@
     </div>
   </div>
 
-  <script type="module" src="js/admin.js?v=7.1"></script>
+  <!-- Modal 4: Reminder Profile Modal (สร้าง/แก้ไข รูปแบบการแจ้งเตือน) -->
+  <div id="modalReminderProfile" class="admin-modal">
+    <div class="modal-dialog" style="max-width: 640px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">🔔</span>
+          <div>
+            <h3 id="modalProfileTitle" style="font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0;">สร้างรูปแบบการแจ้งเตือนใหม่</h3>
+            <span style="font-size: 11.5px; color: var(--text-muted);">กำหนดความถี่ รอบเวลาส่งแบบหลายช่วงเวลา และเงื่อนไขเตือนล่วงหน้า/เกินกำหนด</span>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" id="btnCloseProfileModal">&times;</button>
+      </div>
+      <form id="formReminderProfile">
+        <input type="hidden" id="profileFormMode" value="CREATE">
+        <input type="hidden" id="profileInputId" value="">
+        <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+          
+          <!-- ชื่อโปรไฟล์ & ความถี่หลัก -->
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">🏷️ ชื่อรูปแบบการแจ้งเตือน:</label>
+              <input type="text" id="profName" class="form-control" required placeholder="เช่น เตือนรายวันรอบเช้า-ค่ำ">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">📅 รูปแบบความถี่ (Frequency):</label>
+              <select id="profFrequencyType" class="form-control">
+                <option value="DAILY">เตือนรายวัน (Daily)</option>
+                <option value="DUE_DATE_RELATIVE">อิงวันครบกำหนด (Due Date Relative)</option>
+                <option value="END_OF_MONTH">วันสิ้นเดือน (End of Month)</option>
+                <option value="SPECIFIC_DAYS">ระบุวันที่ในเดือน (Specific Days)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- รอบเวลาส่ง (Multi-Time Slots) -->
+          <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+            <label class="form-label" style="font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+              <span>🕒 รอบเวลาส่งแจ้งเตือน (Time Slots - เวลาไทย UTC+7):</span>
+              <span style="font-size: 11px; color: var(--primary); font-weight: normal;">*ส่งหลายรอบต่อวันได้</span>
+            </label>
+            <input type="text" id="profTimeSlots" class="form-control" placeholder="เช่น 08:00, 13:00, 18:00" value="08:00">
+            <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+              <span style="font-size: 11px; color: var(--text-muted); align-self: center;">กดเพิ่มเร็ว:</span>
+              <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('08:00')">+ 08:00 (เช้า)</button>
+              <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('12:00')">+ 12:00 (เที่ยง)</button>
+              <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('17:00')">+ 17:00 (เย็น)</button>
+              <button type="button" class="topbar-btn" style="padding: 2px 8px; font-size: 10.5px;" onclick="addProfileTimeSlot('19:00')">+ 19:00 (ค่ำ)</button>
+            </div>
+          </div>
+
+          <!-- วันในสัปดาห์ (Days of Week) -->
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label" style="font-weight: 600;">📆 วันที่อนุญาตให้ส่งแจ้งเตือน (Days of Week):</label>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;" id="profDowContainer">
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="1" checked> จันทร์</label>
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="2" checked> อังคาร</label>
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="3" checked> พุธ</label>
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="4" checked> พฤหัสบดี</label>
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="5" checked> ศุกร์</label>
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="6" checked> เสาร์</label>
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;"><input type="checkbox" name="profDow" value="0" checked> อาทิตย์</label>
+            </div>
+          </div>
+
+          <!-- กฎการแจ้งเตือน (Rules) -->
+          <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+            <label class="form-label" style="font-weight: 600; margin-bottom: 10px;">⚙️ กฎเงื่อนไขการส่งแจ้งเตือน (Trigger Rules):</label>
+            
+            <!-- ครบกำหนดวันนี้ -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <div>
+                <strong style="font-size: 13px; color: var(--text-main);">เตือนตรงวันครบกำหนด (Due Today)</strong>
+                <div style="font-size: 11px; color: var(--text-muted);">ส่งข้อความแจ้งเตือนในวันที่สัญญาครบกำหนด</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="profRuleDueToday" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+
+            <!-- เตือนล่วงหน้าหลายขั้น -->
+            <div style="border-top: 1px solid var(--surface-border); padding-top: 10px; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <div>
+                  <strong style="font-size: 13px; color: var(--text-main);">เตือนล่วงหน้าก่อนครบกำหนด (Pre-Due Steps)</strong>
+                  <div style="font-size: 11px; color: var(--text-muted);">ส่งเตือนล่วงหน้า เช่น 3 วัน และ 1 วันก่อนครบกำหนด</div>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="profRuleBefore" checked>
+                  <span class="slider-toggle"></span>
+                </label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                <span style="font-size: 12px; color: var(--text-muted);">ระบุจำนวนวันก่อนครบกำหนด (คั่นด้วยจุลภาค):</span>
+                <input type="text" id="profPreDueSteps" class="form-control" style="width: 140px; font-size: 12px;" value="3, 1" placeholder="เช่น 3, 1">
+              </div>
+            </div>
+
+            <!-- เตือนเกินกำหนด -->
+            <div style="border-top: 1px solid var(--surface-border); padding-top: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <div>
+                  <strong style="font-size: 13px; color: var(--text-main);">เตือนเกินกำหนดชำระ (Overdue Escalation)</strong>
+                  <div style="font-size: 11px; color: var(--text-muted);">ส่งข้อความติดตามยอดเมื่อเลยกำหนดชำระ พร้อมปรับความเข้มงวดตามระยะเวลา</div>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="profRuleOverdue" checked>
+                  <span class="slider-toggle"></span>
+                </label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                <span style="font-size: 12px; color: var(--text-muted);">ความถี่การส่งเกินกำหนด:</span>
+                <select id="profOverdueFrequency" class="form-control" style="width: 160px; font-size: 12px;">
+                  <option value="DAILY">ทุกวัน (Daily)</option>
+                  <option value="EVERY_2_DAYS">ทุก 2 วัน</option>
+                  <option value="EVERY_3_DAYS">ทุก 3 วัน</option>
+                  <option value="WEEKLY">ทุกสัปดาห์</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ข้อความ & โทนภาษา -->
+          <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-bottom: 12px;">
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">🎭 โทนภาษาหลัก:</label>
+              <select id="profTone" class="form-control">
+                <option value="POLITE">สุภาพเป็นกันเอง (Polite)</option>
+                <option value="FORMAL">ทางการ (Formal)</option>
+                <option value="URGENT">เร่งด่วนเข้มงวด (Urgent)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">📢 ข้อความหัวเรื่อง (Header):</label>
+              <input type="text" id="profHeader" class="form-control" placeholder="แจ้งยอดครบกำหนดชำระ">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label" style="font-weight: 600;">💬 ข้อความส่วนท้าย (Footer):</label>
+            <input type="text" id="profFooter" class="form-control" placeholder="เมื่อโอนเงินแล้ว กรุณากดแนบรูปสลิปผ่านเมนูด้านล่างนี้ได้ทันที ขอขอบคุณครับ">
+          </div>
+
+          <!-- ค่าเริ่มต้น -->
+          <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <strong style="font-size: 13px; color: var(--text-main);">ตั้งเป็นรูปแบบเริ่มต้น (Default Profile)</strong>
+                <div style="font-size: 11px; color: var(--text-muted);">ใช้เป็นโปรไฟล์อัตโนมัติหากสัญญาไม่ได้ระบุรูปแบบไว้</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="profIsDefault">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="topbar-btn" onclick="closeProfileModal()">ยกเลิก</button>
+          <button type="submit" class="btn-primary-admin" id="btnSaveReminderProfile">💾 บันทึกรูปแบบการแจ้งเตือน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="js/admin.js?v=7.2"></script>
 </body>
 </html>
