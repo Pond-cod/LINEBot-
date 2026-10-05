@@ -1330,3 +1330,52 @@ function handleGetAuditLogs(data) {
   return { logs: logs };
 }
 
+/**
+ * ==============================================================================
+ * ฟังก์ชันตั้งเวลาอัตโนมัติบน Google Apps Script (GAS 24/7 Cloud Trigger for Vercel)
+ * สำหรับปลุกและสั่งให้ระบบแจ้งเตือนบน Vercel ตรวจสอบรอบเวลาส่งทุกๆ 5 นาที
+ * โดยทำงานบน Cloud ของ Google ตลอด 24 ชม. ฟรี ไม่ต้องเปิดคอมพิวเตอร์ทิ้งไว้
+ * ==============================================================================
+ */
+function triggerVercelReminderCheck() {
+  const vercelUrl = 'https://lineautomatic.vercel.app/api/reminder/trigger-now';
+  try {
+    const response = UrlFetchApp.fetch(vercelUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        triggerType: 'อัตโนมัติ (GAS Cloud Trigger)'
+      }),
+      muteHttpExceptions: true
+    });
+    Logger.log('Trigger Vercel Response: ' + response.getContentText());
+    return { success: true, response: response.getContentText() };
+  } catch (err) {
+    Logger.log('Trigger Vercel Error: ' + err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * ติดตั้ง Trigger อัตโนมัติใน Google Apps Script เพียงกดรันฟังก์ชันนี้ 1 ครั้ง
+ * จะสร้าง Trigger ทำงานทุกๆ 5 นาทีเพื่อยิงไปปลุก Vercel ให้ตรวจสอบรอบเวลา
+ */
+function setupAutoReminderTrigger() {
+  // ลบ Trigger เดิมที่เคยสร้างไว้เพื่อไม่ให้ซ้ำซ้อน
+  const allTriggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < allTriggers.length; i++) {
+    if (allTriggers[i].getHandlerFunction() === 'triggerVercelReminderCheck') {
+      ScriptApp.deleteTrigger(allTriggers[i]);
+    }
+  }
+
+  // สร้าง Trigger ใหม่ รันทุกๆ 5 นาที (Every 5 minutes)
+  ScriptApp.newTrigger('triggerVercelReminderCheck')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  Logger.log('✅ ตั้งค่า Trigger ตรวจสอบแจ้งเตือนทุกๆ 5 นาทีเรียบร้อยแล้ว');
+  return { success: true, message: 'ตั้งค่า Trigger ทุก 5 นาทีเรียบร้อยแล้ว' };
+}
+
