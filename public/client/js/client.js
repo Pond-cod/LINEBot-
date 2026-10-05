@@ -3,15 +3,15 @@
  * Coordinates HashRouter, LIFF Auth, SWR Caching, and Sub-views
  */
 
-import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.4';
-import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.4';
-import { initLiffAuth } from './core/clientAuth.js?v=7.4';
-import { clientRouter } from './core/clientRouter.js?v=7.4';
+import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.5';
+import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.5';
+import { initLiffAuth } from './core/clientAuth.js?v=7.5';
+import { clientRouter } from './core/clientRouter.js?v=7.5';
 
-import { initDashboardView } from './views/dashboardView.js?v=7.4';
-import { initPayView } from './views/payView.js?v=7.4';
-import { initHistoryView } from './views/historyView.js?v=7.4';
-import { initProfileView } from './views/profileView.js?v=7.4';
+import { initDashboardView } from './views/dashboardView.js?v=7.5';
+import { initPayView } from './views/payView.js?v=7.5';
+import { initHistoryView } from './views/historyView.js?v=7.5';
+import { initProfileView } from './views/profileView.js?v=7.5';
 
 /**
  * 1. Data Loading with Stale-While-Revalidate (SWR) (0ms instant render)
@@ -28,7 +28,9 @@ export async function loadClientData() {
 
   // 2. Background Network Revalidation
   try {
-    const json = await fetchClientProfileApi(userId, store.currentUser.displayName);
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUserId = urlParams.get('userId') || urlParams.get('targetUserId') || '';
+    const json = await fetchClientProfileApi(userId, store.currentUser.displayName, targetUserId);
     if (json.success && json.data) {
       store.setClientData(json.data);
       saveCachedData(userId, json.data);

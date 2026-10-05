@@ -28,8 +28,11 @@ export async function resolveLiffId() {
   return liffId || CLIENT_LIFF_ID;
 }
 
-export async function fetchClientProfileApi(userId, displayName) {
-  const url = `/api/client/profile/${encodeURIComponent(userId)}?displayName=${encodeURIComponent(displayName || '')}&_t=${Date.now()}`;
+export async function fetchClientProfileApi(userId, displayName, targetUserId) {
+  let url = `/api/client/profile/${encodeURIComponent(userId)}?displayName=${encodeURIComponent(displayName || '')}&_t=${Date.now()}`;
+  if (targetUserId) {
+    url += `&targetUserId=${encodeURIComponent(targetUserId)}`;
+  }
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`HTTP Error ${res.status}`);

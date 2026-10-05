@@ -6,7 +6,21 @@ const { checkDuplicateSlip } = require('../services/slipVerificationService');
 const { createSlipReceivedFlex } = require('../templates/flexMessages');
 
 /**
- * ดึงข้อมูลครบวงจรสำหรับ Client Portal (โปรไฟล์, สัญญาที่เปิดอยู่, ประวัติการชำระ)
+ * ล้างชื่อลูกหนี้สำหรับจับคู่: ตัด Emoji ทุกชนิด, สัญลักษณ์พิเศษ, ช่องว่าง, และแปลงเป็น lowercase
+ * รองรับทั้ง: '😾POND-IT😸', '🐱 POND-IT 🐱', 'POND-IT', 'pond-it' -> 'pondit'
+ */
+function normalizeDebtorName(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .replace(/[\u{1F000}-\u{1FFFF}\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{200D}]/gu, '')
+    .replace(/[^a-zA-Z0-9\u0E00-\u0E7F]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * ดึงข้อมูลครบวงจรสำหรับ Client Portal (โปรไฟล์, สัญญาทั้งหมด, ยอดหนี้, ประวัติการชำระ)
+ * มีระบบ Multi-Tier Matching Engine ทนทานต่อ Provider Mismatch และ Emoji ที่ต่างกัน
  */
 async function getClientData(req, res) {
   try {
@@ -15,11 +29,83 @@ async function getClientData(req, res) {
       return res.status(400).json({ success: false, message: 'Missing userId' });
     }
 
-    let debtor = await sheetsService.getDebtorByUserId(userId);
-    const displayName = req.query.displayName;
+    const displayName = (req.query.displayName || '').trim();
+    const targetUserId = (req.query.targetUserId || req.query.userIdOverride || '').trim();
+    const effectiveUserId = targetUserId || userId;
 
-    // ถ้ายังไม่มีข้อมูลใน Google Sheets และเป็นผู้ใช้จริงจาก LINE (ขึ้นต้นด้วย U) ให้ลงทะเบียนเริ่มต้นให้อัตโนมัติ
-    if (!debtor && displayName && userId.startsWith('U') && userId !== 'U_DEMO_CLIENT' && userId !== 'U_DEMO_GUEST') {
+    // 1. ดึงข้อมูลสัญญาและลูกหนี้ทั้งหมดเพื่อพร้อมจับคู่
+    let [debtor, debts, allDebts, allDebtors] = await Promise.all([
+      sheetsService.getDebtorByUserId(effectiveUserId),
+      sheetsService.getDebtsByUserId(effectiveUserId),
+      sheetsService.getAllDebts(),
+      sheetsService.getAllDebtors()
+    ]);
+
+    // 2. Multi-Tier Matching Engine: หากไม่พบสัญญาด้วย userId โดยตรง
+    if (debts.length === 0) {
+      const normInputName = normalizeDebtorName(displayName);
+
+      // Tier 2: ตรวจสอบด้วยชื่อที่ผ่านการ Normalize (ตัด Emoji, ช่องว่าง, เครื่องหมาย)
+      if (normInputName) {
+        const matchedByName = allDebts.filter(d => {
+          const normDebtorName = normalizeDebtorName(d.debtorName);
+          return normDebtorName && normDebtorName === normInputName;
+        });
+
+        if (matchedByName.length > 0) {
+          debts = matchedByName;
+        } else {
+          // Tier 3: ตรวจสอบแบบ Partial / Substring Match
+          const matchedPartial = allDebts.filter(d => {
+            const normDebtorName = normalizeDebtorName(d.debtorName);
+            return normDebtorName && (normDebtorName.includes(normInputName) || normInputName.includes(normDebtorName));
+          });
+          if (matchedPartial.length > 0) {
+            debts = matchedPartial;
+          }
+        }
+
+        // ค้นหา debtor profile เดิมที่มีชื่อตรงกัน
+        if (!debtor || debts.length > 0) {
+          const matchedDebtor = allDebtors.find(d => {
+            const dNorm = normalizeDebtorName(d.fullName || d.displayName);
+            return dNorm && (dNorm === normInputName || dNorm.includes(normInputName) || normInputName.includes(dNorm));
+          });
+          if (matchedDebtor) {
+            debtor = matchedDebtor;
+          }
+        }
+      }
+
+      // Tier 4: ตรวจสอบสิทธิ์ผู้ดูแลระบบ (ADMIN_LINE_USER_IDS)
+      const adminIds = (process.env.ADMIN_LINE_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (debts.length === 0 && (adminIds.includes(userId) || (debtor && adminIds.includes(debtor.userId)))) {
+        for (const adminId of adminIds) {
+          const adminDebts = allDebts.filter(d => d.userId === adminId);
+          if (adminDebts.length > 0) {
+            debts = adminDebts;
+            if (!debtor) {
+              debtor = allDebtors.find(d => d.userId === adminId) || null;
+            }
+            break;
+          }
+        }
+      }
+
+      // เรียงลำดับสัญญา Active/Overdue ขึ้นก่อน
+      if (debts.length > 0) {
+        debts = debts.sort((a, b) => {
+          const aActive = a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE';
+          const bActive = b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE';
+          if (aActive && !bActive) return -1;
+          if (!aActive && bActive) return 1;
+          return (b.rowIndex || 0) - (a.rowIndex || 0);
+        });
+      }
+    }
+
+    // 3. Auto-Register: เฉพาะผู้ใช้จริงรายใหม่ที่ไม่มีข้อมูลในระบบเลย และไม่ตรงกับลูกหนี้เดิม
+    if (!debtor && debts.length === 0 && displayName && userId.startsWith('U') && userId !== 'U_DEMO_CLIENT' && userId !== 'U_DEMO_GUEST') {
       try {
         await sheetsService.registerDebtor({
           userId,
@@ -34,46 +120,20 @@ async function getClientData(req, res) {
       }
     }
 
-    let debts = await sheetsService.getDebtsByUserId(userId);
-
-    // Fallback: หากไม่พบสัญญาด้วย userId โดยตรง ให้ค้นหาด้วย displayName / debtorName
-    // (ป้องกันกรณี LIFF Channel อยู่คนละ Provider กับ LINE Bot ทำให้ userId เป็นคนละชุดกัน)
-    if (debts.length === 0 && displayName) {
-      const cleanName = displayName.trim().toLowerCase();
-      const allDebts = await sheetsService.getAllDebts();
-      const matchedByName = allDebts.filter(d => 
-        (d.debtorName && d.debtorName.trim().toLowerCase() === cleanName) ||
-        (debtor && d.userId === debtor.userId)
-      );
-
-      if (matchedByName.length > 0) {
-        debts = matchedByName.sort((a, b) => {
-          const aActive = a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE';
-          const bActive = b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE';
-          if (aActive && !bActive) return -1;
-          if (!aActive && bActive) return 1;
-          return (b.rowIndex || 0) - (a.rowIndex || 0);
-        });
-      }
-
-      if (!debtor) {
-        const allDebtors = await sheetsService.getAllDebtors();
-        debtor = allDebtors.find(d => 
-          (d.displayName && d.displayName.trim().toLowerCase() === cleanName) ||
-          (d.fullName && d.fullName.trim().toLowerCase() === cleanName)
-        ) || null;
-      }
-    }
-
+    // 4. คำนวณยอดหนี้คงเหลือรวมและคัดเลือกสัญญาหลัก
     const activeDebts = debts.filter(d => d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE');
     const activeDebt = activeDebts.length > 0 ? activeDebts[0] : (debts.length > 0 ? debts[0] : null);
-
     const totalRemainingAll = activeDebts.reduce((sum, d) => sum + (Number(d.remainingBalance) || 0), 0);
-    let payments = await sheetsService.getPaymentsByUserId(userId);
-    if (payments.length === 0 && debts.length > 0) {
+
+    // 5. รวบรวมประวัติการชำระเงินของสัญญาทั้งหมด
+    let payments = [];
+    if (debts.length > 0) {
       const debtIds = new Set(debts.map(d => d.debtId));
+      const targetUserIds = new Set([userId, debtor?.userId, ...debts.map(d => d.userId)].filter(Boolean));
       const allPayments = await sheetsService.getAllPayments();
-      payments = allPayments.filter(p => debtIds.has(p.debtId) || p.userId === userId);
+      payments = allPayments.filter(p => debtIds.has(p.debtId) || targetUserIds.has(p.userId));
+    } else {
+      payments = await sheetsService.getPaymentsByUserId(userId);
     }
 
     return res.status(200).json({

@@ -95,6 +95,11 @@ export function initPayView() {
   // Listen for data updates to re-populate the contract selector
   eventBus.on('data:updated', () => renderPayViewDebtSelect());
   eventBus.on('debt:selected', () => syncPayViewDebtSelect());
+  eventBus.on('route:changed', ({ hash }) => {
+    if (hash === '#/pay') {
+      syncPayViewDebtSelect();
+    }
+  });
 
   renderPayViewDebtSelect();
 }

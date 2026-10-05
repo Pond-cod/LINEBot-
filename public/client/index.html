@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/client.css?v=7.4">
+  <link rel="stylesheet" href="css/client.css?v=7.5">
   <!-- LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
@@ -308,6 +308,88 @@
       </button>
     </nav>
 
+    <!-- Contract Detail Modal (ดูลายละเอียดสัญญาเชิงลึก) -->
+    <div id="contractDetailModal" class="client-modal-backdrop" style="display: none;">
+      <div class="client-modal-card">
+        <div class="client-modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">📑</span>
+            <div>
+              <h3 id="modalContractId" class="modal-contract-id">DB-xxxx</h3>
+              <span id="modalContractStatus" class="modal-status-badge">กำลังผ่อนชำระ</span>
+            </div>
+          </div>
+          <button type="button" class="btn-close-modal" id="btnCloseContractModal" aria-label="ปิด">✕</button>
+        </div>
+
+        <div class="client-modal-body">
+          <!-- Overview Stats Grid -->
+          <div class="modal-stats-grid">
+            <div class="modal-stat-box">
+              <span class="stat-box-label">ยอดหนี้คงเหลือ</span>
+              <span id="modalRemaining" class="stat-box-val highlight-danger">฿0.00</span>
+            </div>
+            <div class="modal-stat-box">
+              <span class="stat-box-label">ค่างวดต่องวด</span>
+              <span id="modalInstallment" class="stat-box-val highlight-primary">฿0.00</span>
+            </div>
+            <div class="modal-stat-box">
+              <span class="stat-box-label">วงเงินกู้รวม</span>
+              <span id="modalTotalAmount" class="stat-box-val">฿0.00</span>
+            </div>
+            <div class="modal-stat-box">
+              <span class="stat-box-label">ชำระแล้ว</span>
+              <span id="modalTotalPaid" class="stat-box-val highlight-success">฿0.00</span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="modal-progress-wrap">
+            <div class="modal-progress-labels">
+              <span id="modalProgressText">ความคืบหน้าการผ่อน</span>
+              <span id="modalProgressPercent">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="modalProgressBarFill" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Terms & Dates Details List -->
+          <div class="modal-detail-list">
+            <div class="modal-detail-row">
+              <span class="detail-label">📅 วันครบกำหนดชำระ:</span>
+              <span id="modalDueDate" class="detail-val alert-text">-</span>
+            </div>
+            <div class="modal-detail-row">
+              <span class="detail-label">🔄 รอบการชำระ:</span>
+              <span id="modalCycleDays" class="detail-val">ทุก 30 วัน</span>
+            </div>
+            <div class="modal-detail-row">
+              <span class="detail-label">📝 วันที่บันทึกสัญญา:</span>
+              <span id="modalCreatedAt" class="detail-val">-</span>
+            </div>
+          </div>
+
+          <!-- Payment History of this contract -->
+          <div class="modal-payments-section">
+            <h4 class="modal-section-title">🧾 ประวัติการชำระสัญญานี้</h4>
+            <div id="modalPaymentsList" class="modal-payments-list">
+              <div class="empty-payments-hint">ยังไม่มีประวัติการชำระเงินสำหรับสัญญานี้</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="client-modal-footer">
+          <button type="button" class="btn-modal-pay" id="btnModalPayNow">
+            💳 ชำระสัญญานี้ทันที
+          </button>
+          <button type="button" class="btn-modal-dismiss" id="btnModalDismiss">
+            ปิด
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Notification Toast -->
     <div id="toast" class="toast">
       <span id="toastIcon">ℹ️</span>
@@ -316,6 +398,6 @@
 
   </div>
 
-  <script type="module" src="js/client.js?v=7.4"></script>
+  <script type="module" src="js/client.js?v=7.5"></script>
 </body>
 </html>

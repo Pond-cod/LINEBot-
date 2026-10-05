@@ -35,6 +35,30 @@ export function initDashboardView() {
     });
   }
 
+  // Contract Detail Modal Close Bindings
+  const btnCloseContractModal = document.getElementById('btnCloseContractModal');
+  const btnModalDismiss = document.getElementById('btnModalDismiss');
+  const contractDetailModal = document.getElementById('contractDetailModal');
+
+  if (btnCloseContractModal) {
+    btnCloseContractModal.addEventListener('click', closeContractDetailModal);
+  }
+  if (btnModalDismiss) {
+    btnModalDismiss.addEventListener('click', closeContractDetailModal);
+  }
+  if (contractDetailModal) {
+    contractDetailModal.addEventListener('click', (e) => {
+      if (e.target === contractDetailModal) {
+        closeContractDetailModal();
+      }
+    });
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeContractDetailModal();
+    }
+  });
+
   // Subscribe to data updates from eventBus
   eventBus.on('data:updated', (data) => {
     renderDashboard(data);
@@ -310,7 +334,7 @@ export function renderDashboard(data) {
 
             <div class="debt-card-actions">
               <button type="button" class="btn-card-view-contract" data-debt-id="${d.debtId}">
-                🔍 ดูสัญญานี้
+                🔍 ดูรายละเอียด
               </button>
               <button type="button" class="btn-card-pay-contract" data-debt-id="${d.debtId}" data-installment="${install}">
                 💳 ชำระสัญญานี้ (฿${install.toLocaleString('th-TH')})
@@ -320,35 +344,145 @@ export function renderDashboard(data) {
         `;
       }).join('');
 
-      // Bind handlers to "ดูสัญญานี้"
+      // Bind handlers to "ดูรายละเอียด" (เปิด Contract Detail Modal)
       debtsCardsList.querySelectorAll('.btn-card-view-contract').forEach(btn => {
         btn.addEventListener('click', () => {
           const debtId = btn.getAttribute('data-debt-id');
-          store.setSelectedDebtId(debtId);
-          const balanceHeroCard = document.getElementById('balanceHeroCard');
-          if (balanceHeroCard) {
-            balanceHeroCard.scrollIntoView({ behavior: 'smooth' });
-          }
-          showToast(`เลือกดูสัญญา: ${debtId}`, '📑');
+          openContractDetailModal(debtId);
         });
       });
 
-      // Bind handlers to "ชำระสัญญานี้"
+      // Bind handlers to "ชำระสัญญานี้" (Direct-to-Pay)
       debtsCardsList.querySelectorAll('.btn-card-pay-contract').forEach(btn => {
         btn.addEventListener('click', () => {
           const debtId = btn.getAttribute('data-debt-id');
           const installment = btn.getAttribute('data-installment');
-          store.setSelectedDebtId(debtId);
-          const slipAmountInput = document.getElementById('slipAmountInput');
-          if (slipAmountInput && installment) {
-            slipAmountInput.value = installment;
-          }
-          showToast(`เตรียมชำระสัญญา ${debtId}`, '💳');
-          clientRouter.navigateTo('#/pay');
+          selectAndGoToPay(debtId, installment);
         });
       });
     }
   } else {
     if (debtsBreakdownSection) debtsBreakdownSection.style.display = 'none';
+  }
+}
+
+/**
+ * สลับไปยังหน้าชำระเงิน (#/pay) พร้อมเลือกสัญญาและกรอกยอดค่างวดให้อัตโนมัติ
+ */
+export function selectAndGoToPay(debtId, installmentAmount) {
+  if (debtId) {
+    store.setSelectedDebtId(debtId);
+  }
+  const slipAmountInput = document.getElementById('slipAmountInput');
+  if (slipAmountInput && installmentAmount) {
+    slipAmountInput.value = installmentAmount;
+  }
+  closeContractDetailModal();
+  showToast(`เลือกชำระสัญญา ${debtId || ''}`, '💳');
+  clientRouter.navigateTo('#/pay');
+}
+
+/**
+ * เปิดหน้าต่าง Modal ดูรายละเอียดสัญญาเชิงลึก
+ */
+export function openContractDetailModal(debtId) {
+  const modal = document.getElementById('contractDetailModal');
+  if (!modal) return;
+
+  const debts = store.clientData?.debts || [];
+  const debt = debts.find(d => d.debtId === debtId);
+  if (!debt) {
+    showToast(`ไม่พบข้อมูลสัญญา ${debtId}`, '⚠️');
+    return;
+  }
+
+  const remain = Number(debt.remainingBalance) || 0;
+  const total = Number(debt.totalAmount) || 0;
+  const install = Number(debt.installmentAmount) || 0;
+  const paid = Math.max(0, total - remain);
+  const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+  const isOverdue = debt.debtStatus === 'OVERDUE';
+  const statusLabel = isOverdue ? 'เกินกำหนดชำระ' : (debt.debtStatus === 'ACTIVE' ? 'กำลังผ่อนชำระ' : (debt.debtStatus || 'ปกติ'));
+
+  // Fill Header
+  const modalContractId = document.getElementById('modalContractId');
+  const modalContractStatus = document.getElementById('modalContractStatus');
+  if (modalContractId) modalContractId.textContent = debt.debtId;
+  if (modalContractStatus) {
+    modalContractStatus.textContent = statusLabel;
+    modalContractStatus.className = `modal-status-badge ${isOverdue ? 'overdue' : ''}`;
+  }
+
+  // Fill Stats Grid
+  const modalRemaining = document.getElementById('modalRemaining');
+  const modalInstallment = document.getElementById('modalInstallment');
+  const modalTotalAmount = document.getElementById('modalTotalAmount');
+  const modalTotalPaid = document.getElementById('modalTotalPaid');
+  if (modalRemaining) modalRemaining.textContent = `฿${remain.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+  if (modalInstallment) modalInstallment.textContent = `฿${install.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+  if (modalTotalAmount) modalTotalAmount.textContent = `฿${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+  if (modalTotalPaid) modalTotalPaid.textContent = `฿${paid.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+
+  // Fill Progress Bar
+  const modalProgressBarFill = document.getElementById('modalProgressBarFill');
+  const modalProgressPercent = document.getElementById('modalProgressPercent');
+  if (modalProgressBarFill) modalProgressBarFill.style.width = `${pct}%`;
+  if (modalProgressPercent) modalProgressPercent.textContent = `${pct}% (ชำระแล้ว ฿${paid.toLocaleString('th-TH')})`;
+
+  // Fill Terms & Dates
+  const modalDueDate = document.getElementById('modalDueDate');
+  const modalCycleDays = document.getElementById('modalCycleDays');
+  const modalCreatedAt = document.getElementById('modalCreatedAt');
+  if (modalDueDate) modalDueDate.textContent = debt.dueDate || '-';
+  if (modalCycleDays) modalCycleDays.textContent = `ทุก ${debt.cycleDays || 30} วัน`;
+  if (modalCreatedAt) modalCreatedAt.textContent = debt.createdAt || '-';
+
+  // Fill Payment History of this contract
+  const modalPaymentsList = document.getElementById('modalPaymentsList');
+  if (modalPaymentsList) {
+    const allPayments = store.clientData?.payments || [];
+    const contractPayments = allPayments.filter(p => p.debtId === debt.debtId);
+
+    if (contractPayments.length > 0) {
+      modalPaymentsList.innerHTML = contractPayments.map(p => {
+        const isVerified = p.verificationStatus === 'VERIFIED' || p.verificationStatus === 'APPROVED';
+        const statusText = isVerified ? '✓ อนุมัติแล้ว' : '⏳ รอตรวจสอบ';
+        const statusClass = isVerified ? 'verified' : 'pending';
+        const amountNum = Number(p.amount) || 0;
+        return `
+          <div class="modal-payment-item">
+            <div class="modal-payment-left">
+              <span class="modal-payment-amount">+฿${amountNum.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+              <span class="modal-payment-date">📅 ${p.uploadedAt || '-'}</span>
+            </div>
+            <span class="modal-payment-status ${statusClass}">${statusText}</span>
+          </div>
+        `;
+      }).join('');
+    } else {
+      modalPaymentsList.innerHTML = '<div class="empty-payments-hint">ยังไม่มีประวัติการชำระเงินสำหรับสัญญานี้</div>';
+    }
+  }
+
+  // Setup Pay Now Button
+  const btnModalPayNow = document.getElementById('btnModalPayNow');
+  if (btnModalPayNow) {
+    btnModalPayNow.textContent = `💳 ชำระสัญญานี้ทันที (฿${install.toLocaleString('th-TH')})`;
+    btnModalPayNow.onclick = () => {
+      selectAndGoToPay(debt.debtId, install);
+    };
+  }
+
+  // Show Modal
+  modal.style.display = 'flex';
+}
+
+/**
+ * ปิดหน้าต่าง Modal ดูรายละเอียดสัญญา
+ */
+export function closeContractDetailModal() {
+  const modal = document.getElementById('contractDetailModal');
+  if (modal) {
+    modal.style.display = 'none';
   }
 }

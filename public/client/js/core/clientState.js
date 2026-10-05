@@ -127,6 +127,8 @@ export function loadCachedData(userId) {
 
 export function saveCachedData(userId, data) {
   if (!userId || !data) return;
+  // ไม่บันทึกทับด้วยข้อมูลสัญญาว่างเปล่า
+  if (!Array.isArray(data.debts) || data.debts.length === 0) return;
   try {
     const toSave = { ...data, _cv: '7.5' };
     localStorage.setItem(`client_cache_${userId}`, JSON.stringify(toSave));
