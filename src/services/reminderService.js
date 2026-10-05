@@ -35,7 +35,9 @@ async function runDailyReminderCheck(options = {}) {
   const todayDateObj = dayjs().tz(tz);
   const currentBangkokTime = todayDateObj.format('HH:mm');
 
-  console.log(`⏰ [Reminder Engine v6.0] Starting scan (${triggerType}) at Bangkok time ${currentBangkokTime}...`);
+  if (!options.silentIfEmpty) {
+    console.log(`⏰ [Reminder Engine v6.0] Starting scan (${triggerType}) at Bangkok time ${currentBangkokTime}...`);
+  }
 
   // ตรวจสอบสวิตช์หลักของระบบ
   if (!globalSettings.enabled && !options.forceRun) {
@@ -258,7 +260,9 @@ async function runDailyReminderCheck(options = {}) {
     }
   }
 
-  console.log(`📋 Found ${candidates.length} candidate debt records matching reminder profiles for slot ${currentBangkokTime}.`);
+  if (!options.silentIfEmpty || candidates.length > 0) {
+    console.log(`📋 Found ${candidates.length} candidate debt records matching reminder profiles for slot ${currentBangkokTime}.`);
+  }
 
   let sentCount = 0;
   let skippedCount = 0;
@@ -362,7 +366,9 @@ async function runDailyReminderCheck(options = {}) {
     }
   }
 
-  console.log(`🏁 [Reminder Engine v6.0] Finished: ${JSON.stringify(summary)}`);
+  if (!options.silentIfEmpty || sentCount > 0 || failedCount > 0) {
+    console.log(`🏁 [Reminder Engine v6.0] Finished: ${JSON.stringify(summary)}`);
+  }
   return summary;
 }
 

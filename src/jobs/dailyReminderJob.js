@@ -66,6 +66,25 @@ async function initDailyReminderCron() {
       scheduledTasks.push(secondaryTask);
       console.log(`⏱️ Cron Job Scheduled: Secondary at ${settings.secondaryTime} (${timezone}) [${secondaryCron}]`);
     }
+
+    // Heartbeat Scanner: ตรวจสอบ Custom Reminder Times และ Time Slots รายนาทีอย่างแม่นยำ
+    const heartbeatTask = cron.schedule(
+      '* * * * *',
+      async () => {
+        try {
+          await runDailyReminderCheck({
+            triggerType: 'อัตโนมัติ (Heartbeat Engine)',
+            windowMinutes: 1,
+            silentIfEmpty: true
+          });
+        } catch (error) {
+          console.error('❌ [Heartbeat Cron Error]:', error.message);
+        }
+      },
+      { scheduled: true, timezone }
+    );
+    scheduledTasks.push(heartbeatTask);
+    console.log(`⏱️ Cron Job Scheduled: Heartbeat Engine active (* * * * *) (${timezone})`);
   } catch (err) {
     console.warn('Fallback to default 08:00 AM cron schedule:', err.message);
     const defaultTask = cron.schedule(
@@ -80,6 +99,23 @@ async function initDailyReminderCron() {
       { scheduled: true, timezone }
     );
     scheduledTasks.push(defaultTask);
+
+    const heartbeatFallback = cron.schedule(
+      '* * * * *',
+      async () => {
+        try {
+          await runDailyReminderCheck({
+            triggerType: 'อัตโนมัติ (Heartbeat Fallback)',
+            windowMinutes: 1,
+            silentIfEmpty: true
+          });
+        } catch (error) {
+          console.error('❌ [Heartbeat Cron Error]:', error.message);
+        }
+      },
+      { scheduled: true, timezone }
+    );
+    scheduledTasks.push(heartbeatFallback);
   }
 }
 

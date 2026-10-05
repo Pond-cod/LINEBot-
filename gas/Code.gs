@@ -22,7 +22,7 @@ const CONFIG = {
 
 const HEADERS = {
   Debtors: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled', 'pdpaConsent', 'pdpaConsentAt'],
-  Debts: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled'],
+  Debts: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled', 'customReminderTimes'],
   Payments: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote', 'receiptNo', 'approvedBy', 'approvedAt', 'fileHash'],
   ReminderLogs: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
   admin: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status'],
@@ -118,7 +118,11 @@ function doPost(e) {
         break;
 
       case 'hasBeenRemindedToday':
-        result = handleHasBeenRemindedToday(contents.debtId, contents.reminderType);
+        result = handleHasBeenRemindedToday(contents.debtId, contents.reminderType, contents.timeSlot);
+        break;
+
+      case 'updateDebt':
+        result = handleUpdateDebt(contents);
         break;
 
       case 'getAllAdmins':
@@ -450,7 +454,8 @@ function handleCreateDebt(data) {
     nowStr,
     nowStr,
     data.reminderProfileId || '',
-    data.reminderEnabled !== false ? 'TRUE' : 'FALSE'
+    data.reminderEnabled !== false ? 'TRUE' : 'FALSE',
+    data.customReminderTimes || ''
   ]);
 
   return {
@@ -650,7 +655,8 @@ function handleGetAllDebts() {
       createdAt: r[8],
       updatedAt: r[9],
       reminderProfileId: r[10] || '',
-      reminderEnabled: isRemindEnabled
+      reminderEnabled: isRemindEnabled,
+      customReminderTimes: r[12] ? String(r[12]).trim() : ''
     });
   }
   return list;
@@ -840,9 +846,10 @@ function handleLogReminder(data) {
 /**
  * ตรวจสอบการส่งซ้ำ
  */
-function handleHasBeenRemindedToday(debtId, reminderType) {
+function handleHasBeenRemindedToday(debtId, reminderType, timeSlot) {
   const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
   const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.REMINDER_LOGS);
+  if (!sheet) return false;
   const values = sheet.getDataRange().getValues();
   const todayStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
 
@@ -852,8 +859,13 @@ function handleHasBeenRemindedToday(debtId, reminderType) {
     const cleanType = rawType.split(' [')[0].trim();
     const rSentAt = values[i][4] ? String(values[i][4]) : '';
 
-    if (rDebtId === debtId && (cleanType === reminderType || rawType === reminderType) && rSentAt.indexOf(todayStr) !== -1) {
-      return true;
+    if (rDebtId === debtId && (cleanType === reminderType || rawType === reminderType || rawType.startsWith(reminderType)) && rSentAt.indexOf(todayStr) !== -1) {
+      if (timeSlot) {
+        if (rawType.indexOf('[' + timeSlot + ']') !== -1) return true;
+        if (!rawType.match(/\[\d{2}:\d{2}\]/)) return true;
+      } else {
+        return true;
+      }
     }
   }
   return false;
@@ -1031,13 +1043,95 @@ function handleUpdateDebtReminderConfig(data) {
       const rowNum = i + 1;
       const profileVal = data.reminderProfileId !== undefined ? (data.reminderProfileId || '') : (values[i][10] || '');
       const enabledVal = data.reminderEnabled !== undefined ? (data.reminderEnabled ? 'TRUE' : 'FALSE') : (values[i][11] || 'TRUE');
+      const customTimesVal = data.customReminderTimes !== undefined ? String(data.customReminderTimes).trim() : (values[i][12] ? String(values[i][12]).trim() : '');
 
       sheet.getRange(rowNum, 11).setValue(profileVal);
       sheet.getRange(rowNum, 12).setValue(enabledVal);
-      return { success: true, debtId: data.debtId, reminderProfileId: profileVal, reminderEnabled: enabledVal === 'TRUE' };
+      sheet.getRange(rowNum, 13).setValue(customTimesVal);
+      return {
+        success: true,
+        debtId: data.debtId,
+        reminderProfileId: profileVal,
+        reminderEnabled: enabledVal === 'TRUE',
+        customReminderTimes: customTimesVal
+      };
     }
   }
   return { success: false, message: 'Debt not found' };
+}
+
+/**
+ * อัปเดตข้อมูลสัญญาหนี้ (Full Edit)
+ */
+function handleUpdateDebt(data) {
+  const cleanId = String(data.debtId || '').trim();
+  if (!cleanId) throw new Error('debtId is required');
+
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAMES.DEBTS);
+  if (!sheet) throw new Error('Sheet Debts not found');
+
+  const values = sheet.getDataRange().getValues();
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim() === cleanId) {
+      const rowNum = i + 1;
+      const currentRow = values[i];
+
+      const newUserId = data.userId !== undefined ? data.userId : currentRow[1];
+      const newTotalAmount = data.totalAmount !== undefined ? Number(data.totalAmount) : (Number(currentRow[2]) || 0);
+      const newInstallmentAmount = data.installmentAmount !== undefined ? Number(data.installmentAmount) : (Number(currentRow[3]) || 0);
+      const newRemainingBalance = data.remainingBalance !== undefined ? Number(data.remainingBalance) : (Number(currentRow[4]) || 0);
+      const newDueDate = data.dueDate !== undefined ? data.dueDate : (currentRow[5] ? Utilities.formatDate(new Date(currentRow[5]), 'Asia/Bangkok', 'yyyy-MM-dd') : '');
+      const newCycleDays = data.cycleDays !== undefined ? Number(data.cycleDays) : (Number(currentRow[6]) || 30);
+
+      let newDebtStatus = data.debtStatus !== undefined ? String(data.debtStatus).toUpperCase() : (currentRow[7] || 'ACTIVE');
+      if (newRemainingBalance <= 0 && newDebtStatus === 'ACTIVE') {
+        newDebtStatus = 'PAID';
+      }
+
+      const createdAt = currentRow[8] || nowStr;
+      const updatedAt = nowStr;
+      const newReminderProfileId = data.reminderProfileId !== undefined ? data.reminderProfileId : (currentRow[10] || '');
+      const newReminderEnabled = data.reminderEnabled !== undefined ? (data.reminderEnabled ? 'TRUE' : 'FALSE') : (currentRow[11] || 'TRUE');
+      const newCustomReminderTimes = data.customReminderTimes !== undefined ? String(data.customReminderTimes).trim() : (currentRow[12] ? String(currentRow[12]).trim() : '');
+
+      // อัปเดตคอลัมน์ B ถึง M (คอลัมน์ 2 ถึง 13)
+      sheet.getRange(rowNum, 2, 1, 12).setValues([[
+        newUserId,
+        newTotalAmount,
+        newInstallmentAmount,
+        newRemainingBalance,
+        newDueDate,
+        newCycleDays,
+        newDebtStatus,
+        createdAt,
+        updatedAt,
+        newReminderProfileId,
+        newReminderEnabled,
+        newCustomReminderTimes
+      ]]);
+
+      return {
+        success: true,
+        debtId: cleanId,
+        userId: newUserId,
+        totalAmount: newTotalAmount,
+        installmentAmount: newInstallmentAmount,
+        remainingBalance: newRemainingBalance,
+        dueDate: newDueDate,
+        cycleDays: newCycleDays,
+        debtStatus: newDebtStatus,
+        updatedAt: updatedAt,
+        reminderProfileId: newReminderProfileId,
+        reminderEnabled: newReminderEnabled === 'TRUE',
+        customReminderTimes: newCustomReminderTimes
+      };
+    }
+  }
+
+  throw new Error('ไม่พบสัญญา ' + cleanId);
 }
 
 /**
