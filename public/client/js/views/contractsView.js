@@ -6,7 +6,7 @@
  * - Full-detail Contract Cards with Progress Bars, Due Dates, and Direct-to-Pay Action
  */
 
-import { store, eventBus } from '../core/clientState.js';
+import { store, eventBus, sortDebtsByDueDate } from '../core/clientState.js';
 import { clientRouter } from '../core/clientRouter.js';
 import { showToast } from '../core/clientApi.js';
 import { openContractDetailModal, selectAndGoToPay } from './dashboardView.js';
@@ -158,7 +158,9 @@ export function filterAndRenderContracts() {
     contractsEmptyState.style.display = 'none';
   }
 
-  allContractsCardsList.innerHTML = filtered.map(d => {
+  const sortedFiltered = sortDebtsByDueDate(filtered);
+
+  allContractsCardsList.innerHTML = sortedFiltered.map(d => {
     const remain = Number(d.remainingBalance) || 0;
     const total = Number(d.totalAmount) || 0;
     const install = Number(d.installmentAmount) || 0;

@@ -234,19 +234,41 @@ async function getActiveDebtByUserId(userId) {
 }
 
 /**
- * ดึงรายการสัญญาหนี้ทั้งหมดของลูกหนี้รายนี้ (เรียง Active/Overdue ขึ้นก่อน)
+ * ฟังก์ชันเรียงลำดับสัญญา: สัญญาที่ยังไม่ชำระและถึงรอบชำระก่อนให้แสดงก่อน
+ */
+function sortDebtsByDueDate(debtsList) {
+  if (!Array.isArray(debtsList)) return [];
+
+  return [...debtsList].sort((a, b) => {
+    const aRemain = Number(a.remainingBalance) || 0;
+    const bRemain = Number(b.remainingBalance) || 0;
+    const aActive = (a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE') && aRemain > 0;
+    const bActive = (b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE') && bRemain > 0;
+
+    // 1. สัญญาที่ยังต้องชำระ (Active/Overdue) ต้องมาก่อนสัญญาที่จ่ายครบแล้ว (PAID)
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    // 2. ถ้าทั้งคู่ยังต้องชำระ ให้เรียงตามวันครบกำหนดชำระ (dueDate) ที่ถึงรอบก่อน (น้อยไปมาก)
+    const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 9999999999999;
+    const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 9999999999999;
+    if (dateA !== dateB) {
+      return dateA - dateB;
+    }
+
+    // 3. หากวันครบกำหนดตรงกัน ให้เรียงตามแถวล่าสุด
+    return (b.rowIndex || 0) - (a.rowIndex || 0);
+  });
+}
+
+/**
+ * ดึงรายการสัญญาหนี้ทั้งหมดของลูกหนี้รายนี้ (เรียง Active/Overdue ขึ้นก่อน และสัญญาที่ถึงรอบก่อนขึ้นก่อน)
  */
 async function getDebtsByUserId(userId) {
   try {
     const debts = await getAllDebts();
     const matched = debts.filter(r => r.userId === userId);
-    return matched.sort((a, b) => {
-      const aActive = a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE';
-      const bActive = b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE';
-      if (aActive && !bActive) return -1;
-      if (!aActive && bActive) return 1;
-      return (b.rowIndex || 0) - (a.rowIndex || 0);
-    });
+    return sortDebtsByDueDate(matched);
   } catch (error) {
     console.error('Error fetching debts by userId:', error.message);
     return [];

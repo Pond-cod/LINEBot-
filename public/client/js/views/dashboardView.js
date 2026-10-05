@@ -4,7 +4,7 @@
  * Contract Switcher Chips, All Debts Directory Cards, and Direct Per-Contract Payment
  */
 
-import { store, eventBus } from '../core/clientState.js';
+import { store, eventBus, sortDebtsByDueDate } from '../core/clientState.js';
 import { clientRouter } from '../core/clientRouter.js';
 import { showToast } from '../core/clientApi.js';
 
@@ -114,7 +114,7 @@ export function renderDashboard(data) {
   const debtsListCount = document.getElementById('debtsListCount');
   const debtsCardsList = document.getElementById('debtsCardsList');
 
-  const debts = data?.debts || [];
+  const debts = sortDebtsByDueDate(data?.debts || []);
   const selectedDebt = store.getSelectedDebt();
   const isViewingAll = store.isViewingAllDebts();
   const isLoggedIn = store.currentUser && store.currentUser.userId && !store.currentUser.userId.startsWith('U_');
@@ -190,12 +190,13 @@ export function renderDashboard(data) {
       const totalPaidAll = Math.max(0, totalLoanAll - totalRemainingAll);
       const pctAll = totalLoanAll > 0 ? Math.round((totalPaidAll / totalLoanAll) * 100) : 0;
 
-      // Find earliest upcoming due date among active contracts
-      const sortedDueDates = debts
+      // ค้นหาวันครบกำหนดชำระที่เร็วที่สุด (เฉพาะสัญญาที่ยังต้องผ่อน)
+      const activeDebtsForDue = debts.filter(d => (d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE') && (Number(d.remainingBalance) || 0) > 0);
+      const sortedDueDates = activeDebtsForDue
         .map(d => d.dueDate)
         .filter(Boolean)
         .sort();
-      const earliestDue = sortedDueDates[0] || '-';
+      const earliestDue = sortedDueDates[0] || (debts[0]?.dueDate || '-');
 
       if (heroDebtId) heroDebtId.textContent = `📊 รวม ${debts.length} สัญญาที่เปิดอยู่`;
       if (heroLabel) heroLabel.textContent = 'ยอดหนี้รวมคงเหลือทุกสัญญา';

@@ -16,7 +16,34 @@ function normalizeDebtorName(name) {
     .replace(/[\u{1F000}-\u{1FFFF}\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{200D}]/gu, '')
     .replace(/[^a-zA-Z0-9\u0E00-\u0E7F]/g, '')
     .toLowerCase()
-    .trim();
+}
+
+/**
+ * เรียงลำดับสัญญาหนี้: สัญญาที่ยังไม่ชำระและถึงรอบชำระก่อนให้แสดงก่อนเสมอ
+ */
+function sortDebtsByDueDate(debtsList) {
+  if (!Array.isArray(debtsList)) return [];
+
+  return [...debtsList].sort((a, b) => {
+    const aRemain = Number(a.remainingBalance) || 0;
+    const bRemain = Number(b.remainingBalance) || 0;
+    const aActive = (a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE') && aRemain > 0;
+    const bActive = (b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE') && bRemain > 0;
+
+    // 1. สัญญาที่ยังต้องชำระ (Active/Overdue) ต้องมาก่อนสัญญาที่จ่ายครบแล้ว (PAID)
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    // 2. ถ้าทั้งคู่ยังต้องชำระ ให้เรียงตามวันครบกำหนดชำระ (dueDate) ที่ถึงรอบก่อน (น้อยไปมาก)
+    const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 9999999999999;
+    const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 9999999999999;
+    if (dateA !== dateB) {
+      return dateA - dateB;
+    }
+
+    // 3. หากวันครบกำหนดตรงกัน ให้เรียงตามแถวล่าสุด
+    return (b.rowIndex || 0) - (a.rowIndex || 0);
+  });
 }
 
 /**
@@ -75,16 +102,15 @@ async function getClientData(req, res) {
         debtor = allDebtors.find(d => d.userId === debtOwnerUserId) || null;
       }
 
-      // เรียงลำดับสัญญา Active/Overdue ขึ้นก่อน
+      // เรียงลำดับสัญญา Active/Overdue ขึ้นก่อน และสัญญาที่ถึงรอบก่อนขึ้นก่อน
       if (debts.length > 0) {
-        debts = debts.sort((a, b) => {
-          const aActive = a.debtStatus === 'ACTIVE' || a.debtStatus === 'OVERDUE';
-          const bActive = b.debtStatus === 'ACTIVE' || b.debtStatus === 'OVERDUE';
-          if (aActive && !bActive) return -1;
-          if (!aActive && bActive) return 1;
-          return (b.rowIndex || 0) - (a.rowIndex || 0);
-        });
+        debts = sortDebtsByDueDate(debts);
       }
+    }
+
+    // เรียงลำดับสัญญาหนี้ทั้งหมด: สัญญาที่ถึงรอบชำระก่อนให้แสดงก่อนเสมอ
+    if (debts.length > 0) {
+      debts = sortDebtsByDueDate(debts);
     }
 
     // 3. Auto-Register: เฉพาะผู้ใช้จริงรายใหม่ที่ไม่มีข้อมูลในระบบเลย และไม่ตรงกับลูกหนี้เดิม
