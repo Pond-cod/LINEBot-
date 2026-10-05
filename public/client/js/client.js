@@ -1,29 +1,33 @@
 /**
- * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.3 Modular ES)
+ * Client Portal Main Orchestrator & Bootstrap Entrypoint (v7.6 Modular ES)
  * Coordinates HashRouter, LIFF Auth, SWR Caching, and Sub-views
  */
 
-import { store, eventBus, loadCachedData, saveCachedData } from './core/clientState.js?v=7.5';
-import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.5';
-import { initLiffAuth } from './core/clientAuth.js?v=7.5';
-import { clientRouter } from './core/clientRouter.js?v=7.5';
+import { store, eventBus, loadCachedData, saveCachedData, clearCachedData } from './core/clientState.js?v=7.6';
+import { fetchClientProfileApi, showToast } from './core/clientApi.js?v=7.6';
+import { initLiffAuth } from './core/clientAuth.js?v=7.6';
+import { clientRouter } from './core/clientRouter.js?v=7.6';
 
-import { initDashboardView } from './views/dashboardView.js?v=7.5';
-import { initPayView } from './views/payView.js?v=7.5';
-import { initHistoryView } from './views/historyView.js?v=7.5';
-import { initProfileView } from './views/profileView.js?v=7.5';
+import { initDashboardView } from './views/dashboardView.js?v=7.6';
+import { initPayView } from './views/payView.js?v=7.6';
+import { initHistoryView } from './views/historyView.js?v=7.6';
+import { initProfileView } from './views/profileView.js?v=7.6';
 
 /**
  * 1. Data Loading with Stale-While-Revalidate (SWR) (0ms instant render)
  */
-export async function loadClientData() {
+export async function loadClientData(force = false) {
   const userId = store.currentUser.userId;
   if (!userId) return;
 
-  // 1. Instant Cache Render
-  const cached = loadCachedData(userId);
-  if (cached) {
-    store.setClientData(cached);
+  if (force) {
+    clearCachedData(userId);
+  } else {
+    // 1. Instant Cache Render
+    const cached = loadCachedData(userId);
+    if (cached) {
+      store.setClientData(cached);
+    }
   }
 
   // 2. Background Network Revalidation
@@ -86,18 +90,55 @@ window.addEventListener('DOMContentLoaded', async () => {
   // 2. Initialize Hash Router
   clientRouter.init();
 
-  // 3. Re-fetch client data when a slip is submitted
-  eventBus.on('slip:submitted', () => {
-    loadClientData();
+  // 3. Header Sync Button Handler
+  const btnClientSync = document.getElementById('btnClientSync');
+  if (btnClientSync) {
+    btnClientSync.addEventListener('click', async () => {
+      btnClientSync.classList.add('spinning');
+      showToast('กำลังซิงค์ข้อมูลสัญญากับเซิร์ฟเวอร์...', '🔄');
+      try {
+        await loadClientData(true);
+        showToast('ซิงค์ข้อมูลสัญญาสำเร็จ', '✅');
+      } catch (err) {
+        showToast('เกิดข้อผิดพลาดในการซิงค์ข้อมูล', '⚠️');
+      } finally {
+        setTimeout(() => btnClientSync.classList.remove('spinning'), 600);
+      }
+    });
+  }
+
+  // 4. Handle Sync Requests from Sub-views (e.g. Empty State Button)
+  eventBus.on('sync:requested', async () => {
+    if (btnClientSync) btnClientSync.classList.add('spinning');
+    showToast('กำลังโหลดข้อมูลสัญญาจากเซิร์ฟเวอร์...', '🔄');
+    try {
+      await loadClientData(true);
+      showToast('ซิงค์ข้อมูลสัญญาสำเร็จ', '✅');
+    } catch (e) {
+      showToast('ไม่สามารถซิงค์ข้อมูลได้ในขณะนี้', '⚠️');
+    } finally {
+      if (btnClientSync) setTimeout(() => btnClientSync.classList.remove('spinning'), 600);
+    }
   });
 
-  // 4. Initialize Auth & LIFF
+  // 5. Re-fetch client data reactively when user updates or slip is submitted
+  eventBus.on('user:updated', (user) => {
+    if (user && user.userId && user.userId !== 'U_GUEST') {
+      loadClientData(true);
+    }
+  });
+
+  eventBus.on('slip:submitted', () => {
+    loadClientData(true);
+  });
+
+  // 6. Initialize Auth & LIFF
   try {
     await initLiffAuth();
   } catch (authErr) {
     console.warn('Auth init caught exception:', authErr);
   }
 
-  // 5. Always load client data
+  // 7. Always load client data
   await loadClientData();
 });

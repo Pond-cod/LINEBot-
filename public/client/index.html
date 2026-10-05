@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/client.css?v=7.5">
+  <link rel="stylesheet" href="css/client.css?v=7.6">
   <!-- LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
@@ -30,6 +30,7 @@
         </div>
       </div>
       <div class="header-right-actions">
+        <button class="client-sync-btn" id="btnClientSync" title="รีเฟรช / ซิงค์ข้อมูลสัญญา">🔄</button>
         <button class="client-theme-toggle" id="btnClientThemeToggle" title="สลับโหมด สีสว่าง / มืด">☀️</button>
         <button class="header-badge" id="clientStatusBadge">กำลังตรวจสอบ</button>
       </div>
@@ -119,6 +120,18 @@
             <p id="actionBannerSubtitle">โอนเงินและแนบสลิปผ่านระบบได้ทันที</p>
           </div>
           <button class="banner-btn" id="btnGoToPay">ชำระเงินเลย</button>
+        </div>
+
+        <!-- Empty State Sync Helper Banner (shown when debts count is 0) -->
+        <div class="empty-sync-box" id="emptySyncBox" style="display: none;">
+          <div class="empty-sync-icon">🔄</div>
+          <div class="empty-sync-text">
+            <strong>ไม่พบข้อมูลสัญญาในเครื่องนี้?</strong>
+            <p>แตะปุ่มด้านล่างเพื่อดึงข้อมูลสัญญาจากเซิร์ฟเวอร์แบบ Realtime</p>
+          </div>
+          <button type="button" class="btn-sync-retry" id="btnSyncEmptyState">
+            🔄 ซิงค์ข้อมูลสัญญาใหม่ทันที
+          </button>
         </div>
 
         <!-- Section: All Contracts Breakdown & Pay Individual Debt Cards -->
@@ -398,6 +411,6 @@
 
   </div>
 
-  <script type="module" src="js/client.js?v=7.5"></script>
+  <script type="module" src="js/client.js?v=7.6"></script>
 </body>
 </html>

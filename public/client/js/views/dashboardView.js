@@ -59,6 +59,13 @@ export function initDashboardView() {
     }
   });
 
+  const btnSyncEmptyState = document.getElementById('btnSyncEmptyState');
+  if (btnSyncEmptyState) {
+    btnSyncEmptyState.addEventListener('click', () => {
+      eventBus.emit('sync:requested');
+    });
+  }
+
   // Subscribe to data updates from eventBus
   eventBus.on('data:updated', (data) => {
     renderDashboard(data);
@@ -276,7 +283,9 @@ export function renderDashboard(data) {
   }
 
   // 3. Render All Debts Cards Directory Section (เลือกชำระแต่ละสัญญา)
+  const emptySyncBox = document.getElementById('emptySyncBox');
   if (debts.length > 0) {
+    if (emptySyncBox) emptySyncBox.style.display = 'none';
     if (debtsBreakdownSection) debtsBreakdownSection.style.display = 'block';
     if (debtsListCount) debtsListCount.textContent = debts.length;
 
@@ -362,6 +371,7 @@ export function renderDashboard(data) {
       });
     }
   } else {
+    if (emptySyncBox) emptySyncBox.style.display = 'flex';
     if (debtsBreakdownSection) debtsBreakdownSection.style.display = 'none';
   }
 }

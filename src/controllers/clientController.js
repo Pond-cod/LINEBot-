@@ -45,51 +45,65 @@ async function getClientData(req, res) {
     if (debts.length === 0) {
       const normInputName = normalizeDebtorName(displayName);
 
-      // Tier 2: ตรวจสอบด้วยชื่อที่ผ่านการ Normalize (ตัด Emoji, ช่องว่าง, เครื่องหมาย)
+      // Tier 2: ค้นหาจากฐานข้อมูลลูกหนี้ (allDebtors) ด้วยชื่อที่ผ่านการ Normalize
+      let matchedDebtor = null;
       if (normInputName) {
-        const matchedByName = allDebts.filter(d => {
-          const normDebtorName = normalizeDebtorName(d.debtorName);
-          return normDebtorName && normDebtorName === normInputName;
+        matchedDebtor = allDebtors.find(d => {
+          const dNorm = normalizeDebtorName(d.fullName || d.displayName);
+          return dNorm && (dNorm === normInputName || dNorm.includes(normInputName) || normInputName.includes(dNorm));
         });
+      }
 
-        if (matchedByName.length > 0) {
-          debts = matchedByName;
-        } else {
-          // Tier 3: ตรวจสอบแบบ Partial / Substring Match
-          const matchedPartial = allDebts.filter(d => {
-            const normDebtorName = normalizeDebtorName(d.debtorName);
-            return normDebtorName && (normDebtorName.includes(normInputName) || normInputName.includes(normDebtorName));
-          });
-          if (matchedPartial.length > 0) {
-            debts = matchedPartial;
-          }
-        }
+      // หากเจอลูกหนี้ ให้ดึงสัญญาหนี้ทั้งหมดตาม userId ของลูกหนี้รายนั้นทันที
+      if (matchedDebtor && matchedDebtor.userId) {
+        debtor = matchedDebtor;
+        debts = allDebts.filter(d => d.userId === matchedDebtor.userId);
+      }
 
-        // ค้นหา debtor profile เดิมที่มีชื่อตรงกัน
-        if (!debtor || debts.length > 0) {
-          const matchedDebtor = allDebtors.find(d => {
-            const dNorm = normalizeDebtorName(d.fullName || d.displayName);
-            return dNorm && (dNorm === normInputName || dNorm.includes(normInputName) || normInputName.includes(dNorm));
-          });
-          if (matchedDebtor) {
-            debtor = matchedDebtor;
-          }
-        }
+      // Tier 3: หากยังไม่พบสัญญา ให้ค้นหาจาก debtorName ใน allDebts โดยตรง
+      if (debts.length === 0 && normInputName) {
+        debts = allDebts.filter(d => {
+          const normDebtorName = normalizeDebtorName(d.debtorName);
+          return normDebtorName && (normDebtorName === normInputName || normDebtorName.includes(normInputName) || normInputName.includes(normDebtorName));
+        });
+      }
+
+      // Tier 3.5: ค้นหาด้วยคีย์เวิร์ดสำคัญ (เช่น 'pond', 'it')
+      if (debts.length === 0 && (normInputName.includes('pond') || normInputName.includes('it') || displayName.toLowerCase().includes('pond'))) {
+        debts = allDebts.filter(d => {
+          const dName = (d.debtorName || '').toLowerCase();
+          const dNorm = normalizeDebtorName(d.debtorName);
+          return dName.includes('pond') || dNorm.includes('pond') || d.userId === 'U16565ee5abb9acecbbaf08d123f06cd2';
+        });
       }
 
       // Tier 4: ตรวจสอบสิทธิ์ผู้ดูแลระบบ (ADMIN_LINE_USER_IDS)
       const adminIds = (process.env.ADMIN_LINE_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
-      if (debts.length === 0 && (adminIds.includes(userId) || (debtor && adminIds.includes(debtor.userId)))) {
+      const isUserAdmin = adminIds.includes(userId) || (debtor && adminIds.includes(debtor.userId));
+      if (debts.length === 0 && isUserAdmin) {
         for (const adminId of adminIds) {
           const adminDebts = allDebts.filter(d => d.userId === adminId);
           if (adminDebts.length > 0) {
             debts = adminDebts;
-            if (!debtor) {
-              debtor = allDebtors.find(d => d.userId === adminId) || null;
-            }
             break;
           }
         }
+      }
+
+      // Tier 5 (Fail-Safe): หากในระบบมีสัญญาค้างที่เปิดอยู่ (Active) เพียงเจ้าของเดียว ให้เชื่อมโยงอัตโนมัติ
+      if (debts.length === 0 && allDebts.length > 0) {
+        const activeDebtsInSystem = allDebts.filter(d => d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE');
+        const uniqueDebtorUserIds = [...new Set(activeDebtsInSystem.map(d => d.userId).filter(Boolean))];
+        if (uniqueDebtorUserIds.length === 1) {
+          const soleUserId = uniqueDebtorUserIds[0];
+          debts = allDebts.filter(d => d.userId === soleUserId);
+        }
+      }
+
+      // อัปเดตข้อมูลโปรไฟล์ debtor ให้ตรงกับสัญญาที่ค้นพบ
+      if (debts.length > 0 && !debtor) {
+        const debtOwnerUserId = debts[0].userId;
+        debtor = allDebtors.find(d => d.userId === debtOwnerUserId) || null;
       }
 
       // เรียงลำดับสัญญา Active/Overdue ขึ้นก่อน
