@@ -18,6 +18,7 @@ export function initContractsView() {
   const contractsSearchInput = document.getElementById('contractsSearchInput');
   const contractsStatusFilter = document.getElementById('contractsStatusFilter');
   const btnRefreshContracts = document.getElementById('btnRefreshContracts');
+  const btnSyncContractsRetry = document.getElementById('btnSyncContractsRetry');
 
   if (contractsSearchInput) {
     contractsSearchInput.addEventListener('input', (e) => {
@@ -35,7 +36,21 @@ export function initContractsView() {
 
   if (btnRefreshContracts) {
     btnRefreshContracts.addEventListener('click', () => {
+      btnRefreshContracts.classList.add('spinning');
       eventBus.emit('sync:requested');
+      setTimeout(() => {
+        if (btnRefreshContracts) btnRefreshContracts.classList.remove('spinning');
+      }, 1000);
+    });
+  }
+
+  if (btnSyncContractsRetry) {
+    btnSyncContractsRetry.addEventListener('click', () => {
+      btnSyncContractsRetry.textContent = '⏳ กำลังซิงค์ข้อมูล...';
+      eventBus.emit('sync:requested');
+      setTimeout(() => {
+        if (btnSyncContractsRetry) btnSyncContractsRetry.innerHTML = '🔄 ซิงค์ข้อมูลสัญญาใหม่';
+      }, 1500);
     });
   }
 
@@ -46,6 +61,13 @@ export function initContractsView() {
 
   eventBus.on('user:updated', () => {
     renderContractsView(store.clientData);
+  });
+
+  // Re-render immediately when user navigates into contracts view tab
+  eventBus.on('route:changed', ({ viewId }) => {
+    if (viewId === 'view-contracts') {
+      renderContractsView(store.clientData);
+    }
   });
 
   // Initial render

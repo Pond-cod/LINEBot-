@@ -105,7 +105,19 @@ class EventBus {
   }
 }
 
-export const eventBus = new EventBus();
+// Global Singleton Guard to prevent duplicate instances across query string imports
+const globalScope = typeof window !== 'undefined' ? window : globalThis;
+if (!globalScope.__CLIENT_EVENT_BUS__) {
+  globalScope.__CLIENT_EVENT_BUS__ = new EventBus();
+}
+export const eventBus = globalScope.__CLIENT_EVENT_BUS__;
+
+if (!globalScope.__CLIENT_STORE__) {
+  globalScope.__CLIENT_STORE__ = store;
+}
+export const store = globalScope.__CLIENT_STORE__;
+
+const CACHE_VERSION = '7.8';
 
 // LocalStorage SWR Caching
 export function loadCachedData(userId) {
@@ -114,8 +126,8 @@ export function loadCachedData(userId) {
     const raw = localStorage.getItem(`client_cache_${userId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Valid cache must have cacheVersion 7.7 and must have debts array
-      if (parsed && typeof parsed === 'object' && parsed._cv === '7.7' && Array.isArray(parsed.debts) && parsed.debts.length > 0) {
+      // Valid cache must have cacheVersion 7.8 and must have debts array
+      if (parsed && typeof parsed === 'object' && parsed._cv === CACHE_VERSION && Array.isArray(parsed.debts) && parsed.debts.length > 0) {
         return parsed;
       } else {
         localStorage.removeItem(`client_cache_${userId}`);
@@ -132,7 +144,7 @@ export function saveCachedData(userId, data) {
   // ไม่บันทึกทับด้วยข้อมูลสัญญาว่างเปล่า
   if (!Array.isArray(data.debts) || data.debts.length === 0) return;
   try {
-    const toSave = { ...data, _cv: '7.7' };
+    const toSave = { ...data, _cv: CACHE_VERSION };
     localStorage.setItem(`client_cache_${userId}`, JSON.stringify(toSave));
   } catch (e) {
     console.warn('Cache write notice:', e);
