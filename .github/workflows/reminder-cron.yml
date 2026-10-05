@@ -1,0 +1,19 @@
+name: 24/7 Automated Reminder Trigger
+
+on:
+  schedule:
+    # รันอัตโนมัติทุกๆ 5 นาที ตลอด 24 ชม. บน GitHub Cloud
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-reminder:
+    name: Ping Vercel Reminder API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Daily Reminder Check
+        run: |
+          echo "⏰ Sending trigger to Vercel Reminder Engine..."
+          curl -s -X POST https://lineautomatic.vercel.app/api/reminder/trigger-now \
+            -H "Content-Type: application/json" \
+            -d '{"triggerType": "อัตโนมัติ (GitHub Actions Cloud Cron)"}'
