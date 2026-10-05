@@ -2,7 +2,7 @@ const dayjs = require('dayjs');
 const { getTodayStringBangkok, getNowStringBangkok, normalizeDate } = require('../utils/dateHelper');
 const sheetsService = require('../services/sheetsService');
 const lineService = require('../services/lineService');
-const { getRecentAuditLogs } = require('../services/auditService');
+const { getRecentAuditLogs, logAuditAction } = require('../services/auditService');
 const { createPaymentStatusFlex, createReminderFlex, createNewContractFlex } = require('../templates/flexMessages');
 
 /**
@@ -385,7 +385,8 @@ async function updateContract(req, res) {
       cycleDays,
       debtStatus,
       reminderProfileId,
-      reminderEnabled
+      reminderEnabled,
+      customReminderTimes
     } = req.body;
 
     const updated = await sheetsService.updateDebt(debtId, {
@@ -397,18 +398,23 @@ async function updateContract(req, res) {
       cycleDays,
       debtStatus,
       reminderProfileId,
-      reminderEnabled
+      reminderEnabled,
+      customReminderTimes
     });
 
     const operatorId = req.headers['x-line-userid'] || 'ADMIN';
-    logAuditAction({
-      operatorUserId: operatorId,
-      operatorName: 'Admin',
-      action: 'UPDATE_CONTRACT',
-      targetType: 'CONTRACT',
-      targetId: debtId,
-      details: `แก้ไขสัญญา ${debtId}: ยอดรวม ${totalAmount}, ยอดคงเหลือ ${remainingBalance}, สถานะ ${debtStatus}`
-    });
+    try {
+      await logAuditAction({
+        operatorUserId: operatorId,
+        operatorName: 'Admin',
+        action: 'UPDATE_CONTRACT',
+        targetType: 'CONTRACT',
+        targetId: debtId,
+        details: `แก้ไขสัญญา ${debtId}: ยอดรวม ${totalAmount}, ยอดคงเหลือ ${remainingBalance}, สถานะ ${debtStatus}`
+      });
+    } catch (auditErr) {
+      console.warn('logAuditAction warning:', auditErr.message);
+    }
 
     return res.status(200).json({
       success: true,
