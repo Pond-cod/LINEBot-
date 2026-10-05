@@ -325,7 +325,7 @@ async function runDailyReminderCheck(options = {}) {
         promptPayNumber: promptPayStr,
         customHeader: customHeaderStr,
         customFooter: customFooterStr,
-        liffUrl: process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/'
+        liffUrl: process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/#'
       });
 
       // ส่งข้อความผ่าน LINE Messaging API

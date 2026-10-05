@@ -29,7 +29,7 @@ export async function resolveLiffId() {
 }
 
 export async function fetchClientProfileApi(userId, displayName, targetUserId) {
-  let url = `/api/client/profile/${encodeURIComponent(userId)}?displayName=${encodeURIComponent(displayName || '')}&_t=${Date.now()}`;
+  let url = `/api/client/profile/${encodeURIComponent(userId)}?displayName=${encodeURIComponent(displayName || '')}`;
   if (targetUserId) {
     url += `&targetUserId=${encodeURIComponent(targetUserId)}`;
   }
@@ -47,6 +47,29 @@ export async function uploadSlipApi(payload) {
     body: JSON.stringify(payload)
   });
   return await res.json();
+}
+
+/**
+ * Background Silent Refresh — อัปเดตข้อมูลทุก 2 นาทีโดยไม่ทำให้หน้า loading กระตุก
+ * เรียกใช้ครั้งเดียวหลัง login สำเร็จ
+ */
+let _bgRefreshTimer = null;
+export function startBackgroundRefresh(fetchFn, intervalMs = 120000) {
+  if (_bgRefreshTimer) clearInterval(_bgRefreshTimer);
+  _bgRefreshTimer = setInterval(async () => {
+    try {
+      await fetchFn();
+    } catch (e) {
+      // Silent fail — ไม่แสดง error ให้ผู้ใช้เห็น
+    }
+  }, intervalMs);
+}
+
+export function stopBackgroundRefresh() {
+  if (_bgRefreshTimer) {
+    clearInterval(_bgRefreshTimer);
+    _bgRefreshTimer = null;
+  }
 }
 
 /**

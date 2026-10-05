@@ -4,7 +4,7 @@
  */
 
 import { store, eventBus, loadCachedData, saveCachedData, clearCachedData } from './core/clientState.js';
-import { fetchClientProfileApi, showToast } from './core/clientApi.js';
+import { fetchClientProfileApi, showToast, startBackgroundRefresh } from './core/clientApi.js';
 import { initLiffAuth } from './core/clientAuth.js';
 import { clientRouter } from './core/clientRouter.js';
 
@@ -145,4 +145,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // 7. Always load client data
   await loadClientData();
+
+  // 8. Background Silent Refresh (ทุก 2 นาที — ไม่กระตุก UI)
+  startBackgroundRefresh(() => loadClientData(false), 120000);
 });

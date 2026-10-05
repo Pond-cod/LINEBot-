@@ -228,7 +228,7 @@ function createReminderFlex({
             action: {
               type: 'uri',
               label: '📱 เปิดหน้าลูกหนี้',
-              uri: liffUrl || (process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/')
+              uri: liffUrl || (process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/#')
             }
           },
           {

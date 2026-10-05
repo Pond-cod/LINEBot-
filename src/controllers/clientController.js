@@ -61,13 +61,17 @@ async function getClientData(req, res) {
     const targetUserId = (req.query.targetUserId || req.query.userIdOverride || '').trim();
     const effectiveUserId = targetUserId || userId;
 
-    // 1. ดึงข้อมูลสัญญาและลูกหนี้ทั้งหมดเพื่อพร้อมจับคู่
-    let [debtor, debts, allDebts, allDebtors] = await Promise.all([
-      sheetsService.getDebtorByUserId(effectiveUserId),
-      sheetsService.getDebtsByUserId(effectiveUserId),
+    // 1. ดึงข้อมูลทั้งหมดพร้อมกัน (3 requests แทนที่จะเป็น 4) — getAllDebts เรียก getAllDebtors ภายใน
+    //    ดังนั้นเราดึง allDebts+allDebtors+allPayments แบบ parallel แล้ว filter ใน memory แทน
+    const [allDebts, allDebtors, allPayments] = await Promise.all([
       sheetsService.getAllDebts(),
-      sheetsService.getAllDebtors()
+      sheetsService.getAllDebtors(),
+      sheetsService.getAllPayments()
     ]);
+
+    // หา debtor และ debts จากข้อมูลที่ดึงมาแล้ว (ไม่ยิง request เพิ่ม)
+    let debtor = allDebtors.find(d => d.userId === effectiveUserId) || null;
+    let debts = allDebts.filter(d => d.userId === effectiveUserId);
 
     // 2. Matching Engine: หากไม่พบสัญญาด้วย userId โดยตรง ให้ค้นหาจากชื่อลูกหนี้ที่ตรงกัน
     if (debts.length === 0) {
@@ -149,15 +153,14 @@ async function getClientData(req, res) {
     const totalRemainingAll = unpaidDebts.reduce((sum, d) => sum + (Number(d.remainingBalance) || 0), 0);
     const totalPaidAll = Math.max(0, totalPrincipalAll - totalRemainingAll);
 
-    // 5. รวบรวมประวัติการชำระเงินของสัญญาทั้งหมด (รวมทั้งสัญญาที่ปิดยอดแล้ว)
+    // 5. รวบรวมประวัติการชำระเงินของสัญญาทั้งหมด (ใช้ allPayments จาก Promise.all ด้านบน — ไม่ยิง request ซ้ำ)
     let payments = [];
     if (debts.length > 0) {
       const debtIds = new Set(debts.map(d => d.debtId));
       const targetUserIds = new Set([userId, debtor?.userId, ...debts.map(d => d.userId)].filter(Boolean));
-      const allPayments = await sheetsService.getAllPayments();
       payments = allPayments.filter(p => debtIds.has(p.debtId) || targetUserIds.has(p.userId));
     } else {
-      payments = await sheetsService.getPaymentsByUserId(userId);
+      payments = allPayments.filter(p => p.userId === userId);
     }
 
     // ป้องกันการรั่วไหลของข้อมูลอ่อนไหว (PDPA Compliance Data Masking)
