@@ -52,19 +52,28 @@ export async function loadStats() {
       const s = data.stats;
       store.stats = s;
 
-      const totalContractsNum = s.activeCount ?? s.totalContracts ?? s.activeDebtsCount ?? 0;
+      const totalContractsNum = (s.totalContracts !== undefined) ? s.totalContracts : (s.activeCount ?? s.activeDebtsCount ?? 0);
       const totalDebtorsNum = s.totalDebtors ?? s.debtorsCount ?? 0;
 
-      if (statRemaining) statRemaining.textContent = formatMoney(s.totalRemaining);
-      if (statPendingSlips) statPendingSlips.textContent = `${s.pendingSlipsCount || 0} ใบ`;
-      if (statDueToday) statDueToday.textContent = `${s.dueTodayCount || 0} ราย`;
-      if (statTotalContracts) statTotalContracts.textContent = `${totalContractsNum} สัญญา`;
-      if (statTotalDebtors) statTotalDebtors.textContent = `${totalDebtorsNum} คน`;
+      const elRemaining = statRemaining || document.getElementById('statRemaining');
+      const elPendingSlips = statPendingSlips || document.getElementById('statPendingSlips');
+      const elDueToday = statDueToday || document.getElementById('statDueToday');
+      const elTotalContracts = statTotalContracts || document.getElementById('statTotalContracts');
+      const elTotalDebtors = statTotalDebtors || document.getElementById('statTotalDebtors');
 
-      if (sidebarContractsBadge) sidebarContractsBadge.textContent = totalContractsNum;
-      if (sidebarSlipsBadge) {
-        sidebarSlipsBadge.textContent = `${s.pendingSlipsCount || 0} ใบ`;
-        sidebarSlipsBadge.style.display = (s.pendingSlipsCount > 0) ? 'inline-block' : 'none';
+      if (elRemaining) elRemaining.textContent = formatMoney(s.totalRemaining);
+      if (elPendingSlips) elPendingSlips.textContent = `${s.pendingSlipsCount || 0} ใบ`;
+      if (elDueToday) elDueToday.textContent = `${s.dueTodayCount || 0} ราย`;
+      if (elTotalContracts) elTotalContracts.textContent = `${totalContractsNum} สัญญา`;
+      if (elTotalDebtors) elTotalDebtors.textContent = `${totalDebtorsNum} คน`;
+
+      const badgeContracts = sidebarContractsBadge || document.getElementById('sidebarContractsBadge');
+      if (badgeContracts) badgeContracts.textContent = totalContractsNum;
+
+      const badgeSlips = sidebarSlipsBadge || document.getElementById('sidebarSlipsBadge');
+      if (badgeSlips) {
+        badgeSlips.textContent = `${s.pendingSlipsCount || 0} ใบ`;
+        badgeSlips.style.display = (s.pendingSlipsCount > 0) ? 'inline-block' : 'none';
       }
     }
   } catch (err) {

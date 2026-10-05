@@ -48,6 +48,10 @@ export const store = {
 
   setContracts(list) {
     this.contracts = list || [];
+    const badge = document.getElementById('sidebarContractsBadge');
+    if (badge) {
+      badge.textContent = this.contracts.length;
+    }
     eventBus.emit('contracts:updated', this.contracts);
   },
 
@@ -58,6 +62,12 @@ export const store = {
 
   setSlips(list) {
     this.slips = list || [];
+    const badge = document.getElementById('sidebarSlipsBadge');
+    if (badge) {
+      const pendingCount = this.slips.filter(s => s.verificationStatus === 'PENDING').length;
+      badge.textContent = `${pendingCount} ใบ`;
+      badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    }
     eventBus.emit('slips:updated', this.slips);
   },
 

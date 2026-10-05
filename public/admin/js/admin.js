@@ -6,6 +6,7 @@
 import { router } from './core/router.js';
 import { initAdminAuth, logout } from './core/auth.js';
 import { showToast } from './core/api.js';
+import { eventBus } from './core/state.js';
 
 import * as overviewModule from './modules/overviewModule.js';
 import * as contractsModule from './modules/contractsModule.js';
@@ -16,6 +17,11 @@ import * as remindersModule from './modules/remindersModule.js';
 import * as managersModule from './modules/managersModule.js';
 import * as auditModule from './modules/auditModule.js';
 import { initAssignReminderModal } from './modules/assignReminderModal.js';
+
+// Sync stats & shell badges across entire app lifecycle
+eventBus.on('stats:needsRefresh', () => {
+  overviewModule.loadStats();
+});
 
 // ==============================================================================
 // 1. Route Registry (Deep-Linking & Sub-view Management)
@@ -113,5 +119,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (isAuthorized) {
     // เริ่มต้นระบบ Routing ตาม Hash URL
     router.init();
+
+    // โหลดข้อมูลสถิติและ Badge แถบข้างทันทีในพื้นหลัง
+    overviewModule.loadStats();
   }
 });
