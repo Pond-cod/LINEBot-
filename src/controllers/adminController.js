@@ -118,7 +118,8 @@ async function createContract(req, res) {
       dueDate,
       cycleDays: cycleDays || 30,
       reminderProfileId: req.body.reminderProfileId || '',
-      reminderEnabled: req.body.reminderEnabled !== undefined ? req.body.reminderEnabled : true
+      reminderEnabled: req.body.reminderEnabled !== undefined ? req.body.reminderEnabled : true,
+      customReminderTimes: req.body.customReminderTimes || ''
     });
 
     recentContractCreations.set(dedupeKey, {

@@ -300,6 +300,46 @@
                   </div>
                 </div>
 
+                <!-- เวลาแจ้งเตือนเฉพาะสัญญา (Custom Times) สำหรับสัญญาใหม่ -->
+                <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 12px; margin-top: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="form-label" style="font-weight: 600; font-size: 12px; margin-bottom: 0;">
+                      🕒 เวลาส่งแจ้งเตือนเฉพาะสัญญานี้ (Custom Times):
+                    </label>
+                    <button type="button" id="btnClearWizardTimes" style="background: none; border: none; font-size: 11px; color: var(--danger); cursor: pointer; text-decoration: underline; padding: 0; font-weight: 600;">
+                      ล้างเวลา
+                    </button>
+                  </div>
+
+                  <div id="wizardTimesTags" style="display: flex; flex-wrap: wrap; gap: 6px; min-height: 36px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--surface-border); border-radius: 6px; margin-bottom: 8px; align-items: center;">
+                    <span style="font-size: 11px; color: var(--text-muted); font-style: italic;">(ยังไม่ได้ระบุเวลาเฉพาะสัญญา - จะใช้เวลาตามโปรไฟล์)</span>
+                  </div>
+
+                  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                    <div style="flex: 1; max-width: 150px;">
+                      <input type="time" id="wizardTimePicker" class="form-control" style="font-size: 13px; font-weight: 600; padding: 6px 8px; cursor: pointer;">
+                    </div>
+                    <button type="button" id="btnAddWizardTime" class="btn-primary-admin" style="padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; height: 35px;">
+                      ➕ เพิ่มเวลานี้
+                    </button>
+                    <span style="font-size: 11px; color: var(--text-muted);">คลิกเลือกชั่วโมง/นาที แล้วกดเพิ่ม</span>
+                  </div>
+
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="wizardPresetTimeButtons">
+                    <button type="button" class="btn-time-preset" data-time="08:00">☀️ 08:00 (เช้า)</button>
+                    <button type="button" class="btn-time-preset" data-time="09:00">☕ 09:00</button>
+                    <button type="button" class="btn-time-preset" data-time="12:00">🍱 12:00 (เที่ยง)</button>
+                    <button type="button" class="btn-time-preset" data-time="15:00">🕒 15:00</button>
+                    <button type="button" class="btn-time-preset" data-time="18:00">🌆 18:00 (เย็น)</button>
+                    <button type="button" class="btn-time-preset" data-time="20:00">🌙 20:00</button>
+                    <button type="button" class="btn-time-preset" id="btnWizardPresetNext5Min" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.4); color: var(--success); font-weight: 600;">
+                      🚀 +5 นาทีจากตอนนี้ (ทดสอบ)
+                    </button>
+                  </div>
+
+                  <input type="hidden" id="wizardCustomTimes" name="customReminderTimes">
+                </div>
+
                 <div style="font-size: 14px; font-weight: 600; color: var(--primary); margin: 18px 0 14px 0; display: flex; align-items: center; gap: 8px;">
                   <span>3. ตัวเลือกการแจ้งเตือน (LINE Push Notification)</span>
                 </div>
@@ -1259,12 +1299,52 @@
             <select id="editContractReminderProfile" class="form-control" style="margin-bottom: 10px;">
               <option value="">⚙️ ใช้รูปแบบเริ่มต้น (Default Profile)</option>
             </select>
-            <div style="margin-bottom: 10px;">
-              <label class="form-label" style="font-weight: 600; font-size: 12px;">🕒 เวลาส่งแจ้งเตือนเฉพาะสัญญานี้ (Custom Times):</label>
-              <input type="text" id="editContractCustomTimes" class="form-control" placeholder="เช่น 09:00, 18:00 (เว้นว่างไว้เพื่อใช้เวลาตามโปรไฟล์)" style="font-size: 12px;">
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
-                ระบุเวลาไทย HH:mm คั่นด้วยจุลภาค เช่น <code>08:00, 17:30</code> (หากระบุ จะแทนที่เวลาของโปรไฟล์)
+            <div style="margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="font-weight: 600; font-size: 12px; margin-bottom: 0;">
+                  🕒 เวลาส่งแจ้งเตือนเฉพาะสัญญานี้ (Custom Times):
+                </label>
+                <button type="button" id="btnClearContractTimes" style="background: none; border: none; font-size: 11px; color: var(--danger); cursor: pointer; text-decoration: underline; padding: 0; font-weight: 600;">
+                  ล้างเวลาทั้งหมด
+                </button>
               </div>
+
+              <!-- รายการเวลาที่เลือกไว้ (Chips) -->
+              <div id="editContractTimesTags" style="display: flex; flex-wrap: wrap; gap: 6px; min-height: 38px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--surface-border); border-radius: 6px; margin-bottom: 8px; align-items: center;">
+                <span style="font-size: 11px; color: var(--text-muted); font-style: italic;">(ยังไม่ได้ระบุเวลาเฉพาะสัญญา - จะใช้เวลาตามโปรไฟล์)</span>
+              </div>
+
+              <!-- เลือกเวลาผ่านนาฬิกา + ปุ่มเพิ่ม -->
+              <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                <div style="flex: 1; max-width: 150px;">
+                  <input type="time" id="editContractTimePicker" class="form-control" style="font-size: 13px; font-weight: 600; padding: 6px 8px; cursor: pointer;">
+                </div>
+                <button type="button" id="btnAddContractTime" class="btn-primary-admin" style="padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; height: 35px;">
+                  ➕ เพิ่มเวลานี้
+                </button>
+                <span style="font-size: 11px; color: var(--text-muted);">คลิกเลือกชั่วโมง/นาที แล้วกดเพิ่ม</span>
+              </div>
+
+              <!-- ปุ่มเลือกเวลาด่วนยอดนิยม (Presets) -->
+              <div style="margin-bottom: 6px;">
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px;">
+                  ⚡ หรือกดเลือกเวลาด่วน:
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="contractPresetTimeButtons">
+                  <button type="button" class="btn-time-preset" data-time="08:00">☀️ 08:00 (เช้า)</button>
+                  <button type="button" class="btn-time-preset" data-time="09:00">☕ 09:00</button>
+                  <button type="button" class="btn-time-preset" data-time="12:00">🍱 12:00 (เที่ยง)</button>
+                  <button type="button" class="btn-time-preset" data-time="15:00">🕒 15:00</button>
+                  <button type="button" class="btn-time-preset" data-time="18:00">🌆 18:00 (เย็น)</button>
+                  <button type="button" class="btn-time-preset" data-time="20:00">🌙 20:00</button>
+                  <button type="button" class="btn-time-preset" id="btnPresetNext5Min" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.4); color: var(--success); font-weight: 600;">
+                    🚀 +5 นาทีจากตอนนี้ (ทดสอบ)
+                  </button>
+                </div>
+              </div>
+
+              <!-- Hidden input เพื่อเก็บค่าส่ง Backend (รูปแบบ HH:mm, HH:mm) -->
+              <input type="hidden" id="editContractCustomTimes" name="customReminderTimes">
             </div>
             <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--surface-border); padding-top: 10px;">
               <div>

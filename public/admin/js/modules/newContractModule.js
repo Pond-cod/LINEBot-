@@ -91,8 +91,121 @@ function initDomElements() {
   if (btnResetWizardForm) {
     btnResetWizardForm.addEventListener('click', () => {
       if (createContractWizardForm) createContractWizardForm.reset();
+      wizardCustomTimesList = [];
+      syncWizardTimes();
+      renderWizardTimeChips();
       initWizardDefaults();
       showToast('ล้างข้อมูลฟอร์มแล้ว', '🔄');
+    });
+  }
+
+  // Custom Reminder Times for Wizard
+  let wizardCustomTimesList = [];
+
+  function normalizeWizardTime(str) {
+    if (!str) return null;
+    let clean = String(str).trim().replace('.', ':');
+    const parts = clean.split(':');
+    if (parts.length >= 2) {
+      let h = parseInt(parts[0], 10);
+      let m = parseInt(parts[1], 10);
+      if (!isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
+    return null;
+  }
+
+  function syncWizardTimes() {
+    const hidden = document.getElementById('wizardCustomTimes');
+    if (hidden) hidden.value = wizardCustomTimesList.join(', ');
+  }
+
+  function renderWizardTimeChips() {
+    const container = document.getElementById('wizardTimesTags');
+    if (!container) return;
+    if (wizardCustomTimesList.length === 0) {
+      container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted); font-style: italic;">(ยังไม่ได้ระบุเวลาเฉพาะสัญญา - จะใช้เวลาตามโปรไฟล์)</span>`;
+      return;
+    }
+    container.innerHTML = wizardCustomTimesList.map(time => `
+      <span class="time-chip">
+        🕒 ${time}
+        <span class="remove-tag" data-time="${time}" title="ลบ">✕</span>
+      </span>
+    `).join('');
+    container.querySelectorAll('.remove-tag').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const t = btn.getAttribute('data-time');
+        wizardCustomTimesList = wizardCustomTimesList.filter(x => x !== t);
+        syncWizardTimes();
+        renderWizardTimeChips();
+      };
+    });
+  }
+
+  function addWizardTime(raw) {
+    const norm = normalizeWizardTime(raw);
+    if (!norm) {
+      showToast('กรุณาระบุเวลาให้ถูกต้อง (เช่น 15:10)', '⚠️');
+      return;
+    }
+    if (wizardCustomTimesList.includes(norm)) {
+      showToast(`เวลา ${norm} มีอยู่ในรายการแล้ว`, 'ℹ️');
+      return;
+    }
+    wizardCustomTimesList.push(norm);
+    wizardCustomTimesList.sort();
+    syncWizardTimes();
+    renderWizardTimeChips();
+    showToast(`เพิ่มเวลาแจ้งเตือน ${norm}`, '✅');
+  }
+
+  const wTimePicker = document.getElementById('wizardTimePicker');
+  const btnAddWTime = document.getElementById('btnAddWizardTime');
+  if (btnAddWTime && wTimePicker) {
+    btnAddWTime.addEventListener('click', () => {
+      if (wTimePicker.value) {
+        addWizardTime(wTimePicker.value);
+        wTimePicker.value = '';
+      } else {
+        showToast('กรุณาเลือกเวลาก่อนกดเพิ่ม', '⚠️');
+      }
+    });
+    wTimePicker.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnAddWTime.click();
+      }
+    });
+  }
+
+  document.querySelectorAll('#wizardPresetTimeButtons .btn-time-preset[data-time]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.getAttribute('data-time');
+      if (t) addWizardTime(t);
+    });
+  });
+
+  const btnWNext5Min = document.getElementById('btnWizardPresetNext5Min');
+  if (btnWNext5Min) {
+    btnWNext5Min.addEventListener('click', () => {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 5);
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      addWizardTime(`${h}:${m}`);
+    });
+  }
+
+  const btnClearWTimes = document.getElementById('btnClearWizardTimes');
+  if (btnClearWTimes) {
+    btnClearWTimes.addEventListener('click', () => {
+      wizardCustomTimesList = [];
+      syncWizardTimes();
+      renderWizardTimeChips();
+      showToast('ล้างเวลาแล้ว', 'ℹ️');
     });
   }
 
@@ -215,6 +328,7 @@ async function handleContractSubmit(e) {
     dueDate: wizardDueDate?.value,
     reminderProfileId: wizardReminderProfile?.value || '',
     reminderEnabled: wizardReminderEnabled?.checked !== false,
+    customReminderTimes: document.getElementById('wizardCustomTimes')?.value?.trim() || '',
     sendPush: Boolean(wizardSendPushCheck?.checked)
   };
 

@@ -72,6 +72,157 @@ function initDomElements() {
     });
   }
 
+  // ==============================================================================
+  // Custom Reminder Times Picker & Chips Logic
+  // ==============================================================================
+  let contractCustomTimesList = [];
+
+  function normalizeTimeStr(str) {
+    if (!str) return null;
+    // แปลงจุดเป็นโคลอนอัตโนมัติ เช่น 15.10 -> 15:10
+    let clean = String(str).trim().replace('.', ':');
+    const parts = clean.split(':');
+    if (parts.length >= 2) {
+      let h = parseInt(parts[0], 10);
+      let m = parseInt(parts[1], 10);
+      if (!isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
+    return null;
+  }
+
+  function syncCustomTimesToInput() {
+    const hiddenInput = document.getElementById('editContractCustomTimes');
+    if (hiddenInput) {
+      hiddenInput.value = contractCustomTimesList.join(', ');
+    }
+  }
+
+  function renderContractTimeChips(initialTimesStr = null) {
+    const container = document.getElementById('editContractTimesTags');
+    if (!container) return;
+
+    if (initialTimesStr !== null) {
+      if (typeof initialTimesStr === 'string' && initialTimesStr.trim()) {
+        const raw = initialTimesStr.split(',').map(s => s.trim()).filter(Boolean);
+        contractCustomTimesList = [];
+        raw.forEach(t => {
+          const norm = normalizeTimeStr(t);
+          if (norm && !contractCustomTimesList.includes(norm)) {
+            contractCustomTimesList.push(norm);
+          }
+        });
+        contractCustomTimesList.sort();
+      } else {
+        contractCustomTimesList = [];
+      }
+      syncCustomTimesToInput();
+    }
+
+    if (contractCustomTimesList.length === 0) {
+      container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted); font-style: italic;">(ยังไม่ได้ระบุเวลาเฉพาะสัญญา - จะใช้เวลาตามโปรไฟล์)</span>`;
+      return;
+    }
+
+    container.innerHTML = contractCustomTimesList.map(time => `
+      <span class="time-chip">
+        🕒 ${time}
+        <span class="remove-tag" data-time="${time}" title="ลบเวลานี้">✕</span>
+      </span>
+    `).join('');
+
+    container.querySelectorAll('.remove-tag').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const timeToRemove = btn.getAttribute('data-time');
+        removeContractTime(timeToRemove);
+      };
+    });
+  }
+
+  function addContractTime(rawTime) {
+    const norm = normalizeTimeStr(rawTime);
+    if (!norm) {
+      showToast('กรุณาระบุเวลาให้ถูกต้อง (HH:mm เช่น 15:10)', '⚠️');
+      return;
+    }
+    if (contractCustomTimesList.includes(norm)) {
+      showToast(`เวลา ${norm} มีอยู่ในรายการแล้ว`, 'ℹ️');
+      return;
+    }
+    contractCustomTimesList.push(norm);
+    contractCustomTimesList.sort();
+    syncCustomTimesToInput();
+    renderContractTimeChips();
+    showToast(`เพิ่มเวลาแจ้งเตือน ${norm} เรียบร้อยแล้ว`, '✅');
+  }
+
+  function removeContractTime(timeStr) {
+    contractCustomTimesList = contractCustomTimesList.filter(t => t !== timeStr);
+    syncCustomTimesToInput();
+    renderContractTimeChips();
+  }
+
+  function clearContractTimes() {
+    contractCustomTimesList = [];
+    syncCustomTimesToInput();
+    renderContractTimeChips();
+    showToast('ล้างเวลาเฉพาะสัญญาแล้ว (จะใช้เวลาตามโปรไฟล์)', 'ℹ️');
+  }
+
+  // ผูก Event Listener กับปุ่มและตัวเลือกเวลา
+  const timePicker = document.getElementById('editContractTimePicker');
+  const btnAddTime = document.getElementById('btnAddContractTime');
+  if (btnAddTime && timePicker) {
+    btnAddTime.addEventListener('click', () => {
+      const val = timePicker.value;
+      if (val) {
+        addContractTime(val);
+        timePicker.value = '';
+      } else {
+        showToast('กรุณาคลิกเลือกเวลาก่อนกดปุ่มเพิ่ม', '⚠️');
+      }
+    });
+
+    // กด Enter ในช่องเลือกเวลาเพื่อเพิ่มได้ทันที
+    timePicker.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnAddTime.click();
+      }
+    });
+  }
+
+  // ปุ่ม Presets สำเร็จรูป
+  document.querySelectorAll('#contractPresetTimeButtons .btn-time-preset[data-time]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const timeVal = btn.getAttribute('data-time');
+      if (timeVal) addContractTime(timeVal);
+    });
+  });
+
+  // ปุ่มลัด +5 นาทีจากตอนนี้ (เหมาะสำหรับทดสอบระบบ)
+  const btnNext5Min = document.getElementById('btnPresetNext5Min');
+  if (btnNext5Min) {
+    btnNext5Min.addEventListener('click', () => {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 5);
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      addContractTime(`${h}:${m}`);
+    });
+  }
+
+  // ปุ่มล้างเวลาทั้งหมด
+  const btnClearTimes = document.getElementById('btnClearContractTimes');
+  if (btnClearTimes) {
+    btnClearTimes.addEventListener('click', clearContractTimes);
+  }
+
+  // เปิดให้เรียก render จากภายนอกได้
+  window._renderContractTimeChips = renderContractTimeChips;
+
   // Form Edit Contract Submit
   const formEditContract = document.getElementById('formEditContract');
   if (formEditContract) {
@@ -625,6 +776,9 @@ window.openEditContractModal = function(debtId) {
 
   const elCustomTimes = document.getElementById('editContractCustomTimes');
   if (elCustomTimes) elCustomTimes.value = contract.customReminderTimes || '';
+  if (typeof window._renderContractTimeChips === 'function') {
+    window._renderContractTimeChips(contract.customReminderTimes || '');
+  }
 
   // Delete button inside modal
   if (btnDelete) {
