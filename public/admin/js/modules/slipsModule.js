@@ -7,7 +7,8 @@ import { adminFetch, formatMoney, showToast } from '../core/api.js';
 import { store, eventBus } from '../core/state.js';
 
 let slipsContainer = null;
-let slipFilterStatus = null;
+let currentFilter = 'PENDING'; // ค่าเริ่มต้น: รอตรวจสอบ (PENDING | ALL | VERIFIED | REJECTED)
+let searchKeyword = '';
 let modalSlipDetail = null;
 let currentModalSlip = null;
 
@@ -15,21 +16,36 @@ let isInitialized = false;
 
 function initDomElements() {
   slipsContainer = document.getElementById('slipsContainer');
-  slipFilterStatus = document.getElementById('slipFilterStatus');
   modalSlipDetail = document.getElementById('modalSlipDetail');
 
   const btnRefreshSlips = document.getElementById('btnRefreshSlips');
   if (btnRefreshSlips) {
-    btnRefreshSlips.addEventListener('click', loadSlips);
+    btnRefreshSlips.addEventListener('click', () => loadSlips());
   }
 
   const btnSyncDriveSlips = document.getElementById('btnSyncDriveSlips');
   if (btnSyncDriveSlips) {
-    btnSyncDriveSlips.addEventListener('click', syncDriveSlips);
+    btnSyncDriveSlips.addEventListener('click', () => syncDriveSlips());
   }
 
-  if (slipFilterStatus) {
-    slipFilterStatus.addEventListener('change', renderSlips);
+  // Event Delegation สำหรับปุ่ม Filter Tabs (⏳ รอตรวจสอบ, 📑 ทั้งหมด, ✅ อนุมัติแล้ว, ❌ ปฏิเสธ)
+  const filterTabsContainer = document.getElementById('slipFilterTabs');
+  if (filterTabsContainer) {
+    filterTabsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-slip-filter]');
+      if (!btn) return;
+      const filter = btn.getAttribute('data-slip-filter');
+      setFilter(filter);
+    });
+  }
+
+  // ช่องค้นหาสลิปแบบ Real-time
+  const slipSearchInput = document.getElementById('slipSearchInput');
+  if (slipSearchInput) {
+    slipSearchInput.addEventListener('input', (e) => {
+      searchKeyword = (e.target.value || '').trim().toLowerCase();
+      renderSlips();
+    });
   }
 
   // Modal Close Listeners
@@ -61,16 +77,45 @@ function initDomElements() {
   }
 }
 
+/**
+ * อัปเดตคลาส active บนปุ่ม Tabs ทั้ง 4 ปุ่ม
+ */
+function updateFilterTabsUI() {
+  const buttons = document.querySelectorAll('#slipFilterTabs [data-slip-filter]');
+  buttons.forEach(btn => {
+    if (btn.getAttribute('data-slip-filter') === currentFilter) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+/**
+ * สลับหมวดหมู่ตัวกรองสลิป
+ */
+export function setFilter(filter) {
+  currentFilter = filter || 'ALL';
+  updateFilterTabsUI();
+  renderSlips();
+}
+
+// Hook ไว้ให้เรียกจาก HTML inline onclick ได้
+window.switchSlipFilter = function(filter) {
+  setFilter(filter);
+};
+
 export async function mount(filterStatus) {
   if (!isInitialized) {
     initDomElements();
     isInitialized = true;
   }
 
-  if (filterStatus && slipFilterStatus) {
-    slipFilterStatus.value = filterStatus;
+  if (filterStatus) {
+    currentFilter = filterStatus;
   }
 
+  updateFilterTabsUI();
   await loadSlips();
 }
 
@@ -86,6 +131,8 @@ export async function loadSlips() {
       store.setSlips(data.slips);
       updateSlipBadgeCounts();
       renderSlips();
+    } else {
+      slipsContainer.innerHTML = `<div style="text-align: center; color: #EF4444; padding: 40px; grid-column: 1 / -1;">${data.message || 'ไม่สามารถโหลดข้อมูลสลิปได้'}</div>`;
     }
   } catch (err) {
     console.error('Error loading slips:', err);
@@ -93,41 +140,140 @@ export async function loadSlips() {
   }
 }
 
+/**
+ * คำนวณและอัปเดตตัวเลข Badge บน Tabs ทั้งหมดแบบ Dynamic
+ */
 export function updateSlipBadgeCounts() {
-  const pendingCount = (store.slips || []).filter(s => s.verificationStatus === 'PENDING').length;
-  const sidebarSlipsBadge = document.getElementById('sidebarSlipsBadge');
-  const countBadgePendingSlips = document.getElementById('countBadgePendingSlips');
+  const slips = store.slips || [];
+  const pendingCount = slips.filter(s => s.verificationStatus === 'PENDING').length;
+  const verifiedCount = slips.filter(s => s.verificationStatus === 'VERIFIED').length;
+  const rejectedCount = slips.filter(s => s.verificationStatus === 'REJECTED').length;
+  const allCount = slips.length;
 
+  const badgePendingCount = document.getElementById('badgePendingCount');
+  if (badgePendingCount) badgePendingCount.textContent = pendingCount;
+
+  const badgeAllCount = document.getElementById('badgeAllCount');
+  if (badgeAllCount) badgeAllCount.textContent = allCount;
+
+  const badgeVerifiedCount = document.getElementById('badgeVerifiedCount');
+  if (badgeVerifiedCount) badgeVerifiedCount.textContent = verifiedCount;
+
+  const badgeRejectedCount = document.getElementById('badgeRejectedCount');
+  if (badgeRejectedCount) badgeRejectedCount.textContent = rejectedCount;
+
+  const sidebarSlipsBadge = document.getElementById('sidebarSlipsBadge');
   if (sidebarSlipsBadge) {
     sidebarSlipsBadge.textContent = `${pendingCount} ใบ`;
     sidebarSlipsBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
   }
+
+  const countBadgePendingSlips = document.getElementById('countBadgePendingSlips');
   if (countBadgePendingSlips) {
     countBadgePendingSlips.textContent = `${pendingCount} รอตรวจ`;
     countBadgePendingSlips.style.display = pendingCount > 0 ? 'inline-block' : 'none';
   }
+
+  const statPendingSlips = document.getElementById('statPendingSlips');
+  if (statPendingSlips) {
+    statPendingSlips.textContent = `${pendingCount} ใบ`;
+  }
 }
 
+/**
+ * เรนเดอร์การ์ดสลิปตาม Tab ที่เลือกและคำค้นหา
+ */
 export function renderSlips() {
   if (!slipsContainer) return;
 
-  const filter = slipFilterStatus ? slipFilterStatus.value : 'ALL';
-  const filtered = (store.slips || []).filter(s => {
-    if (filter === 'ALL') return true;
-    return s.verificationStatus === filter;
+  const slips = store.slips || [];
+
+  // 1. กรองตามสถานะที่เลือก
+  let filtered = slips.filter(s => {
+    if (currentFilter === 'ALL') return true;
+    return s.verificationStatus === currentFilter;
   });
 
+  // 2. กรองตามคำค้นหา (ถ้ามี)
+  if (searchKeyword) {
+    filtered = filtered.filter(s => {
+      const debtor = String(s.debtorName || '').toLowerCase();
+      const debtId = String(s.debtId || '').toLowerCase();
+      const payId = String(s.paymentId || '').toLowerCase();
+      const phone = String(s.debtorPhone || '').toLowerCase();
+      const amount = String(s.amount || '');
+      const note = String(s.adminNote || '').toLowerCase();
+      return debtor.includes(searchKeyword) ||
+             debtId.includes(searchKeyword) ||
+             payId.includes(searchKeyword) ||
+             phone.includes(searchKeyword) ||
+             amount.includes(searchKeyword) ||
+             note.includes(searchKeyword);
+    });
+  }
+
+  // 3. แสดง Empty State ที่ชัดเจนและสวยงาม
   if (filtered.length === 0) {
+    if (searchKeyword) {
+      slipsContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 50px 20px; grid-column: 1 / -1; background: var(--surface); border: 1px dashed var(--surface-border); border-radius: var(--radius-md);">
+          <div style="font-size: 36px; margin-bottom: 8px;">🔍</div>
+          <div style="font-weight: 700; font-size: 15px; color: var(--text-main); margin-bottom: 4px;">ไม่พบสลิปที่ตรงกับคำค้นหา "${searchKeyword}"</div>
+          <div style="font-size: 12px; color: var(--text-sub);">ลองเปลี่ยนคำค้นหาเป็นชื่อลูกหนี้, รหัสสัญญา หรือรหัสสลิป</div>
+        </div>
+      `;
+      return;
+    }
+
+    if (currentFilter === 'PENDING') {
+      slipsContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 50px 20px; grid-column: 1 / -1; background: var(--surface); border: 1.5px dashed var(--surface-border); border-radius: var(--radius-md);">
+          <div style="font-size: 40px; margin-bottom: 10px;">🎉</div>
+          <div style="font-weight: 700; font-size: 16px; color: var(--text-main); margin-bottom: 6px;">ไม่มีสลิปรอตรวจสอบในขณะนี้</div>
+          <div style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px;">สลิปทั้งหมดได้รับการตรวจสอบและอนุมัติแล้ว หรือยังไม่มีสลิปใหม่ส่งเข้ามา</div>
+          ${slips.length > 0 ? `
+            <button class="topbar-btn primary" onclick="window.switchSlipFilter('ALL')" style="margin: 0 auto; padding: 8px 18px; font-size: 13px;">
+              📑 ดูสลิปทั้งหมดที่มีในระบบ (${slips.length} รายการ)
+            </button>
+          ` : ''}
+        </div>
+      `;
+      return;
+    }
+
+    if (currentFilter === 'VERIFIED') {
+      slipsContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 50px 20px; grid-column: 1 / -1; background: var(--surface); border: 1px dashed var(--surface-border); border-radius: var(--radius-md);">
+          <div style="font-size: 36px; margin-bottom: 8px;">📁</div>
+          <div style="font-weight: 700; font-size: 15px; color: var(--text-main); margin-bottom: 4px;">ยังไม่มีสลิปที่อนุมัติแล้ว</div>
+          <div style="font-size: 12px; color: var(--text-sub);">เมื่อมีการอนุมัติสลิป ประวัติจะแสดงที่นี่</div>
+        </div>
+      `;
+      return;
+    }
+
+    if (currentFilter === 'REJECTED') {
+      slipsContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 50px 20px; grid-column: 1 / -1; background: var(--surface); border: 1px dashed var(--surface-border); border-radius: var(--radius-md);">
+          <div style="font-size: 36px; margin-bottom: 8px;">✨</div>
+          <div style="font-weight: 700; font-size: 15px; color: var(--text-main); margin-bottom: 4px;">ไม่มีสลิปที่ถูกปฏิเสธ</div>
+          <div style="font-size: 12px; color: var(--text-sub);">ไม่มีรายการสลิปที่ไม่อนุมัติ</div>
+        </div>
+      `;
+      return;
+    }
+
     slipsContainer.innerHTML = `
-      <div style="text-align: center; color: var(--text-muted); padding: 50px; grid-column: 1 / -1; background: var(--surface); border: 1px dashed var(--surface-border); border-radius: var(--radius-md);">
-        <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
-        <div style="font-weight: 600;">ไม่พบสลิปโอนเงินในหมวดหมู่นี้</div>
+      <div style="text-align: center; color: var(--text-muted); padding: 50px 20px; grid-column: 1 / -1; background: var(--surface); border: 1px dashed var(--surface-border); border-radius: var(--radius-md);">
+        <div style="font-size: 36px; margin-bottom: 8px;">📭</div>
+        <div style="font-weight: 700; font-size: 15px; color: var(--text-main); margin-bottom: 4px;">ไม่พบรายการสลิปในระบบ</div>
         <div style="font-size: 12px; color: var(--text-sub); margin-top: 4px;">เมื่อลูกหนี้ส่งสลิปผ่าน LINE หรือแนบผ่านเว็บ รายการจะปรากฏที่นี่ทันที</div>
       </div>
     `;
     return;
   }
 
+  // 4. เรนเดอร์การ์ดสลิปแต่ละใบ
   slipsContainer.innerHTML = filtered.map(s => {
     let badgeClass = 'warning';
     let badgeText = '⏳ รอตรวจสอบ';
@@ -271,6 +417,7 @@ window.approveSlip = async function(paymentId, amount) {
     if (data.success) {
       eventBus.emit('stats:needsRefresh');
       eventBus.emit('contracts:needsRefresh');
+      loadSlips();
     } else {
       showToast(data.message || 'อนุมัติไม่สำเร็จ', '❌');
       loadSlips();
