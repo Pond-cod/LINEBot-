@@ -1298,8 +1298,110 @@
         </div>
       </form>
     </div>
+  <!-- Modal 3: Edit Contract Modal (แก้ไขสัญญาหนี้) -->
+  <div id="modalEditContract" class="admin-modal">
+    <div class="modal-dialog" style="max-width: 580px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">✏️</span>
+          <div>
+            <h3 id="modalEditContractTitle" style="font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0;">แก้ไขสัญญาหนี้</h3>
+            <span id="modalEditContractSub" style="font-size: 11.5px; color: var(--text-muted); font-family: monospace;">-</span>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeEditContractModal()">&times;</button>
+      </div>
+      <form id="formEditContract">
+        <input type="hidden" id="editContractDebtId" value="">
+        <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+          
+          <!-- เลือก/โอนลูกหนี้ -->
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label" style="font-weight: 600;">👤 ลูกหนี้ (ผู้กู้):</label>
+            <select id="editContractUserId" class="form-control" required style="font-size: 13px;">
+              <!-- Populated dynamically with all debtors -->
+            </select>
+          </div>
+
+          <!-- กริดตัวเลขการเงิน: ยอดหนี้รวม & ยอดคงเหลือ -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">💰 วงเงินกู้รวม (฿):</label>
+              <input type="number" step="0.01" min="0" id="editContractTotalAmount" class="form-control" required placeholder="เช่น 10000">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">⏳ ยอดคงเหลือสุทธิ (฿):</label>
+              <input type="number" step="0.01" min="0" id="editContractRemainingBalance" class="form-control" required placeholder="เช่น 8000">
+            </div>
+          </div>
+
+          <!-- กริดตัวเลขการเงิน: ค่างวด & วันครบกำหนด -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">💵 ค่างวดต่องวด (฿):</label>
+              <input type="number" step="0.01" min="0" id="editContractInstallmentAmount" class="form-control" required placeholder="เช่น 1000">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">📅 วันครบกำหนดชำระ:</label>
+              <input type="date" id="editContractDueDate" class="form-control" required>
+            </div>
+          </div>
+
+          <!-- รอบการชำระ & สถานะสัญญา -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">🔄 รอบการชำระ (วัน):</label>
+              <select id="editContractCycleDays" class="form-control">
+                <option value="1">1 วัน (รายวัน)</option>
+                <option value="7">7 วัน (รายสัปดาห์)</option>
+                <option value="15">15 วัน (ปักษ์)</option>
+                <option value="30">30 วัน (รายเดือน)</option>
+                <option value="custom">กำหนดเอง...</option>
+              </select>
+              <input type="number" min="1" id="editContractCycleCustom" class="form-control" style="display: none; margin-top: 6px;" placeholder="ระบุจำนวนวัน">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 600;">📌 สถานะสัญญา:</label>
+              <select id="editContractStatus" class="form-control" required>
+                <option value="ACTIVE">🟢 กำลังผ่อน (ACTIVE)</option>
+                <option value="OVERDUE">🔴 เกินกำหนด (OVERDUE)</option>
+                <option value="PAID">⚪ ชำระครบแล้ว (PAID)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- รูปแบบแจ้งเตือน & เปิด/ปิด -->
+          <div class="form-group" style="background: var(--surface-raised); border: 1px solid var(--surface-border); border-radius: 8px; padding: 12px; margin-top: 6px;">
+            <label class="form-label" style="font-weight: 600;">🔔 รูปแบบการแจ้งเตือน (Reminder Profile):</label>
+            <select id="editContractReminderProfile" class="form-control" style="margin-bottom: 10px;">
+              <option value="">⚙️ ใช้รูปแบบเริ่มต้น (Default Profile)</option>
+            </select>
+            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--surface-border); padding-top: 10px;">
+              <div>
+                <strong style="font-size: 13px; color: var(--text-main);">เปิดการแจ้งเตือนสำหรับสัญญานี้</strong>
+                <div style="font-size: 11px; color: var(--text-muted);">บอทจะส่งข้อความแจ้งเตือนตามรอบวันครบกำหนด</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" id="editContractReminderEnabled" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+          <button type="button" id="btnDeleteFromEditModal" style="padding: 8px 14px; border-radius: 6px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--danger); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer; font-weight: 600;">
+            🗑️ ลบสัญญานี้
+          </button>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="topbar-btn" onclick="closeEditContractModal()">ยกเลิก</button>
+            <button type="submit" class="btn-primary-admin" id="btnSaveEditContract">💾 บันทึกการแก้ไข</button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 
-  <script type="module" src="js/admin.js?v=7.0"></script>
+  <script type="module" src="js/admin.js?v=7.1"></script>
 </body>
 </html>

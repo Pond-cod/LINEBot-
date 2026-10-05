@@ -761,6 +761,12 @@ body {
   border-color: var(--primary);
 }
 
+.btn-action-icon.edit:hover {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563EB;
+  border-color: #3B82F6;
+}
+
 .btn-action-icon.remind:hover {
   background: var(--primary-light);
   color: var(--primary-dark);

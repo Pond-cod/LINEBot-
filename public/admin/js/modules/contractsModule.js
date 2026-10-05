@@ -57,6 +57,111 @@ function initDomElements() {
   if (btnRefreshContracts) {
     btnRefreshContracts.addEventListener('click', loadContractsData);
   }
+
+  // Cycle Days Custom Toggle in Edit Modal
+  const editContractCycleDays = document.getElementById('editContractCycleDays');
+  const editContractCycleCustom = document.getElementById('editContractCycleCustom');
+  if (editContractCycleDays && editContractCycleCustom) {
+    editContractCycleDays.addEventListener('change', () => {
+      if (editContractCycleDays.value === 'custom') {
+        editContractCycleCustom.style.display = 'block';
+        editContractCycleCustom.focus();
+      } else {
+        editContractCycleCustom.style.display = 'none';
+      }
+    });
+  }
+
+  // Form Edit Contract Submit
+  const formEditContract = document.getElementById('formEditContract');
+  if (formEditContract) {
+    formEditContract.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const debtId = document.getElementById('editContractDebtId')?.value;
+      if (!debtId) return;
+
+      const userId = document.getElementById('editContractUserId')?.value || '';
+      const totalAmount = Number(document.getElementById('editContractTotalAmount')?.value) || 0;
+      const remainingBalance = Number(document.getElementById('editContractRemainingBalance')?.value) || 0;
+      const installmentAmount = Number(document.getElementById('editContractInstallmentAmount')?.value) || 0;
+      const dueDate = document.getElementById('editContractDueDate')?.value || '';
+      
+      let cycleDays = 30;
+      const cycleSelectVal = editContractCycleDays?.value;
+      if (cycleSelectVal === 'custom') {
+        cycleDays = Number(editContractCycleCustom?.value) || 30;
+      } else {
+        cycleDays = Number(cycleSelectVal) || 30;
+      }
+
+      const debtStatus = document.getElementById('editContractStatus')?.value || 'ACTIVE';
+      const reminderProfileId = document.getElementById('editContractReminderProfile')?.value || '';
+      const reminderEnabled = Boolean(document.getElementById('editContractReminderEnabled')?.checked);
+
+      const btnSave = document.getElementById('btnSaveEditContract');
+      if (btnSave) {
+        btnSave.disabled = true;
+        btnSave.textContent = '⏳ กำลังบันทึก...';
+      }
+
+      try {
+        const res = await adminFetch(`/api/admin/contracts/${encodeURIComponent(debtId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            totalAmount,
+            remainingBalance,
+            installmentAmount,
+            dueDate,
+            cycleDays,
+            debtStatus,
+            reminderProfileId,
+            reminderEnabled
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showToast(`แก้ไขสัญญา ${debtId} สำเร็จ!`, '✅');
+          window.closeEditContractModal();
+
+          // อัปเดตข้อมูลสัญญาในเครื่องทันที
+          const cIndex = store.contracts.findIndex(c => c.debtId === debtId);
+          if (cIndex > -1) {
+            const current = store.contracts[cIndex];
+            const debtor = (store.debtors || []).find(d => d.userId === userId);
+            store.contracts[cIndex] = {
+              ...current,
+              userId,
+              debtorName: debtor ? (debtor.fullName || debtor.displayName) : current.debtorName,
+              totalAmount,
+              remainingBalance,
+              installmentAmount,
+              dueDate,
+              cycleDays,
+              debtStatus,
+              reminderProfileId,
+              reminderEnabled
+            };
+          }
+
+          renderContractsTable();
+          updateSelectedDebtorHero();
+          eventBus.emit('stats:needsRefresh');
+        } else {
+          showToast(data.message || 'ไม่สามารถแก้ไขสัญญาได้', '❌');
+        }
+      } catch (err) {
+        showToast('เกิดข้อผิดพลาด: ' + err.message, '❌');
+      } finally {
+        if (btnSave) {
+          btnSave.disabled = false;
+          btnSave.textContent = '💾 บันทึกการแก้ไข';
+        }
+      }
+    });
+  }
 }
 
 export async function mount(debtorId) {
@@ -429,6 +534,9 @@ export function renderContractsTable() {
           </div>
         </td>
         <td style="text-align: center; white-space: nowrap;">
+          <button class="btn-action-icon edit" onclick="openEditContractModal('${c.debtId}')" title="แก้ไขรายละเอียดสัญญา">
+            ✏️
+          </button>
           <button class="btn-action-icon remind" onclick="sendSingleReminder('${c.debtId}')" title="ยิงแจ้งเตือนทันที">
             🔔
           </button>
@@ -442,6 +550,92 @@ export function renderContractsTable() {
 }
 
 // Global hooks for inline HTML onclick/onchange handlers
+window.openEditContractModal = function(debtId) {
+  const contract = (store.contracts || []).find(c => c.debtId === debtId);
+  if (!contract) {
+    showToast('ไม่พบข้อมูลสัญญา ' + debtId, '⚠️');
+    return;
+  }
+
+  const modal = document.getElementById('modalEditContract');
+  const elDebtId = document.getElementById('editContractDebtId');
+  const elSub = document.getElementById('modalEditContractSub');
+  const elUserId = document.getElementById('editContractUserId');
+  const elTotal = document.getElementById('editContractTotalAmount');
+  const elRemaining = document.getElementById('editContractRemainingBalance');
+  const elInstallment = document.getElementById('editContractInstallmentAmount');
+  const elDueDate = document.getElementById('editContractDueDate');
+  const elCycle = document.getElementById('editContractCycleDays');
+  const elCycleCustom = document.getElementById('editContractCycleCustom');
+  const elStatus = document.getElementById('editContractStatus');
+  const elProfile = document.getElementById('editContractReminderProfile');
+  const elEnabled = document.getElementById('editContractReminderEnabled');
+  const btnDelete = document.getElementById('btnDeleteFromEditModal');
+
+  if (elDebtId) elDebtId.value = contract.debtId;
+  if (elSub) elSub.textContent = `รหัส: ${contract.debtId} | เจ้าของเดิม: ${contract.debtorName || contract.userId}`;
+
+  // Populate debtors dropdown
+  if (elUserId) {
+    const debtorsList = store.debtors || [];
+    elUserId.innerHTML = debtorsList.map(d => {
+      const isSelected = d.userId === contract.userId ? 'selected' : '';
+      return `<option value="${d.userId}" ${isSelected}>👤 ${d.fullName || d.displayName} (${d.userId})</option>`;
+    }).join('');
+    if (!debtorsList.some(d => d.userId === contract.userId)) {
+      elUserId.insertAdjacentHTML('afterbegin', `<option value="${contract.userId}" selected>👤 ${contract.debtorName || contract.userId} (ปัจจุบัน)</option>`);
+    }
+  }
+
+  if (elTotal) elTotal.value = contract.totalAmount || 0;
+  if (elRemaining) elRemaining.value = contract.remainingBalance !== undefined ? contract.remainingBalance : (contract.totalAmount || 0);
+  if (elInstallment) elInstallment.value = contract.installmentAmount || 0;
+  if (elDueDate) elDueDate.value = contract.dueDate || '';
+
+  // Cycle days
+  const cycle = Number(contract.cycleDays) || 30;
+  if (elCycle) {
+    if ([1, 7, 15, 30].includes(cycle)) {
+      elCycle.value = String(cycle);
+      if (elCycleCustom) elCycleCustom.style.display = 'none';
+    } else {
+      elCycle.value = 'custom';
+      if (elCycleCustom) {
+        elCycleCustom.value = cycle;
+        elCycleCustom.style.display = 'block';
+      }
+    }
+  }
+
+  if (elStatus) elStatus.value = contract.debtStatus || 'ACTIVE';
+
+  // Reminder profiles
+  if (elProfile) {
+    elProfile.innerHTML = '<option value="">⚙️ ใช้รูปแบบเริ่มต้น (Default Profile)</option>' +
+      (store.reminderProfiles || []).map(p => {
+        const isSel = p.profileId === contract.reminderProfileId ? 'selected' : '';
+        return `<option value="${p.profileId}" ${isSel}>${p.name}${p.isDefault ? ' [เริ่มต้น]' : ''} (${p.frequencyType})</option>`;
+      }).join('');
+  }
+
+  if (elEnabled) elEnabled.checked = contract.reminderEnabled !== false;
+
+  // Delete button inside modal
+  if (btnDelete) {
+    btnDelete.onclick = () => {
+      window.closeEditContractModal();
+      window.deleteContract(contract.debtId);
+    };
+  }
+
+  if (modal) modal.classList.add('open');
+};
+
+window.closeEditContractModal = function() {
+  const modal = document.getElementById('modalEditContract');
+  if (modal) modal.classList.remove('open');
+};
+
 window.selectContractDebtor = function(userId) {
   store.setActiveDebtorId(userId);
   router.navigate('#/contracts', { debtorId: userId });
@@ -458,16 +652,20 @@ window.viewContractsForDebtor = function(userId) {
 };
 
 window.deleteContract = async function(debtId) {
-  if (!confirm(`ต้องการลบสัญญา ${debtId} ใช่หรือไม่? ข้อมูลในระบบจะถูกนำออก`)) return;
+  const contract = (store.contracts || []).find(c => c.debtId === debtId);
+  const remainText = contract ? ` (ยอดคงเหลือ ฿${Number(contract.remainingBalance || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })})` : '';
+  
+  if (!confirm(`⚠️ ยืนยันการลบสัญญา ${debtId}${remainText} ใช่หรือไม่?\n\nการลบนี้จะนำข้อมูลสัญญาออกจากระบบและ Google Sheet ทันที`)) return;
 
   store.setContracts(store.contracts.filter(c => c.debtId !== debtId));
   renderContractsTable();
+  updateSelectedDebtorHero();
 
   try {
     const res = await adminFetch(`/api/admin/contracts/${debtId}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
-      showToast('ลบสัญญาสำเร็จ', '✅');
+      showToast(`ลบสัญญา ${debtId} สำเร็จ`, '✅');
       eventBus.emit('stats:needsRefresh');
     } else {
       showToast(data.message || 'ลบสัญญาไม่สำเร็จ', '❌');

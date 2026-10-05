@@ -367,6 +367,61 @@ async function deleteContract(req, res) {
 }
 
 /**
+ * 7.2 แก้ไขข้อมูลสัญญาหนี้ (Edit Contract)
+ */
+async function updateContract(req, res) {
+  try {
+    const { debtId } = req.params;
+    if (!debtId) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุรหัสสัญญา' });
+    }
+
+    const {
+      userId,
+      totalAmount,
+      installmentAmount,
+      remainingBalance,
+      dueDate,
+      cycleDays,
+      debtStatus,
+      reminderProfileId,
+      reminderEnabled
+    } = req.body;
+
+    const updated = await sheetsService.updateDebt(debtId, {
+      userId,
+      totalAmount,
+      installmentAmount,
+      remainingBalance,
+      dueDate,
+      cycleDays,
+      debtStatus,
+      reminderProfileId,
+      reminderEnabled
+    });
+
+    const operatorId = req.headers['x-line-userid'] || 'ADMIN';
+    logAuditAction({
+      operatorUserId: operatorId,
+      operatorName: 'Admin',
+      action: 'UPDATE_CONTRACT',
+      targetType: 'CONTRACT',
+      targetId: debtId,
+      details: `แก้ไขสัญญา ${debtId}: ยอดรวม ${totalAmount}, ยอดคงเหลือ ${remainingBalance}, สถานะ ${debtStatus}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `แก้ไขสัญญา ${debtId} เรียบร้อยแล้ว`,
+      contract: updated
+    });
+  } catch (error) {
+    console.error('Error updating contract:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/**
  * 8. ดึงรายชื่อลูกหนี้ทั้งหมด (Debtors)
  */
 async function getDebtors(req, res) {
@@ -740,6 +795,7 @@ module.exports = {
   saveAdmin,
   deleteAdmin,
   deleteContract,
+  updateContract,
   getReminderSettings,
   saveReminderSettings,
   sendTestReminderPush,

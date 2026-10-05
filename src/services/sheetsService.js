@@ -1436,11 +1436,113 @@ async function updateDebtReminderConfig(debtId, { reminderProfileId, reminderEna
   return { success: true, debtId, reminderProfileId, reminderEnabled };
 }
 
+/**
+ * อัปเดตข้อมูลสัญญาหนี้ (Full Edit)
+ */
+async function updateDebt(debtId, updateData = {}) {
+  const cleanId = String(debtId || '').trim();
+  if (!cleanId) throw new Error('debtId is required');
+
+  cache.delByPattern(/^debts_/);
+
+  if (isGasConfigured()) {
+    try {
+      const res = await callGas('updateDebt', { debtId: cleanId, ...updateData });
+      cache.delByPattern(/^debts_/);
+      if (res && res.success) return res;
+    } catch (err) {
+      console.warn('callGas updateDebt note:', err.message);
+    }
+  }
+
+  if (sheets && sheetId) {
+    try {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${SHEET_NAMES.DEBTS}!A:L`
+      });
+
+      const rows = res.data.values || [];
+      const now = getNowStringBangkok();
+
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][0] === cleanId) {
+          const rowNum = i + 1;
+          const currentRow = rows[i];
+
+          const newUserId = updateData.userId !== undefined ? updateData.userId : (currentRow[1] || '');
+          const newTotalAmount = updateData.totalAmount !== undefined ? Number(updateData.totalAmount) : (Number(currentRow[2]) || 0);
+          const newInstallmentAmount = updateData.installmentAmount !== undefined ? Number(updateData.installmentAmount) : (Number(currentRow[3]) || 0);
+          const newRemainingBalance = updateData.remainingBalance !== undefined ? Number(updateData.remainingBalance) : (Number(currentRow[4]) || 0);
+          const newDueDate = updateData.dueDate !== undefined ? normalizeDate(updateData.dueDate) : (currentRow[5] || '');
+          const newCycleDays = updateData.cycleDays !== undefined ? Number(updateData.cycleDays) : (Number(currentRow[6]) || 30);
+          
+          let newDebtStatus = updateData.debtStatus !== undefined ? String(updateData.debtStatus).toUpperCase() : (currentRow[7] || 'ACTIVE');
+          if (newRemainingBalance <= 0 && newDebtStatus === 'ACTIVE') {
+            newDebtStatus = 'PAID';
+          }
+
+          const createdAt = currentRow[8] || now;
+          const updatedAt = now;
+          const newReminderProfileId = updateData.reminderProfileId !== undefined ? updateData.reminderProfileId : (currentRow[10] || '');
+          const newReminderEnabled = updateData.reminderEnabled !== undefined ? (updateData.reminderEnabled ? 'TRUE' : 'FALSE') : (currentRow[11] || 'TRUE');
+
+          const updatedValues = [
+            newUserId,
+            newTotalAmount,
+            newInstallmentAmount,
+            newRemainingBalance,
+            newDueDate,
+            newCycleDays,
+            newDebtStatus,
+            createdAt,
+            updatedAt,
+            newReminderProfileId,
+            newReminderEnabled
+          ];
+
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: `${SHEET_NAMES.DEBTS}!B${rowNum}:L${rowNum}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [updatedValues]
+            }
+          });
+
+          cache.delByPattern(/^debts_/);
+          return {
+            success: true,
+            debtId: cleanId,
+            userId: newUserId,
+            totalAmount: newTotalAmount,
+            installmentAmount: newInstallmentAmount,
+            remainingBalance: newRemainingBalance,
+            dueDate: newDueDate,
+            cycleDays: newCycleDays,
+            debtStatus: newDebtStatus,
+            updatedAt,
+            reminderProfileId: newReminderProfileId,
+            reminderEnabled: newReminderEnabled === 'TRUE'
+          };
+        }
+      }
+    } catch (err) {
+      console.error('Sheets API updateDebt error:', err.message);
+      throw err;
+    }
+  }
+
+  cache.delByPattern(/^debts_/);
+  return { success: true, debtId: cleanId, ...updateData };
+}
+
 module.exports = {
   SHEET_NAMES,
   initializeSheets,
   registerDebtor,
   createDebt,
+  updateDebt,
   getActiveDebtByUserId,
   getDebtsByUserId,
   getDebtorByUserId,

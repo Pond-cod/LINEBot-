@@ -6,6 +6,7 @@ const {
   getContracts,
   createContract,
   deleteContract,
+  updateContract,
   getSlips,
   approveSlip,
   rejectSlip,
@@ -68,6 +69,7 @@ router.get('/admin/stats', requireAdminAuth, getAdminStats);
 router.get('/admin/debtors', requireAdminAuth, getDebtors);
 router.get('/admin/contracts', requireAdminAuth, getContracts);
 router.post('/admin/contracts', requireAdminAuth, createContract);
+router.put('/admin/contracts/:debtId', requireAdminAuth, updateContract);
 router.delete('/admin/contracts/:debtId', requireAdminAuth, deleteContract);
 router.get('/admin/slips', requireAdminAuth, getSlips);
 router.post('/admin/slips/approve', requireAdminAuth, approveSlip);
