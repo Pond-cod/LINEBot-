@@ -107,7 +107,7 @@ async function uploadSlipBuffer(buffer, fileName, mimeType = 'image/jpeg', userI
 
   const bufferStream = new stream.PassThrough();
   bufferStream.end(buffer);
-  return await uploadSlipStream(bufferStream, fileName, mimeType);
+  return await uploadSlipStream(bufferStream, fileName, mimeType, userId, debtId, amount);
 }
 
 module.exports = {

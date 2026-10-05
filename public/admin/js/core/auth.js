@@ -34,10 +34,28 @@ export async function initAdminAuth() {
     }
   }
 
+async function resolveAdminLiffId() {
+  if (typeof window !== 'undefined' && window.ENV_LIFF_ID && typeof window.ENV_LIFF_ID === 'string' && window.ENV_LIFF_ID.trim()) {
+    return window.ENV_LIFF_ID.trim();
+  }
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data.liffId === 'string' && data.liffId.trim() !== '') {
+        return data.liffId.trim();
+      }
+    }
+  } catch (e) {
+    console.warn('Could not fetch liffId from /api/config:', e.message);
+  }
+  return '2011816015-RfpKwHVZ';
+}
+
   // 2. เริ่มต้น LIFF SDK
   try {
     if (typeof liff !== 'undefined') {
-      const liffId = window.ENV_LIFF_ID || '2008328706-O3a6kZ5b';
+      const liffId = await resolveAdminLiffId();
       await liff.init({ liffId });
 
       if (liff.isLoggedIn()) {

@@ -91,6 +91,21 @@ function maskIdCard(idCard) {
 }
 
 /**
+ * Mask หมายเลขโทรศัพท์เพื่อความปลอดภัยตาม PDPA (เช่น 081-XXX-5678)
+ */
+function maskPhone(phone) {
+  if (!phone) return '-';
+  const clean = String(phone).replace(/\D/g, '');
+  if (clean.length === 10) {
+    return `${clean.slice(0, 3)}-XXX-${clean.slice(6)}`;
+  }
+  if (clean.length === 9) {
+    return `${clean.slice(0, 2)}-XXX-${clean.slice(5)}`;
+  }
+  return phone;
+}
+
+/**
  * สร้าง HTML สำหรับใบเสร็จรับเงินอิเล็กทรอนิกส์ (e-Receipt)
  */
 function generateReceiptHtml({ payment = {}, debt = {}, debtor = {}, settings = {} }) {
@@ -673,5 +688,6 @@ module.exports = {
   thaiBahtText,
   generateReceiptNo,
   generateReceiptHtml,
-  maskIdCard
+  maskIdCard,
+  maskPhone
 };

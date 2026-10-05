@@ -2,6 +2,8 @@ const dayjs = require('dayjs');
 const lineService = require('../services/lineService');
 const sheetsService = require('../services/sheetsService');
 const driveService = require('../services/driveService');
+const reminderSettingsService = require('../services/reminderSettingsService');
+const { checkDuplicateSlip, computeImageHash } = require('../services/slipVerificationService');
 const {
   createSlipReceivedFlex,
   createDebtSummaryFlex,
@@ -34,36 +36,60 @@ async function handleWebhookEvent(event) {
       try {
         console.log(`📸 Received image message from user: ${userId} (MsgID: ${message.id})`);
 
-        // 1. สตรีมไฟล์ภาพจาก LINE API
+        // 1. สตรีมไฟล์ภาพจาก LINE API และแปลงเป็น Buffer
         const imageStream = await lineService.getMessageStream(message.id);
+        const chunks = [];
+        for await (const chunk of imageStream) {
+          chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
+        const imageBase64 = buffer.toString('base64');
+        const fileHash = computeImageHash(imageBase64);
 
-        // 2. ค้นหาสัญญาหนี้ที่ใช้งานอยู่ของผู้ใช้รายนี้
+        // 2. ตรวจสอบสลิปซ้ำ (Anti-Fraud Duplicate Detection)
+        try {
+          const existingPayments = await sheetsService.getAllPayments();
+          const dupCheck = checkDuplicateSlip(imageBase64, 0, existingPayments);
+          if (dupCheck.isDuplicate) {
+            console.warn(`⚠️ Duplicate slip rejected for user ${userId}: ${dupCheck.reason}`);
+            return await lineService.replyMessage(replyToken, {
+              type: 'text',
+              text: `⚠️ ระบบตรวจพบว่ารูปภาพสลิปนี้เคยถูกส่งเข้าระบบแล้วครับ\n\n📌 รายการอ้างอิง: ${dupCheck.matchedPaymentId || '-'}\nหากท่านมีข้อสงสัย กรุณาติดต่อเจ้าหน้าที่ได้เลยครับ`
+            });
+          }
+        } catch (dupErr) {
+          console.warn('Duplicate check warning:', dupErr.message);
+        }
+
+        // 3. ค้นหาสัญญาหนี้ที่ใช้งานอยู่ของผู้ใช้รายนี้
         const activeDebt = await sheetsService.getActiveDebtByUserId(userId);
         const debtId = activeDebt?.debtId || '';
 
-        // 3. บันทึกรูปภาพลง Google Drive
+        // 4. บันทึกรูปภาพลง Google Drive
         const timestamp = dayjs().format('YYYYMMDD_HHmmss');
         const fileName = `SLIP_${userId}_${timestamp}.jpg`;
-        const driveResult = await driveService.uploadSlipStream(imageStream, fileName, 'image/jpeg', userId, debtId);
+        const driveResult = await driveService.uploadSlipBuffer(buffer, fileName, 'image/jpeg', userId, debtId);
 
-        // 5. บันทึกลง Google Sheets (หากยังไม่ได้บันทึกโดย GAS)
+        // 5. บันทึกลง Google Sheets
         let paymentRecord = null;
-        if (driveResult.paymentId) {
+        if (driveResult && driveResult.paymentId) {
           paymentRecord = {
             paymentId: driveResult.paymentId,
             debtId,
             userId,
             uploadedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-            slipViewUrl: driveResult.webViewLink
+            slipViewUrl: driveResult.webViewLink,
+            fileHash
           };
         } else {
           paymentRecord = await sheetsService.recordPayment({
             debtId,
             userId,
             amount: 0,
-            driveFileId: driveResult.fileId,
-            slipViewUrl: driveResult.webViewLink,
-            adminNote: 'ส่งผ่าน LINE Chat'
+            driveFileId: driveResult?.fileId || '',
+            slipViewUrl: driveResult?.webViewLink || (driveResult?.fileId ? `https://lh3.googleusercontent.com/d/${driveResult.fileId}` : ''),
+            adminNote: 'ส่งผ่าน LINE Chat',
+            fileHash
           });
         }
 
@@ -123,10 +149,43 @@ async function handleWebhookEvent(event) {
         });
       }
 
-      if (['วิธีชำระเงิน', 'เลขบัญชี', 'โอนเงิน', 'ชำระเงิน'].some(kw => text.includes(kw))) {
+      if (['วิธีชำระเงิน', 'เลขบัญชี', 'โอนเงิน', 'ชำระเงิน', 'ข้อมูลการชำระเงิน'].some(kw => text.includes(kw))) {
+        let bankName = 'ธนาคารกสิกรไทย (KBANK)';
+        let accountNumber = '123-4-56789-0';
+        let accountName = 'ชื่อบัญชีผู้รับโอน';
+        let promptPay = '';
+        let customFooter = 'เมื่อโอนเงินเรียบร้อยแล้ว สามารถถ่ายภาพหรือส่งรูปสลิปเข้ามาในแชทนี้ได้ทันทีครับ 📸';
+
+        try {
+          const settings = await reminderSettingsService.getSettings();
+          const tpl = settings.template || {};
+          if (tpl.bankName) bankName = tpl.bankName;
+          if (tpl.accountNumber) accountNumber = tpl.accountNumber;
+          if (tpl.accountName) accountName = tpl.accountName;
+          if (tpl.promptPayNumber) promptPay = `\n• พร้อมเพย์: ${tpl.promptPayNumber}`;
+          if (tpl.customFooter) customFooter = tpl.customFooter;
+        } catch (settingsErr) {
+          console.warn('Could not load dynamic bank settings:', settingsErr.message);
+        }
+
         return await lineService.replyMessage(replyToken, {
           type: 'text',
-          text: `💳 ช่องทางการชำระเงิน:\n\n• ธนาคาร: กสิกรไทย (KBANK)\n• เลขที่บัญชี: 123-4-56789-0\n• ชื่อบัญชี: ระบบจัดการหนี้\n\nเมื่อโอนเงินเรียบร้อยแล้ว สามารถถ่ายภาพหรือส่งรูปสลิปเข้ามาในแชทนี้ได้ทันทีครับ 📸`
+          text: `💳 ช่องทางการชำระเงิน:\n\n• ธนาคาร: ${bankName}\n• เลขที่บัญชี: ${accountNumber}\n• ชื่อบัญชี: ${accountName}${promptPay}\n\n${customFooter}`
+        });
+      }
+
+      if (['ติดต่อเจ้าหน้าที่', 'ติดต่อแอดมิน', 'ติดต่อสอบถาม', 'โทร', 'เจ้าหน้าที่'].some(kw => text.includes(kw))) {
+        let contactPhone = '02-123-4567';
+        try {
+          const settings = await reminderSettingsService.getSettings();
+          if (settings.contactPhone || settings.companyPhone) {
+            contactPhone = settings.contactPhone || settings.companyPhone;
+          }
+        } catch (e) {}
+
+        return await lineService.replyMessage(replyToken, {
+          type: 'text',
+          text: `📞 ฝ่ายบริการลูกค้าและติดต่อเจ้าหน้าที่:\n\n• โทรศัพท์: ${contactPhone}\n• เวลาทำการ: จันทร์ - ศุกร์ 08:30 - 17:30 น.\n\nหากท่านต้องการแจ้งชำระเงิน สามารถถ่ายภาพและส่งรูปสลิปในแชทนี้ได้ตลอด 24 ชม. ครับ 📋`
         });
       }
 
@@ -141,7 +200,7 @@ async function handleWebhookEvent(event) {
       // Default Help Text
       return await lineService.replyMessage(replyToken, {
         type: 'text',
-        text: `สวัสดีครับ 🙏 คุณสามารถใช้งานระบบได้ดังนี้:\n\n• ส่ง "รูปสลิป" เพื่อบันทึกการชำระเงิน\n• พิมพ์ "เช็กยอด" เพื่อดูยอดหนี้คงเหลือ\n• พิมพ์ "วิธีชำระเงิน" เพื่อดูเลขบัญชี\n• พิมพ์ "ลงทะเบียน" เพื่อกรอกข้อมูลใหม่ผ่าน LIFF`
+        text: `สวัสดีครับ 🙏 คุณสามารถใช้งานระบบได้ดังนี้:\n\n• ส่ง "รูปสลิป" เพื่อบันทึกการชำระเงิน\n• พิมพ์ "เช็กยอด" เพื่อดูยอดหนี้คงเหลือ\n• พิมพ์ "วิธีชำระเงิน" เพื่อดูเลขบัญชี\n• พิมพ์ "ติดต่อเจ้าหน้าที่" เพื่อสอบถามข้อมูล\n• พิมพ์ "ลงทะเบียน" เพื่อกรอกข้อมูลใหม่ผ่าน LIFF`
       });
     }
   }

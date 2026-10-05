@@ -37,17 +37,6 @@ export async function loadClientData(force = false) {
     const targetUserId = urlParams.get('userId') || urlParams.get('targetUserId') || '';
     let json = await fetchClientProfileApi(userId, store.currentUser.displayName, targetUserId);
 
-    // Fallback: หากยังไม่พบสัญญาหนี้ (เช่น กรณี LIFF ได้ User ID คนละ Provider หรือยังไม่ลิงก์)
-    if ((!json.data || !json.data.debts || json.data.debts.length === 0) && !targetUserId) {
-      try {
-        const fallbackJson = await fetchClientProfileApi(userId, store.currentUser.displayName, 'U16565ee5abb9acecbbaf08d123f06cd2');
-        if (fallbackJson.success && fallbackJson.data && fallbackJson.data.debts && fallbackJson.data.debts.length > 0) {
-          json = fallbackJson;
-        }
-      } catch (fbErr) {
-        console.warn('Fallback profile query error:', fbErr.message);
-      }
-    }
 
     if (json.success && json.data) {
       store.setClientData(json.data);

@@ -23,7 +23,7 @@ const CONFIG = {
 const HEADERS = {
   Debtors: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled', 'pdpaConsent', 'pdpaConsentAt'],
   Debts: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled'],
-  Payments: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote', 'receiptNo', 'approvedBy', 'approvedAt'],
+  Payments: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote', 'receiptNo', 'approvedBy', 'approvedAt', 'fileHash'],
   ReminderLogs: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
   admin: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status'],
   ReminderProfiles: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt'],
@@ -308,7 +308,11 @@ function handleRecordPayment(data) {
     slipViewUrl,
     nowStr,
     data.verificationStatus || 'PENDING',
-    data.adminNote || 'บันทึกการชำระเงิน'
+    data.adminNote || 'บันทึกการชำระเงิน',
+    data.receiptNo || '',
+    data.approvedBy || '',
+    data.approvedAt || '',
+    data.fileHash || ''
   ]);
 
   return {
@@ -348,9 +352,24 @@ function handleSyncDriveSlips() {
     const fId = file.getId();
     if (!existingFileIds.has(fId)) {
       const fName = file.getName();
-      let uId = 'U16565ee5abb9acecbbaf08d123f06cd2';
-      const match = fName.match(/SLIP_([^_]+)_/);
+      let uId = '';
+      const match = fName.match(/SLIP_(?:WEB_)?([^_]+)_/);
       if (match && match[1]) uId = match[1];
+
+      // ค้นหาสัญญา Active ของลูกหนี้รายนี้จากชีต Debts
+      let matchedDebtId = '';
+      if (uId) {
+        const debtsSheet = ss.getSheetByName(CONFIG.SHEET_NAMES.DEBTS);
+        if (debtsSheet) {
+          const dData = debtsSheet.getDataRange().getValues();
+          for (let d = 1; d < dData.length; d++) {
+            if (dData[d][1] === uId && (dData[d][7] === 'ACTIVE' || dData[d][7] === 'OVERDUE')) {
+              matchedDebtId = dData[d][0];
+              break;
+            }
+          }
+        }
+      }
 
       const paymentId = 'PAY-' + Utilities.formatDate(file.getDateCreated(), 'Asia/Bangkok', 'yyyyMMdd') + '-' + Math.floor(1000 + Math.random() * 9000);
       const createdStr = Utilities.formatDate(file.getDateCreated(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
@@ -358,9 +377,9 @@ function handleSyncDriveSlips() {
 
       sheet.appendRow([
         paymentId,
-        'DB-202610-2478',
+        matchedDebtId,
         uId,
-        1900,
+        0,
         fId,
         viewUrl,
         createdStr,
@@ -586,7 +605,11 @@ function handleGetAllPayments() {
       slipViewUrl: r[5],
       uploadedAt: r[6],
       verificationStatus: r[7] || 'PENDING',
-      adminNote: r[8] || ''
+      adminNote: r[8] || '',
+      receiptNo: r[9] || '',
+      approvedBy: r[10] || '',
+      approvedAt: r[11] || '',
+      fileHash: r[12] || ''
     });
   }
   return list;

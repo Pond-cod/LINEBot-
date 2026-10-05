@@ -22,6 +22,10 @@
     {
       "source": "/health",
       "destination": "/api/index.js"
+    },
+    {
+      "source": "/receipt/(.*)",
+      "destination": "/api/index.js"
     }
   ],
   "crons": [

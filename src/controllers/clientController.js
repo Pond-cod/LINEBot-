@@ -2,7 +2,8 @@ const dayjs = require('dayjs');
 const sheetsService = require('../services/sheetsService');
 const driveService = require('../services/driveService');
 const lineService = require('../services/lineService');
-const { checkDuplicateSlip } = require('../services/slipVerificationService');
+const { checkDuplicateSlip, computeImageHash } = require('../services/slipVerificationService');
+const { maskIdCard, maskPhone } = require('../services/receiptService');
 const { createSlipReceivedFlex } = require('../templates/flexMessages');
 
 /**
@@ -41,65 +42,31 @@ async function getClientData(req, res) {
       sheetsService.getAllDebtors()
     ]);
 
-    // 2. Multi-Tier Matching Engine: หากไม่พบสัญญาด้วย userId โดยตรง
+    // 2. Matching Engine: หากไม่พบสัญญาด้วย userId โดยตรง ให้ค้นหาจากชื่อลูกหนี้ที่ตรงกัน
     if (debts.length === 0) {
       const normInputName = normalizeDebtorName(displayName);
 
-      // Tier 2: ค้นหาจากฐานข้อมูลลูกหนี้ (allDebtors) ด้วยชื่อที่ผ่านการ Normalize
+      // Tier 2: ค้นหาจากฐานข้อมูลลูกหนี้ (allDebtors) ด้วยชื่อที่ตรงกัน
       let matchedDebtor = null;
       if (normInputName) {
         matchedDebtor = allDebtors.find(d => {
           const dNorm = normalizeDebtorName(d.fullName || d.displayName);
-          return dNorm && (dNorm === normInputName || dNorm.includes(normInputName) || normInputName.includes(dNorm));
+          return dNorm && dNorm === normInputName;
         });
       }
 
-      // หากเจอลูกหนี้ ให้ดึงสัญญาหนี้ทั้งหมดตาม userId ของลูกหนี้รายนั้นทันที
+      // หากเจอลูกหนี้ที่ชื่อตรงกันพอดี ให้ดึงสัญญาหนี้ทั้งหมดตาม userId ของลูกหนี้รายนั้น
       if (matchedDebtor && matchedDebtor.userId) {
         debtor = matchedDebtor;
         debts = allDebts.filter(d => d.userId === matchedDebtor.userId);
       }
 
-      // Tier 3: หากยังไม่พบสัญญา ให้ค้นหาจาก debtorName ใน allDebts โดยตรง
+      // Tier 3: ค้นหาจาก debtorName ใน allDebts ที่ตรงกันพอดี
       if (debts.length === 0 && normInputName) {
         debts = allDebts.filter(d => {
           const normDebtorName = normalizeDebtorName(d.debtorName);
-          return normDebtorName && (normDebtorName === normInputName || normDebtorName.includes(normInputName) || normInputName.includes(normDebtorName));
+          return normDebtorName && normDebtorName === normInputName;
         });
-      }
-
-      // Tier 3.5: ค้นหาด้วยคีย์เวิร์ดสำคัญ (เช่น 'pond', 'it')
-      if (debts.length === 0 && (normInputName.includes('pond') || normInputName.includes('it') || displayName.toLowerCase().includes('pond'))) {
-        debts = allDebts.filter(d => {
-          const dName = (d.debtorName || '').toLowerCase();
-          const dNorm = normalizeDebtorName(d.debtorName);
-          return dName.includes('pond') || dNorm.includes('pond') || d.userId === 'U16565ee5abb9acecbbaf08d123f06cd2';
-        });
-      }
-
-      // Tier 4: ตรวจสอบสิทธิ์ผู้ดูแลระบบ (ADMIN_LINE_USER_IDS)
-      const adminIds = (process.env.ADMIN_LINE_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
-      const isUserAdmin = adminIds.includes(userId) || (debtor && adminIds.includes(debtor.userId));
-      if (debts.length === 0 && isUserAdmin) {
-        for (const adminId of adminIds) {
-          const adminDebts = allDebts.filter(d => d.userId === adminId);
-          if (adminDebts.length > 0) {
-            debts = adminDebts;
-            break;
-          }
-        }
-      }
-
-      // Tier 5 (Fail-Safe): หากในระบบมีสัญญาค้างที่เปิดอยู่ (Active) เพียงเจ้าของเดียว ให้เชื่อมโยงอัตโนมัติ
-      if (debts.length === 0 && allDebts.length > 0) {
-        const activeDebtsInSystem = allDebts.filter(d => d.debtStatus === 'ACTIVE' || d.debtStatus === 'OVERDUE');
-        const uniqueDebtorUserIds = [...new Set(activeDebtsInSystem.map(d => d.userId).filter(Boolean))];
-        if (uniqueDebtorUserIds.length === 1) {
-          const soleUserId = uniqueDebtorUserIds[0];
-          debts = allDebts.filter(d => d.userId === soleUserId);
-        } else if (allDebts.some(d => d.userId === 'U16565ee5abb9acecbbaf08d123f06cd2')) {
-          debts = allDebts.filter(d => d.userId === 'U16565ee5abb9acecbbaf08d123f06cd2');
-        }
       }
 
       // อัปเดตข้อมูลโปรไฟล์ debtor ให้ตรงกับสัญญาที่ค้นพบ
@@ -154,10 +121,17 @@ async function getClientData(req, res) {
       payments = await sheetsService.getPaymentsByUserId(userId);
     }
 
+    // ป้องกันการรั่วไหลของข้อมูลอ่อนไหว (PDPA Compliance Data Masking)
+    const safeDebtor = debtor ? {
+      ...debtor,
+      idCardNumber: maskIdCard(debtor.idCardNumber),
+      phone: maskPhone(debtor.phone)
+    } : null;
+
     return res.status(200).json({
       success: true,
       data: {
-        debtor,
+        debtor: safeDebtor,
         activeDebt,
         debts,
         totalPrincipalAll,
@@ -203,8 +177,9 @@ async function uploadSlipWeb(req, res) {
       console.warn('Duplicate check warning:', checkErr.message);
     }
 
-    // แปลง base64 เป็น Buffer
+    // แปลง base64 เป็น Buffer และคำนวณ Hash
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const fileHash = computeImageHash(cleanBase64);
     const buffer = Buffer.from(cleanBase64, 'base64');
 
     // ค้นหาสัญญาหากไม่ได้ระบุมา
@@ -235,7 +210,8 @@ async function uploadSlipWeb(req, res) {
         amount: Number(amount) || 0,
         driveFileId: driveResult.fileId || '',
         slipViewUrl: driveResult.webViewLink || (driveResult.fileId ? `https://lh3.googleusercontent.com/d/${driveResult.fileId}` : ''),
-        uploadedAt: dayjs().format('YYYY-MM-DD HH:mm:ss')
+        uploadedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+        fileHash
       };
     } else {
       paymentRecord = await sheetsService.recordPayment({
@@ -244,7 +220,8 @@ async function uploadSlipWeb(req, res) {
         amount: amount ? Number(amount) : 0,
         driveFileId: driveResult?.fileId || '',
         slipViewUrl: driveResult?.webViewLink || (driveResult?.fileId ? `https://lh3.googleusercontent.com/d/${driveResult.fileId}` : ''),
-        adminNote: 'อัปโหลดผ่านเว็บ LIFF'
+        adminNote: 'อัปโหลดผ่านเว็บ LIFF',
+        fileHash
       });
     }
 

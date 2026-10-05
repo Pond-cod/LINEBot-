@@ -44,9 +44,9 @@ async function initializeLiff() {
     if (!liff.isLoggedIn()) {
       if (window.location.protocol === 'http:' && !liff.isInClient()) {
         console.warn('Cannot auto-login with LINE on HTTP localhost. Using demo offline mode.');
-        userNameEl.textContent = '😾POND-IT😸 (โหมดทดสอบ Local)';
-        userIdInput.value = 'U16565ee5abb9acecbbaf08d123f06cd2';
-        displayNameInput.value = '😾POND-IT😸';
+        userNameEl.textContent = 'ผู้ใช้งานทดสอบ (โหมด Local)';
+        userIdInput.value = 'U_DEMO_LOCAL_USER';
+        displayNameInput.value = 'ผู้ใช้งานทดสอบ';
         const today = new Date();
         today.setDate(today.getDate() + 30);
         document.getElementById('dueDate').value = today.toISOString().split('T')[0];

@@ -48,22 +48,27 @@ export async function adminFetch(url, options = {}) {
     }
   }
 
-  // ป้องกันการ throw Unexpected token เมื่อเซิร์ฟเวอร์คืน HTML หรือ Plain text 500 Error
-  const originalJson = res.json.bind(res);
+  // ป้องกันการ throw Unexpected token เมื่อเซิร์ฟเวอร์คืน HTML หรือ Plain text Error
+  const originalText = res.text.bind(res);
+  let cachedText = null;
+
+  res.text = async () => {
+    if (cachedText === null) {
+      cachedText = await originalText();
+    }
+    return cachedText;
+  };
+
   res.json = async () => {
+    const raw = await res.text();
     try {
-      return await originalJson();
+      return JSON.parse(raw);
     } catch (parseErr) {
-      try {
-        const text = await res.clone().text();
-        console.error(`Server returned non-JSON response from ${url}:`, text);
-        if (res.status >= 500) {
-          throw new Error(`เซิร์ฟเวอร์ทำงานผิดพลาด (${res.status}): ${text.slice(0, 120)}`);
-        }
-        throw new Error(`รูปแบบข้อมูลไม่ถูกต้อง (${res.status})`);
-      } catch (cloneErr) {
-        throw new Error(`การเชื่อมต่อเซิร์ฟเวอร์ผิดพลาด (${res.status})`);
+      console.error(`Server returned non-JSON response from ${url}:`, raw);
+      if (res.status >= 500) {
+        throw new Error(`เซิร์ฟเวอร์ทำงานผิดพลาด (${res.status}): ${raw.slice(0, 120)}`);
       }
+      throw new Error(`รูปแบบข้อมูลไม่ถูกต้อง (${res.status})`);
     }
   };
 

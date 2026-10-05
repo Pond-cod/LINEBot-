@@ -58,9 +58,56 @@ async function isUserAdmin(userId) {
   return { authorized: adminIds.includes(userId), isConfigured: true, adminCount: adminIds.length };
 }
 
+/**
+ * ตรวจสอบความถูกต้องของ LINE ID Token ผ่าน LINE OAuth2 Verify API
+ */
+async function verifyLineIdToken(idToken, expectedUserId = null) {
+  if (!idToken || typeof idToken !== 'string') return { valid: false, reason: 'Missing token' };
+  try {
+    const channelId = process.env.LINE_LOGIN_CHANNEL_ID || (process.env.LIFF_ID || '').split('-')[0];
+    const params = new URLSearchParams();
+    params.append('id_token', idToken);
+    if (channelId) params.append('client_id', channelId);
+
+    const res = await fetch('https://api.line.me/oauth2/v2.1/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+
+    if (!res.ok) return { valid: false, reason: 'LINE verify rejected' };
+    const data = await res.json();
+    if (expectedUserId && data.sub !== expectedUserId) {
+      return { valid: false, reason: 'User ID mismatch' };
+    }
+    return { valid: true, userId: data.sub, profile: data };
+  } catch (err) {
+    return { valid: false, reason: err.message };
+  }
+}
+
 async function requireAdminAuth(req, res, next) {
   try {
-    const userId = req.headers['x-line-userid'] || req.query.adminUserId || req.body?.adminUserId;
+    const adminKey = process.env.ADMIN_API_KEY;
+    const providedKey = req.headers['x-admin-key'] || (req.headers['authorization']?.startsWith('Bearer ') ? req.headers['authorization'].slice(7) : null);
+
+    // 1. ตรวจสอบผ่าน ADMIN_API_KEY (ถ้ามีการตั้งค่าไว้ใน .env)
+    if (adminKey && providedKey === adminKey) {
+      return next();
+    }
+
+    let userId = req.headers['x-line-userid'] || req.query.adminUserId || req.body?.adminUserId;
+    const authHeader = req.headers['authorization'];
+    const idToken = req.headers['x-line-id-token'] || (authHeader?.startsWith('Bearer ') && authHeader.slice(7) !== adminKey ? authHeader.slice(7) : null);
+
+    // 2. หากมี ID Token ส่งมา ให้ตรวจสอบความถูกต้องกับ LINE Platform
+    if (idToken) {
+      const verifyResult = await verifyLineIdToken(idToken, userId);
+      if (verifyResult.valid) {
+        userId = verifyResult.userId;
+      }
+    }
+
     const adminIds = await getAdminUserIds();
 
     // บล็อกเด็ดขาด หากไม่มีแอดมินในระบบ หรือ userId ไม่อยู่ในรายชื่อแอดมินที่ได้รับอนุญาต

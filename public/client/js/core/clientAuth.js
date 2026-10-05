@@ -149,8 +149,8 @@ export async function initLiffAuth() {
         if (window.location.protocol === 'http:' && !liff.isInClient()) {
           console.warn('Cannot auto-redirect to LINE Login on HTTP localhost. Using local client demo session.');
           store.setCurrentUser({
-            userId: 'U16565ee5abb9acecbbaf08d123f06cd2',
-            displayName: '😾POND-IT😸 (โหมดทดสอบ Local)',
+            userId: 'U_DEMO_CLIENT',
+            displayName: 'ผู้ใช้งานทดสอบ (โหมด Local)',
             pictureUrl: DEFAULT_AVATAR
           });
           setLoginUiState(false);

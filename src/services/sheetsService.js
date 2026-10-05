@@ -19,7 +19,7 @@ const SHEET_NAMES = {
 const HEADERS = {
   [SHEET_NAMES.DEBTORS]: ['userId', 'displayName', 'fullName', 'phone', 'idCardNumber', 'registeredAt', 'status', 'reminderProfileId', 'reminderEnabled', 'pdpaConsent', 'pdpaConsentAt'],
   [SHEET_NAMES.DEBTS]: ['debtId', 'userId', 'totalAmount', 'installmentAmount', 'remainingBalance', 'dueDate', 'cycleDays', 'debtStatus', 'createdAt', 'updatedAt', 'reminderProfileId', 'reminderEnabled'],
-  [SHEET_NAMES.PAYMENTS]: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote', 'receiptNo', 'approvedBy', 'approvedAt'],
+  [SHEET_NAMES.PAYMENTS]: ['paymentId', 'debtId', 'userId', 'amount', 'driveFileId', 'slipViewUrl', 'uploadedAt', 'verificationStatus', 'adminNote', 'receiptNo', 'approvedBy', 'approvedAt', 'fileHash'],
   [SHEET_NAMES.REMINDER_LOGS]: ['logId', 'debtId', 'userId', 'reminderType', 'sentAt', 'status'],
   [SHEET_NAMES.ADMINS]: ['userId', 'displayName', 'role', 'phone', 'note', 'createdAt', 'status'],
   [SHEET_NAMES.REMINDER_PROFILES]: ['profileId', 'name', 'frequencyType', 'scheduleConfig', 'primaryTime', 'secondaryTime', 'rulesConfig', 'templateConfig', 'isDefault', 'status', 'createdAt', 'updatedAt'],
@@ -361,11 +361,11 @@ async function getAllDebtors() {
 /**
  * บันทึกการส่งสลิปชำระเงิน
  */
-async function recordPayment({ debtId, userId, amount = 0, driveFileId, slipViewUrl, adminNote = '' }) {
+async function recordPayment({ debtId, userId, amount = 0, driveFileId, slipViewUrl, adminNote = '', fileHash = '' }) {
   cache.delByPattern(/^(payments_|debts_)/);
 
   if (isGasConfigured()) {
-    const res = await callGas('recordPayment', { debtId, userId, amount, driveFileId, slipViewUrl, adminNote });
+    const res = await callGas('recordPayment', { debtId, userId, amount, driveFileId, slipViewUrl, adminNote, fileHash });
     cache.delByPattern(/^(payments_|debts_)/);
     return res;
   }
@@ -377,7 +377,7 @@ async function recordPayment({ debtId, userId, amount = 0, driveFileId, slipView
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: `${SHEET_NAMES.PAYMENTS}!A:I`,
+    range: `${SHEET_NAMES.PAYMENTS}!A:M`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[
@@ -389,13 +389,17 @@ async function recordPayment({ debtId, userId, amount = 0, driveFileId, slipView
         slipViewUrl || '',
         now,
         'PENDING',
-        adminNote
+        adminNote,
+        '',
+        '',
+        '',
+        fileHash || ''
       ]]
     }
   });
 
   cache.delByPattern(/^(payments_|debts_)/);
-  return { paymentId, debtId, userId, slipViewUrl, uploadedAt: now, amount };
+  return { paymentId, debtId, userId, slipViewUrl, uploadedAt: now, amount, fileHash };
 }
 
 /**
@@ -455,7 +459,11 @@ async function getAllPayments() {
                 slipViewUrl: clean[5] || (clean[4] ? `https://lh3.googleusercontent.com/d/${clean[4]}` : ''),
                 uploadedAt: clean[6] || '',
                 verificationStatus: clean[7] || 'PENDING',
-                adminNote: clean[8] || ''
+                adminNote: clean[8] || '',
+                receiptNo: clean[9] || '',
+                approvedBy: clean[10] || '',
+                approvedAt: clean[11] || '',
+                fileHash: clean[12] || ''
               });
             }
           }
@@ -488,7 +496,7 @@ async function getAllPayments() {
   if (sheets && sheetId) {
     try {
       const [paymentsRes, debtorsRes] = await Promise.all([
-        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.PAYMENTS}!A2:I` }),
+        sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.PAYMENTS}!A2:M` }),
         sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${SHEET_NAMES.DEBTORS}!A2:G` })
       ]);
 
@@ -505,11 +513,15 @@ async function getAllPayments() {
         debtorName: debtorMap.get(r[2])?.name || 'ลูกค้า',
         debtorPhone: debtorMap.get(r[2])?.phone || '',
         amount: Number(r[3]) || 0,
-        driveFileId: r[4],
+        driveFileId: r[4] || '',
         slipViewUrl: r[5] || (r[4] ? `https://lh3.googleusercontent.com/d/${r[4]}` : ''),
-        uploadedAt: r[6],
+        uploadedAt: r[6] || '',
         verificationStatus: r[7] || 'PENDING',
-        adminNote: r[8] || ''
+        adminNote: r[8] || '',
+        receiptNo: r[9] || '',
+        approvedBy: r[10] || '',
+        approvedAt: r[11] || '',
+        fileHash: r[12] || ''
       })).reverse();
 
       if (result.length > 0) {

@@ -56,37 +56,36 @@ async function verifySlipWithProvider({ imageBase64, expectedAmount, targetBankA
   }
 
   try {
-    // โครงสร้างมาตรฐานสำหรับเรียก EasySlip หรือ SlipOK API
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-    // ตัวอย่างการเรียก SlipOK / EasySlip API (ถ้าผู้ใช้ใส่คีย์)
-    /*
-    const response = await fetch('https://api.slipok.com/api/line/apikey/' + apiKey, {
+    const response = await fetch(`https://api.slipok.com/api/line/apikey/${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         data: cleanBase64,
-        amount: expectedAmount
+        amount: expectedAmount ? Number(expectedAmount) : undefined
       })
     });
+
     const result = await response.json();
-    if (result.success && result.data.success) {
+    if (result.success && result.data && result.data.success) {
       return {
         configured: true,
         verified: true,
         transactionId: result.data.transRef,
         amount: result.data.amount,
         sender: result.data.sender,
-        receiver: result.data.receiver
+        receiver: result.data.receiver,
+        transTimestamp: result.data.transTimestamp || result.data.transDate,
+        message: 'ตรวจสอบสลิปผ่านระบบ SlipOK เรียบร้อยแล้ว'
       };
     }
-    */
 
     return {
       configured: true,
       verified: false,
       manualReviewRequired: true,
-      message: 'ตรวจสอบข้อมูลสลิปเรียบร้อย ส่งให้เจ้าหน้าที่ตรวจสอบขั้นสุดท้าย'
+      message: result.message || 'ไม่สามารถยืนยันสลิปอัตโนมัติได้ กรุณาให้เจ้าหน้าที่ตรวจสอบ'
     };
   } catch (error) {
     console.error('Slip Verification API error:', error.message);
