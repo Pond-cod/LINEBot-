@@ -21,7 +21,7 @@ async function handleWebhookEvent(event) {
   if (event.type === 'follow') {
     const profile = await lineService.getProfile(userId);
     const displayName = profile?.displayName || 'ผู้ใช้งาน';
-    const liffUrl = `https://liff.line.me/${process.env.LIFF_ID}`;
+    const liffUrl = 'https://lineautomatic.vercel.app/client/#';
 
     const welcomeMsg = createWelcomeFlex({ displayName, liffUrl });
     return await lineService.replyMessage(replyToken, welcomeMsg);
@@ -136,13 +136,13 @@ async function handleWebhookEvent(event) {
         } else {
           return await lineService.replyMessage(replyToken, {
             type: 'text',
-            text: `ไม่พบข้อมูลสัญญาหนี้ที่กำลังเปิดใช้งานของคุณในระบบครับ 📋\n\nหากต้องการลงทะเบียนหรือบันทึกข้อมูล สามารถเปิดฟอร์มได้ที่: https://liff.line.me/${process.env.LIFF_ID}`
+            text: `ไม่พบข้อมูลสัญญาหนี้ที่กำลังเปิดใช้งานของคุณในระบบครับ 📋\n\nหากต้องการลงทะเบียนหรือบันทึกข้อมูล สามารถเปิดฟอร์มได้ที่: https://lineautomatic.vercel.app/client/#`
           });
         }
       }
 
       if (['ส่งสลิป', 'แนบสลิป', 'ส่งรูปสลิป', 'แจ้งโอน', 'แนบรูป'].some(kw => text.includes(kw))) {
-        const liffUrl = `https://liff.line.me/${process.env.LIFF_ID || ''}`;
+        const liffUrl = 'https://lineautomatic.vercel.app/client/#';
         return await lineService.replyMessage(replyToken, {
           type: 'text',
           text: `📸 คุณสามารถถ่ายภาพหรือแนบรูปสลิปส่งเข้ามาในแชทนี้ได้เลยครับ ระบบจะบันทึกเข้า Google Drive และตัดยอดให้อัตโนมัติครับ ✨\n\nหรือกดส่งและตรวจสอบยอดผ่านระบบได้ที่:\n${liffUrl}`
@@ -190,7 +190,7 @@ async function handleWebhookEvent(event) {
       }
 
       if (['ลงทะเบียน', 'กรอกข้อมูล', 'ฟอร์ม'].some(kw => text.includes(kw))) {
-        const liffUrl = `https://liff.line.me/${process.env.LIFF_ID}`;
+        const liffUrl = 'https://lineautomatic.vercel.app/client/#';
         return await lineService.replyMessage(replyToken, {
           type: 'text',
           text: `📝 คุณสามารถเปิดฟอร์มลงทะเบียนและจัดการข้อมูลได้ที่ลิงก์นี้ครับ:\n${liffUrl}`

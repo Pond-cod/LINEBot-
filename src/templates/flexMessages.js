@@ -228,7 +228,7 @@ function createReminderFlex({
             action: {
               type: 'uri',
               label: '📱 เปิดหน้าลูกหนี้',
-              uri: liffUrl || (process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/#')
+              uri: (liffUrl && liffUrl.includes('/client')) ? liffUrl : 'https://lineautomatic.vercel.app/client/#'
             }
           },
           {
@@ -470,7 +470,7 @@ function createDebtSummaryFlex({
             action: {
               type: 'uri',
               label: '📱 เปิดหน้าลูกหนี้',
-              uri: liffUrl || (process.env.LIFF_ID ? `https://liff.line.me/${process.env.LIFF_ID}` : 'https://lineautomatic.vercel.app/client/')
+              uri: (liffUrl && liffUrl.includes('/client')) ? liffUrl : 'https://lineautomatic.vercel.app/client/#'
             }
           }
         ]
@@ -783,7 +783,7 @@ function createNewContractFlex({
   cycleDays = 30,
   liffUrl = ''
 }) {
-  const targetLiffUrl = liffUrl || `https://liff.line.me/${process.env.LIFF_ID || ''}`;
+  const targetLiffUrl = (liffUrl && liffUrl.includes('/client')) ? liffUrl : 'https://lineautomatic.vercel.app/client/#';
 
   return {
     type: 'flex',

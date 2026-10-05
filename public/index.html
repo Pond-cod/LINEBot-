@@ -9,7 +9,18 @@
   <script>
     (function() {
       try {
-        const search = window.location.search;
+        const ua = navigator.userAgent || '';
+        const search = window.location.search || '';
+        const hash = window.location.hash || '';
+        const isLineApp = /Line\//i.test(ua) || /LIFF/i.test(ua);
+        const isAdminRequested = search.includes('admin') || hash.includes('admin');
+
+        // หากเปิดเข้ามาจากแอป LINE (ผู้ใช้ลูกหนี้) และไม่ได้ระบุว่าต้องการเข้าหน้า admin ให้วิ่งไปหน้าลูกหนี้ (/client/) ทันที
+        if (isLineApp && !isAdminRequested) {
+          window.location.replace('/client/' + search + hash);
+          return;
+        }
+
         if (!search) return;
         const urlParams = new URLSearchParams(search);
         const liffState = urlParams.get('liff.state') || urlParams.get('liffRedirectUri');
